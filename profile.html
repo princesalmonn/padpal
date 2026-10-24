@@ -664,7 +664,9 @@
     if (!tapTwice('remove', 'Tap again to remove this photo')) return;
     var r = await db.from('pinned_photos').delete().eq('id', viewing.id);
     if (r.error) return toast(PadPal.friendlyError(r.error));
-    db.storage.from('photos').remove([viewing.path]);
+    // keep the file if a live 24h post still shows it (the post's cleanup removes it later)
+    var live = await db.from('posts').select('id').eq('photo_path', viewing.path).limit(1);
+    if (!live.data || !live.data.length) db.storage.from('photos').remove([viewing.path]);
     $('viewer').classList.remove('open');
     await loadPins();
     toast('🗑️ Photo removed');

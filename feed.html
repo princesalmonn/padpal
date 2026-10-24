@@ -18,59 +18,38 @@
   .story { border: 0; background: none; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 66px; flex-shrink: 0; }
   .ring { width: 64px; height: 64px; border-radius: 50%; padding: 3px; background: linear-gradient(135deg, var(--primary), var(--accent), var(--gold)); }
   .ring.seen { background: var(--line); }
-  .ring .avatar { width: 100%; height: 100%; border: 3px solid var(--bg); font-size: 20px; }
+  .ring .avatar { width: 100%; height: 100%; border: 3px solid var(--bg); font-size: 20px; overflow: hidden; }
   .story small { font-size: 11px; color: var(--text-2); max-width: 66px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .story .add { position: relative; }
   .story .add::after {
     content: "+"; position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; border-radius: 50%;
     background: var(--primary); color: #fff; border: 2px solid var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 15px; line-height: 1;
   }
+  .avatar { overflow: hidden; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 
   /* Post */
-  .post-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .post-text { margin: 0 0 4px; line-height: 1.45; font-size: 15px; }
-  .actions { display: flex; gap: 18px; margin-top: 12px; color: var(--text-2); font-size: 14px; }
+  .post-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
+  .post-head .user { min-width: 0; }
+  .more { border: 0; background: none; color: var(--text-2); font-size: 18px; padding: 4px 8px; }
+  .post-text { margin: 0 0 4px; line-height: 1.45; font-size: 15px; white-space: pre-wrap; word-wrap: break-word; }
+  .actions { display: flex; gap: 18px; margin-top: 12px; color: var(--text-2); font-size: 14px; flex-wrap: wrap; }
   .actions button { border: 0; background: none; padding: 4px 0; color: inherit; display: flex; align-items: center; gap: 5px; }
   .actions button.liked { color: var(--primary); font-weight: 700; }
   .actions .heart { display: inline-block; transition: transform .15s; }
   .actions .liked .heart { transform: scale(1.25); }
 
-  /* Match result */
-  .match { background: var(--card-2); border-radius: 12px; padding: 10px 12px; }
-  .team { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
-  .team + .team { border-top: 1px solid var(--line); }
-  .team .players { font-size: 14px; }
-  .team.win .players { font-weight: 700; }
-  .sets { display: flex; gap: 12px; font-variant-numeric: tabular-nums; font-weight: 700; }
-  .team:not(.win) .sets { color: var(--text-2); font-weight: 500; }
-  .result { display: flex; justify-content: space-between; margin-top: 10px; font-size: 13px; gap: 8px; flex-wrap: wrap; }
-
-  /* Americano session leaderboard */
-  .podium { background: var(--card-2); border-radius: 12px; padding: 4px 12px; }
-  .podium .row { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; }
-  .podium .row + .row { border-top: 1px solid var(--line); }
-  .podium .pos { width: 22px; text-align: center; }
-  .podium .pts { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
-
-  /* Rank up / down announcement */
-  .announce { text-align: center; padding: 18px 14px; }
-  .announce.up { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, var(--card)), var(--card)); }
-  .announce.down { background: linear-gradient(160deg, color-mix(in srgb, var(--loss) 18%, var(--card)), var(--card)); }
-  .announce .big { font-size: 40px; }
-  .announce h4 { margin: 6px 0 4px; font-size: 17px; }
-  .announce p { margin: 0; color: var(--text-2); font-size: 13px; }
-  .tier-change { display: inline-flex; align-items: center; gap: 8px; margin: 10px 0 2px; font-weight: 700; font-size: 14px; }
-
-  /* Photo post (fake photo for now) */
-  .photo {
-    position: relative; aspect-ratio: 4 / 5; border-radius: 12px; overflow: hidden;
-    display: grid; place-items: center; font-size: 72px; margin: 0 -2px;
-  }
+  /* Photo post */
+  .photo { position: relative; border-radius: 12px; overflow: hidden; background: var(--card-2); margin-top: 8px; }
+  .photo img { width: 100%; display: block; max-height: 70vh; object-fit: cover; }
   .timer {
     position: absolute; top: 10px; right: 10px; font-size: 12px; font-weight: 600;
     background: rgba(0,0,0,.55); color: #fff; padding: 4px 10px; border-radius: 999px;
   }
   .timer.pinned { background: var(--gold); color: #1C1F24; }
+
+  .empty-feed { text-align: center; padding: 40px 16px; color: var(--text-2); }
+  .empty-feed .big { font-size: 48px; }
 
   /* Story viewer (full screen) */
   .viewer {
@@ -78,26 +57,27 @@
     display: none; flex-direction: column; max-width: 440px; margin: 0 auto;
   }
   .viewer.open { display: flex; }
-  .viewer .bar { height: 3px; background: rgba(255,255,255,.3); margin: calc(10px + env(safe-area-inset-top)) 12px 0; border-radius: 2px; overflow: hidden; }
-  .viewer .bar i { display: block; height: 100%; width: 0; background: #fff; }
-  .viewer.open .bar i { animation: fill 5s linear forwards; }
-  @keyframes fill { to { width: 100%; } }
-  .viewer .vhead { display: flex; align-items: center; gap: 10px; padding: 12px; }
+  .viewer .vhead { display: flex; align-items: center; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) 12px 12px; }
   .viewer .vhead .avatar { width: 34px; height: 34px; color: var(--text); }
-  .viewer .close { margin-left: auto; border: 0; background: none; color: #fff; font-size: 26px; }
-  .viewer .vphoto { flex: 1; display: grid; place-items: center; font-size: 110px; margin: 0 12px; border-radius: 16px; }
-  .viewer .vfoot { padding: 14px 12px calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
+  .viewer .close { margin-left: auto; border: 0; background: none; color: #fff; font-size: 30px; }
+  .viewer .vphoto { flex: 1; display: grid; place-items: center; margin: 0 12px; min-height: 0; }
+  .viewer .vphoto img { max-width: 100%; max-height: 100%; border-radius: 16px; }
+  .viewer .vcap { padding: 10px 14px 0; font-size: 15px; white-space: pre-wrap; }
+  .viewer .vfoot { padding: 12px 12px calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
 
-  /* Comments sheet */
+  /* Comments + compose sheets */
   .comment { display: flex; gap: 10px; padding: 8px 0; font-size: 14px; }
   .comment .avatar { width: 32px; height: 32px; font-size: 13px; }
   .comment b { margin-right: 4px; }
+  .comment .when { font-size: 11px; color: var(--text-2); }
   .comment-box { display: flex; gap: 8px; margin-top: 10px; }
   .comment-box input {
     flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--card-2); color: var(--text);
     border-radius: 999px; padding: 10px 14px; font: inherit; font-size: 16px; outline: none;
   }
   .comment-box input:focus { border-color: var(--accent); }
+  textarea.input { resize: none; font-family: inherit; }
+  .preview { width: 100%; max-height: 40vh; object-fit: cover; border-radius: 12px; margin-bottom: 12px; display: block; }
 
   /* "New" menu */
   .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -111,18 +91,18 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="logo"><span>Pad</span><b>Pal</b></div>
-    <button class="icon-btn" id="bell" aria-label="Notifications">🔔<i class="dot"></i></button>
+    <button class="icon-btn" data-soon="Notifications" aria-label="Notifications">🔔</button>
   </div>
 </header>
 
 <main class="wrap">
-  <div class="sample-note">🧪 Sample posts for now. Real posts, photos and likes are coming soon.</div>
   <div class="stories" id="stories"></div>
-  <div id="feed"></div>
+  <div class="error-box" id="feedError" role="alert" hidden></div>
+  <div id="feed"><div class="empty-feed">Loading…</div></div>
 </main>
 
 <!-- Bottom tab bar -->
-<button class="fab" id="fab" aria-label="New">+</button>
+<button class="fab" id="fab" aria-label="New post">+</button>
 <nav class="tabbar">
   <div class="tabs">
     <a class="on" href="feed.html"><span>🏠</span>Feed</a>
@@ -133,38 +113,55 @@
   </div>
 </nav>
 
+<input type="file" id="photoInput" accept="image/*" hidden>
+
 <!-- Pop-ups -->
 <div class="backdrop" id="backdrop"></div>
+
+<div class="sheet" id="newSheet">
+  <div class="grab"></div>
+  <h3>Create</h3>
+  <div class="menu">
+    <button data-new="photo"><span>📷</span>Photo<small>Gone in 24h unless pinned</small></button>
+    <button data-new="text"><span>✏️</span>Text post<small>Stays forever</small></button>
+    <button data-soon="Logging matches"><span>🎾</span>Log a match<small>Coming in Stage 2</small></button>
+    <button data-soon="Open games"><span>📣</span>Open game<small>Coming soon</small></button>
+  </div>
+</div>
+
+<div class="sheet" id="composeSheet">
+  <div class="grab"></div>
+  <h3 id="composeTitle">New post</h3>
+  <form id="composeForm">
+    <img class="preview" id="composePreview" alt="" hidden>
+    <div class="field">
+      <label for="composeText" id="composeLabel">What's up?</label>
+      <textarea class="input" id="composeText" rows="3" maxlength="500"></textarea>
+      <small><span id="composeCount">0</span> / 500</small>
+    </div>
+    <p class="meta" id="composeNote" style="margin:0 0 12px" hidden>⏳ This photo disappears after 24 hours. You can pin it to your profile to keep it.</p>
+    <button class="btn btn-primary" id="composeBtn" style="width:100%">Post</button>
+  </form>
+</div>
 
 <div class="sheet" id="commentsSheet">
   <div class="grab"></div>
   <h3>Comments</h3>
   <div id="commentList"></div>
   <form class="comment-box" id="commentForm">
-    <input id="commentInput" placeholder="Add a comment…" autocomplete="off">
+    <input id="commentInput" placeholder="Add a comment…" autocomplete="off" maxlength="300">
     <button class="btn btn-primary" style="padding:10px 16px">Send</button>
   </form>
 </div>
 
-<div class="sheet" id="newSheet">
-  <div class="grab"></div>
-  <h3>Create</h3>
-  <div class="menu">
-    <button data-soon="Photo posts"><span>📷</span>Photo<small>Gone in 24h unless pinned</small></button>
-    <button data-soon="Text posts"><span>✏️</span>Text post<small>Stays forever</small></button>
-    <button data-soon="Logging matches"><span>🎾</span>Log a match<small>Earn points</small></button>
-    <button data-soon="Open games"><span>📣</span>Open game<small>"Need 1 more!"</small></button>
-  </div>
-</div>
-
 <div class="viewer" id="viewer">
-  <div class="bar"><i></i></div>
   <div class="vhead">
     <div class="avatar" id="vAvatar"></div>
     <div><div class="name" id="vName"></div><div style="font-size:12px;opacity:.7" id="vAgo"></div></div>
     <button class="close" id="vClose" aria-label="Close">×</button>
   </div>
-  <div class="vphoto" id="vPhoto"></div>
+  <div class="vphoto"><img id="vImg" alt=""></div>
+  <div class="vcap" id="vCap"></div>
   <div class="vfoot">
     <span id="vLeft"></span>
     <button class="btn btn-accent" id="vPin" style="padding:8px 14px;font-size:13px">📌 Pin to profile</button>
@@ -174,231 +171,321 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  // ===== Fake data (later this comes from the real database) =====
-  var TIERS = {
-    first: '🐣 First Timer', newbie: '🌱 Newbie', beginner: '🎾 Beginner',
-    amateur: '⚡ Amateur', junior: '🥉 Junior', pro: '🥈 Pro'
-  };
-
-  var stories = [
-    { user: 'rio_padel',  initial: 'R', hoursLeft: 18, art: '🎾', bg: 'linear-gradient(160deg,#B3261E,#D9822B)' },
-    { user: 'sari.vibora', initial: 'S', hoursLeft: 9,  art: '🏆', bg: 'linear-gradient(160deg,#C9A24A,#7A1712)' },
-    { user: 'andi',       initial: 'A', hoursLeft: 5,  art: '🥵', bg: 'linear-gradient(160deg,#4F7CAC,#24272D)' },
-    { user: 'budi_lob',   initial: 'B', hoursLeft: 2,  art: '🍻', bg: 'linear-gradient(160deg,#D9822B,#2E323A)', seen: true },
-    { user: 'maya',       initial: 'M', hoursLeft: 1,  art: '📸', bg: 'linear-gradient(160deg,#7E6AA8,#B3261E)', seen: true }
-  ];
-
-  var posts = [
-    { type: 'rankup', user: 'sari.vibora', initial: 'S', ago: '20m',
-      from: TIERS.newbie, to: TIERS.beginner, points: 204, likes: 18, comments: [
-        { user: 'rio_padel', initial: 'R', text: 'Monster víbora today 🔥' }] },
-
-    { type: 'americano', user: 'rio_padel', initial: 'R', tier: TIERS.amateur, ago: '2h',
-      title: 'Saturday Americano · 8 players · 32 pts',
-      ranking: [ ['🥇', 'Rio', 112], ['🥈', 'Sari', 104], ['🥉', 'Maya', 97], ['4', 'Andi', 90] ],
-      likes: 12, comments: [] },
-
-    { type: 'photo', user: 'maya', initial: 'M', tier: TIERS.beginner, ago: '3h',
-      text: 'Sunset session with the crew 🌅', art: '🌅', bg: 'linear-gradient(160deg,#D9822B,#B3261E 60%,#16181C)',
-      hoursLeft: 21, likes: 9, comments: [] },
-
-    { type: 'match', user: 'rio_padel', initial: 'R', tier: TIERS.amateur, ago: '5h',
-      place: 'Court 3',
-      winners: 'Rio & Sari', losers: 'Andi & Budi', sets: [[6, 4], [7, 5]],
-      change: 'Rio <span class="plus">+10</span> · Sari <span class="plus">+10</span>',
-      changeLose: 'Andi <span class="minus">−5</span> · Budi <span class="minus">−5</span>',
-      likes: 7, comments: [ { user: 'andi', initial: 'A', text: 'Rematch. Tomorrow. 😤' } ] },
-
-    { type: 'rankdown', user: 'budi_lob', initial: 'B', ago: '8h',
-      from: TIERS.beginner, to: TIERS.newbie, reason: "Didn't play for 3 weeks 🧊", likes: 24, comments: [
-        { user: 'maya', initial: 'M', text: 'Not having fun = you are out 😂' },
-        { user: 'budi_lob', initial: 'B', text: 'I was on holiday!!' }] },
-
-    { type: 'text', user: 'andi', initial: 'A', tier: TIERS.beginner, ago: '1d',
-      text: 'Anyone up for Sunday 8am? Need 2 more 🙏', likes: 3, comments: [] },
-
-    { type: 'photo', user: 'sari.vibora', initial: 'S', tier: TIERS.beginner, ago: '2d',
-      text: 'First tournament medal 🥉', art: '🥉', bg: 'linear-gradient(160deg,#C9A24A,#24272D)',
-      pinned: true, likes: 31, comments: [] }
-  ];
+  var db = PadPal.db;
+  var profile = null;
+  var posts = [];
+  var urls = {};        // photo path → link we can show
+  var myPins = {};      // paths I've pinned to my profile
+  var seen = {};        // stories already opened
+  var commentsFor = null;
+  var compose = null;   // { kind, file }
+  var viewing = null;
 
   // ===== Helpers =====
   function $(id) { return document.getElementById(id); }
-
-  function escapeHtml(s) {
-    return s.replace(/[&<>"']/g, function (c) {
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
-
   var toastTimer;
   function toast(msg) {
     var t = $('toast');
     t.textContent = msg;
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2400);
+  }
+  function ago(iso) {
+    var mins = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    if (mins < 1440) return Math.round(mins / 60) + 'h ago';
+    if (mins < 10080) return Math.round(mins / 1440) + 'd ago';
+    return new Date(iso).toLocaleDateString();
+  }
+  function hoursLeft(iso) { return Math.max(1, Math.ceil((new Date(iso) - Date.now()) / 3600000)); }
+  function nameOf(a) { return a ? (a.display_name || a.username) : 'Someone'; }
+  function avatarHtml(a) {
+    var url = a && a.avatar_url && urls[a.avatar_url];
+    return url ? '<img src="' + url + '" alt="">' : esc(nameOf(a)[0].toUpperCase());
+  }
+  // "Are you sure?" without pop-ups: tap once to warn, again within 3s to do it
+  var armed = {};
+  function tapTwice(key, warning) {
+    if (armed[key]) { armed[key] = false; return true; }
+    armed[key] = true;
+    toast(warning);
+    setTimeout(function () { armed[key] = false; }, 3000);
+    return false;
+  }
+
+  // ===== Load =====
+  PadPal.me.then(async function (me) {
+    if (!me) return;
+    profile = me.profile;
+    await cleanupMyExpired();
+    load();
+  });
+
+  // Refresh when you come back to the app
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && profile) load();
+  });
+
+  async function load() {
+    var r = await db.from('posts')
+      .select('id, kind, body, photo_path, expires_at, created_at, author_id, author:profiles(id, username, display_name, avatar_url), likes(user_id), comments(count)')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (r.error) {
+      $('feed').innerHTML = '';
+      $('feedError').textContent = PadPal.friendlyError(r.error);
+      $('feedError').hidden = false;
+      return;
+    }
+    $('feedError').hidden = true;
+    posts = r.data.filter(function (p) { return !p.expires_at || new Date(p.expires_at) > Date.now(); });
+
+    var pr = await db.from('pinned_photos').select('path').eq('user_id', profile.id);
+    myPins = {};
+    (pr.data || []).forEach(function (p) { myPins[p.path] = true; });
+
+    var paths = [];
+    if (profile.avatar_url) paths.push(profile.avatar_url);
+    posts.forEach(function (p) {
+      if (p.photo_path) paths.push(p.photo_path);
+      if (p.author && p.author.avatar_url) paths.push(p.author.avatar_url);
+    });
+    paths = paths.filter(function (p, i) { return paths.indexOf(p) === i && !urls[p]; });
+    try { Object.assign(urls, await PadPal.photoUrls(paths)); } catch (err) {}
+
+    renderStories();
+    renderFeed();
+  }
+
+  // Photo posts older than 24h: delete them (and their file, unless pinned)
+  async function cleanupMyExpired() {
+    try {
+      var r = await db.from('posts').select('id, photo_path')
+        .eq('author_id', profile.id).lt('expires_at', new Date().toISOString());
+      if (!r.data || !r.data.length) return;
+      var pr = await db.from('pinned_photos').select('path').eq('user_id', profile.id);
+      var pinned = {};
+      (pr.data || []).forEach(function (p) { pinned[p.path] = true; });
+      var files = r.data.map(function (p) { return p.photo_path; }).filter(function (f) { return f && !pinned[f]; });
+      if (files.length) await db.storage.from('photos').remove(files);
+      await db.from('posts').delete().in('id', r.data.map(function (p) { return p.id; }));
+    } catch (err) { /* try again next time */ }
   }
 
   // ===== 24h photo row =====
   function renderStories() {
-    var html = '<button class="story" data-mine="1"><div class="ring seen add"><div class="avatar">Y</div></div><small>Your photo</small></button>';
-    stories.forEach(function (s, i) {
-      html += '<button class="story" data-story="' + i + '">' +
-        '<div class="ring' + (s.seen ? ' seen' : '') + '"><div class="avatar">' + s.initial + '</div></div>' +
-        '<small>' + s.user + '</small></button>';
+    var mine = { avatar_url: profile.avatar_url, display_name: profile.display_name, username: profile.username };
+    var html = '<button class="story" data-new="photo"><div class="ring seen add"><div class="avatar">' + avatarHtml(mine) + '</div></div><small>Your photo</small></button>';
+    posts.forEach(function (p) {
+      if (p.kind !== 'photo') return;
+      html += '<button class="story" data-story="' + p.id + '">' +
+        '<div class="ring' + (seen[p.id] ? ' seen' : '') + '"><div class="avatar">' + avatarHtml(p.author) + '</div></div>' +
+        '<small>' + esc(p.author ? p.author.username : '') + '</small></button>';
     });
     $('stories').innerHTML = html;
   }
 
   // ===== Posts =====
-  function postHead(p) {
-    return '<div class="post-head"><div class="user">' +
-      '<div class="avatar">' + p.initial + '</div>' +
-      '<div><div class="name">' + p.user + (p.tier ? ' <span class="pill">' + p.tier + '</span>' : '') + '</div>' +
-      '<div class="meta">' + (p.place ? p.place + ' · ' : '') + p.ago + ' ago</div></div>' +
-      '</div></div>';
-  }
-
-  function postActions(p, i) {
-    return '<div class="actions">' +
-      '<button class="' + (p.liked ? 'liked' : '') + '" data-like="' + i + '"><span class="heart">' + (p.liked ? '❤️' : '🤍') + '</span>' + p.likes + '</button>' +
-      '<button data-comments="' + i + '">💬 ' + p.comments.length + '</button>' +
-      (p.type === 'match' || p.type === 'americano' ? '<button data-soon="Shot ratings">🎾 Rate shots</button>' : '') +
+  function renderPost(p) {
+    var a = p.author || {};
+    var mine = p.author_id === profile.id;
+    var liked = p.likes.some(function (l) { return l.user_id === profile.id; });
+    var nComments = p.comments && p.comments[0] ? p.comments[0].count : 0;
+    var html = '<article class="card">' +
+      '<div class="post-head"><div class="user"><div class="avatar">' + avatarHtml(a) + '</div>' +
+      '<div style="min-width:0"><div class="name">' + esc(nameOf(a)) + '</div>' +
+      '<div class="meta">@' + esc(a.username) + ' · ' + ago(p.created_at) + '</div></div></div>' +
+      (mine || profile.is_admin ? '<button class="more" data-delete="' + p.id + '" aria-label="Delete post">🗑️</button>' : '') +
       '</div>';
-  }
-
-  function renderPost(p, i) {
-    var body = '';
-    if (p.type === 'rankup' || p.type === 'rankdown') {
-      var up = p.type === 'rankup';
-      return '<article class="card announce ' + (up ? 'up' : 'down') + '">' +
-        '<div class="big">' + (up ? '🎉' : '😱') + '</div>' +
-        '<h4>' + p.user + (up ? ' ranked up!' : ' dropped a tier!') + '</h4>' +
-        '<div class="tier-change"><span class="pill">' + p.from + '</span>→<span class="pill">' + p.to + '</span></div>' +
-        '<p>' + (up ? p.points + ' points · keep grinding 💪' : p.reason) + '</p>' +
-        '<div style="display:flex;justify-content:center">' + postActions(p, i) + '</div>' +
-        '</article>';
+    if (p.body) html += '<p class="post-text">' + esc(p.body) + '</p>';
+    if (p.kind === 'photo') {
+      var pinned = mine && myPins[p.photo_path];
+      html += '<button class="photo" data-story="' + p.id + '" style="border:0;padding:0;width:100%;display:block">' +
+        (urls[p.photo_path] ? '<img src="' + urls[p.photo_path] + '" alt="" loading="lazy">' : '<div style="padding:60px 0">📷</div>') +
+        (pinned ? '<span class="timer pinned">📌 Pinned</span>' : '<span class="timer">⏳ ' + hoursLeft(p.expires_at) + 'h left</span>') +
+        '</button>';
     }
-    if (p.type === 'match') {
-      body = '<div class="match">' +
-        '<div class="team win"><div class="players">🏆 ' + p.winners + '</div><div class="sets">' + p.sets.map(function (s) { return '<span>' + s[0] + '</span>'; }).join('') + '</div></div>' +
-        '<div class="team"><div class="players">' + p.losers + '</div><div class="sets">' + p.sets.map(function (s) { return '<span>' + s[1] + '</span>'; }).join('') + '</div></div>' +
-        '</div>' +
-        '<div class="result"><span>' + p.change + '</span><span>' + p.changeLose + '</span></div>';
-    }
-    if (p.type === 'americano') {
-      body = '<p class="post-text" style="font-weight:600">' + p.title + '</p><div class="podium">' +
-        p.ranking.map(function (r) {
-          return '<div class="row"><span class="pos">' + r[0] + '</span><span>' + r[1] + '</span><span class="pts">' + r[2] + ' pts</span></div>';
-        }).join('') + '</div>';
-    }
-    if (p.type === 'photo') {
-      body = '<p class="post-text">' + p.text + '</p>' +
-        '<div class="photo" style="background:' + p.bg + '">' + p.art +
-        (p.pinned ? '<span class="timer pinned">📌 Pinned</span>' : '<span class="timer">⏳ ' + p.hoursLeft + 'h left</span>') +
-        '</div>';
-    }
-    if (p.type === 'text') {
-      body = '<p class="post-text">' + p.text + '</p>';
-    }
-    return '<article class="card">' + postHead(p) + body + postActions(p, i) + '</article>';
+    html += '<div class="actions">' +
+      '<button class="' + (liked ? 'liked' : '') + '" data-like="' + p.id + '"><span class="heart">' + (liked ? '❤️' : '🤍') + '</span>' + p.likes.length + '</button>' +
+      '<button data-comments="' + p.id + '">💬 ' + nComments + '</button>' +
+      (mine && p.kind === 'photo' && !myPins[p.photo_path] ? '<button data-pin="' + p.id + '">📌 Pin to profile</button>' : '') +
+      '</div></article>';
+    return html;
   }
 
   function renderFeed() {
-    $('feed').innerHTML = posts.map(renderPost).join('');
+    $('feed').innerHTML = posts.length
+      ? posts.map(renderPost).join('')
+      : '<div class="empty-feed"><div class="big">🎾</div><p><b>No posts yet.</b></p><p>Be the first! Tap the <b>+</b> button to post a photo or a message.</p></div>';
   }
 
-  // ===== Pop-up sheets =====
-  var openSheetEl = null;
-  function openSheet(el) {
-    openSheetEl = el;
-    el.classList.add('open');
-    $('backdrop').classList.add('open');
-  }
-  function closeSheet() {
-    if (openSheetEl) openSheetEl.classList.remove('open');
-    openSheetEl = null;
-    $('backdrop').classList.remove('open');
-  }
-  $('backdrop').addEventListener('click', closeSheet);
+  function findPost(id) { return posts.filter(function (p) { return p.id === id; })[0]; }
 
-  // Comments
-  var commentsFor = null;
-  function renderComments() {
-    var list = posts[commentsFor].comments;
-    $('commentList').innerHTML = list.length
-      ? list.map(function (c) {
-          return '<div class="comment"><div class="avatar">' + c.initial + '</div><div><b>' + c.user + '</b>' + escapeHtml(c.text) + '</div></div>';
+  // ===== Likes =====
+  async function toggleLike(id) {
+    var p = findPost(id);
+    var liked = p.likes.some(function (l) { return l.user_id === profile.id; });
+    // update the screen first, then save
+    if (liked) p.likes = p.likes.filter(function (l) { return l.user_id !== profile.id; });
+    else p.likes.push({ user_id: profile.id });
+    renderFeed();
+    var r = liked
+      ? await db.from('likes').delete().eq('post_id', id).eq('user_id', profile.id)
+      : await db.from('likes').insert({ post_id: id });
+    if (r.error) { toast(PadPal.friendlyError(r.error)); load(); }
+  }
+
+  // ===== Comments =====
+  async function openComments(id) {
+    commentsFor = id;
+    $('commentList').innerHTML = '<p class="meta">Loading…</p>';
+    openSheet($('commentsSheet'));
+    await renderComments();
+  }
+  async function renderComments() {
+    var r = await db.from('comments')
+      .select('id, body, created_at, author:profiles(username, display_name, avatar_url)')
+      .eq('post_id', commentsFor).order('created_at');
+    if (r.error) { $('commentList').innerHTML = '<p class="meta">' + esc(PadPal.friendlyError(r.error)) + '</p>'; return; }
+    var paths = r.data.map(function (c) { return c.author && c.author.avatar_url; }).filter(function (x) { return x && !urls[x]; });
+    try { Object.assign(urls, await PadPal.photoUrls(paths)); } catch (err) {}
+    $('commentList').innerHTML = r.data.length
+      ? r.data.map(function (c) {
+          return '<div class="comment"><div class="avatar">' + avatarHtml(c.author) + '</div>' +
+            '<div><b>' + esc(c.author ? c.author.username : '') + '</b>' + esc(c.body) +
+            '<div class="when">' + ago(c.created_at) + '</div></div></div>';
         }).join('')
       : '<p class="meta">No comments yet. Be the first! 🎾</p>';
   }
-  $('commentForm').addEventListener('submit', function (e) {
+  $('commentForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     var text = $('commentInput').value.trim();
     if (!text) return;
-    posts[commentsFor].comments.push({ user: 'you', initial: 'Y', text: text });
     $('commentInput').value = '';
+    var r = await db.from('comments').insert({ post_id: commentsFor, body: text });
+    if (r.error) return toast(PadPal.friendlyError(r.error));
+    var p = findPost(commentsFor);
+    if (p) { p.comments = [{ count: (p.comments[0] ? p.comments[0].count : 0) + 1 }]; renderFeed(); }
     renderComments();
-    renderFeed();
   });
 
-  // Story viewer
-  var viewerTimer;
-  function openStory(i) {
-    var s = stories[i];
-    $('vAvatar').textContent = s.initial;
-    $('vName').textContent = s.user;
-    $('vAgo').textContent = (24 - s.hoursLeft) + 'h ago';
-    $('vPhoto').textContent = s.art;
-    $('vPhoto').style.background = s.bg;
-    $('vLeft').textContent = '⏳ Disappears in ' + s.hoursLeft + 'h';
-    $('vPin').style.display = 'none'; // only the owner can pin their own photo
-    var v = $('viewer');
-    v.classList.remove('open'); void v.offsetWidth; // restart the progress bar
-    v.classList.add('open');
-    s.seen = true;
-    clearTimeout(viewerTimer);
-    viewerTimer = setTimeout(closeStory, 5000);
+  // ===== New posts =====
+  function startCompose(kind, file) {
+    compose = { kind: kind, file: file };
+    $('composeTitle').textContent = kind === 'photo' ? 'New photo' : 'New post';
+    $('composeLabel').textContent = kind === 'photo' ? 'Caption (optional)' : "What's up?";
+    $('composeText').value = '';
+    $('composeText').required = kind === 'text';
+    $('composeCount').textContent = '0';
+    $('composeNote').hidden = kind !== 'photo';
+    if (file) { $('composePreview').src = URL.createObjectURL(file); $('composePreview').hidden = false; }
+    else $('composePreview').hidden = true;
+    closeSheets();
+    openSheet($('composeSheet'));
   }
-  function closeStory() {
-    clearTimeout(viewerTimer);
-    $('viewer').classList.remove('open');
-    renderStories();
-  }
-  $('vClose').addEventListener('click', closeStory);
-
-  // ===== One click handler for everything on the page =====
-  document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-like],[data-comments],[data-story],[data-mine],[data-soon],#fab,#bell');
-    if (!el) return;
-
-    if (el.dataset.like !== undefined) {
-      var p = posts[el.dataset.like];
-      p.liked = !p.liked;
-      p.likes += p.liked ? 1 : -1;
-      renderFeed();
-    } else if (el.dataset.comments !== undefined) {
-      commentsFor = +el.dataset.comments;
-      renderComments();
-      openSheet($('commentsSheet'));
-    } else if (el.dataset.story !== undefined) {
-      openStory(+el.dataset.story);
-    } else if (el.dataset.mine) {
-      toast('📷 Adding photos comes in Stage 1');
-    } else if (el.id === 'fab') {
-      openSheet($('newSheet'));
-    } else if (el.id === 'bell') {
-      toast('🔔 Notifications come in a later step');
-    } else if (el.dataset.soon) {
-      e.preventDefault();
-      closeSheet();
-      toast('🚧 ' + el.dataset.soon + ': coming in a later step');
+  $('photoInput').addEventListener('change', function () {
+    var file = this.files[0];
+    this.value = '';
+    if (file) startCompose('photo', file);
+  });
+  $('composeText').addEventListener('input', function () { $('composeCount').textContent = this.value.length; });
+  $('composeForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var btn = $('composeBtn');
+    btn.disabled = true;
+    btn.textContent = compose.kind === 'photo' ? 'Uploading…' : 'Posting…';
+    try {
+      var row = { kind: compose.kind, body: $('composeText').value.trim() || null };
+      if (compose.kind === 'photo') row.photo_path = await PadPal.uploadPhoto(compose.file, 'post');
+      var r = await db.from('posts').insert(row);
+      if (r.error) {
+        if (row.photo_path) db.storage.from('photos').remove([row.photo_path]);
+        throw r.error;
+      }
+      closeSheets();
+      toast(compose.kind === 'photo' ? '📷 Posted! Visible for 24 hours' : '✅ Posted!');
+      await load();
+      window.scrollTo(0, 0);
+    } catch (err) {
+      toast(PadPal.friendlyError(err));
     }
+    btn.disabled = false;
+    btn.textContent = 'Post';
   });
 
-  renderStories();
-  renderFeed();
+  // ===== Pin a photo to your profile =====
+  async function pinPost(id) {
+    var p = findPost(id);
+    var r = await db.from('pinned_photos').insert({ path: p.photo_path });
+    if (r.error) return toast(PadPal.friendlyError(r.error));
+    myPins[p.photo_path] = true;
+    renderFeed();
+    if (viewing && viewing.id === id) $('vPin').hidden = true;
+    toast('📌 Pinned to your profile. It stays forever!');
+  }
+
+  // ===== Delete a post =====
+  async function deletePost(id) {
+    if (!tapTwice('delete' + id, 'Tap 🗑️ again to delete this post')) return;
+    var p = findPost(id);
+    var r = await db.from('posts').delete().eq('id', id);
+    if (r.error) return toast(PadPal.friendlyError(r.error));
+    if (p.photo_path && p.author_id === profile.id && !myPins[p.photo_path]) db.storage.from('photos').remove([p.photo_path]);
+    posts = posts.filter(function (x) { return x.id !== id; });
+    renderStories();
+    renderFeed();
+    toast('🗑️ Post deleted');
+  }
+
+  // ===== Photo viewer =====
+  function openStory(id) {
+    var p = findPost(id);
+    viewing = p;
+    seen[id] = true;
+    $('vAvatar').innerHTML = avatarHtml(p.author);
+    $('vName').textContent = nameOf(p.author);
+    $('vAgo').textContent = ago(p.created_at);
+    $('vImg').src = urls[p.photo_path] || '';
+    $('vCap').textContent = p.body || '';
+    var mine = p.author_id === profile.id;
+    $('vLeft').textContent = mine && myPins[p.photo_path] ? '📌 Pinned to your profile' : '⏳ Disappears in ' + hoursLeft(p.expires_at) + 'h';
+    $('vPin').hidden = !(mine && !myPins[p.photo_path]);
+    $('viewer').classList.add('open');
+  }
+  function closeStory() { $('viewer').classList.remove('open'); viewing = null; renderStories(); }
+  $('vClose').addEventListener('click', closeStory);
+  $('vPin').addEventListener('click', function () { if (viewing) pinPost(viewing.id); });
+
+  // ===== Sheets =====
+  function openSheet(el) { el.classList.add('open'); $('backdrop').classList.add('open'); }
+  function closeSheets() {
+    document.querySelectorAll('.sheet.open').forEach(function (s) { s.classList.remove('open'); });
+    $('backdrop').classList.remove('open');
+  }
+  $('backdrop').addEventListener('click', closeSheets);
+  $('fab').addEventListener('click', function () { openSheet($('newSheet')); });
+
+  // ===== One click handler for the feed =====
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-soon]');
+    if (!el) return;
+    var d = el.dataset;
+    if (d.like) toggleLike(d.like);
+    else if (d.comments) openComments(d.comments);
+    else if (d.story) openStory(d.story);
+    else if (d.pin) pinPost(d.pin);
+    else if (d.delete) deletePost(d.delete);
+    else if (d.new === 'photo') { closeSheets(); $('photoInput').click(); }
+    else if (d.new === 'text') startCompose('text');
+    else if (d.soon) { e.preventDefault(); closeSheets(); toast('🚧 ' + d.soon + ': coming in a later step'); }
+  });
 </script>
 </body>
 </html>
