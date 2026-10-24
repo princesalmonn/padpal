@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PadPal Chat</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script>PadPal.me = PadPal.guard(); // members only</script>
+<style>
+  /* ===== Chat-only styles ===== */
+  .disclaimer {
+    font-size: 12px; color: var(--text-2); background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 8px 12px; margin: 4px 0 12px; text-align: center;
+  }
+  .filters { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; scrollbar-width: none; }
+  .filters button { flex-shrink: 0; border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 14px; font-size: 13px; color: var(--text-2); }
+  .filters button.on { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+  /* Chat list */
+  .chat-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 0; background: none; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+  .chat-row .avatar { width: 50px; height: 50px; font-size: 20px; }
+  .chat-row .avatar.group { border-radius: 14px; border-color: var(--gold); }
+  .chat-row .avatar.game { border-radius: 14px; border-color: var(--primary); background: color-mix(in srgb, var(--primary) 25%, var(--card)); }
+  .chat-row .mid { flex: 1; min-width: 0; }
+  .chat-row .top { display: flex; justify-content: space-between; gap: 8px; }
+  .chat-row .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-row .time { font-size: 12px; color: var(--text-2); flex-shrink: 0; }
+  .chat-row .last { font-size: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .chat-row.unread .last { color: var(--text); font-weight: 600; }
+  .chat-row .sub { font-size: 11px; color: var(--accent); margin-top: 2px; }
+  .badge-n { background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; padding: 0 6px; }
+
+  /* Conversation (full screen) */
+  .convo {
+    position: fixed; inset: 0; z-index: 50; background: var(--bg);
+    display: none; flex-direction: column; max-width: 440px; margin: 0 auto;
+  }
+  .convo.open { display: flex; }
+  .c-head { display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; border-bottom: 1px solid var(--line); background: var(--card); }
+  .c-head .back { border: 0; background: none; font-size: 26px; padding: 0 6px 0 0; line-height: 1; color: var(--accent); }
+  .c-head .avatar { width: 38px; height: 38px; font-size: 16px; }
+  .c-head .nm { font-weight: 700; }
+  .c-head .members { font-size: 12px; color: var(--text-2); }
+  .c-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+
+  .game-pin { background: var(--card); border: 1px solid var(--primary); border-radius: 14px; padding: 10px 12px; font-size: 13px; margin-bottom: 6px; }
+  .game-pin b { display: block; font-size: 14px; margin-bottom: 2px; }
+  .sys { align-self: center; font-size: 12px; color: var(--text-2); background: var(--card); border-radius: 999px; padding: 4px 12px; margin: 6px 0; text-align: center; }
+
+  .msg { max-width: 78%; display: flex; flex-direction: column; }
+  .msg .who { font-size: 11px; color: var(--accent); font-weight: 700; margin: 0 0 2px 10px; }
+  .bubble { padding: 9px 13px; border-radius: 18px; font-size: 15px; line-height: 1.35; word-wrap: break-word; }
+  .msg.them { align-self: flex-start; }
+  .msg.them .bubble { background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 6px; }
+  .msg.me { align-self: flex-end; }
+  .msg.me .bubble { background: var(--primary); color: var(--primary-text); border-bottom-right-radius: 6px; }
+  .msg .t { font-size: 10px; color: var(--text-2); margin: 2px 10px 0; }
+  .msg.me .t { text-align: right; }
+  .pic { width: 200px; aspect-ratio: 4 / 5; border-radius: 16px; display: grid; place-items: center; font-size: 60px; position: relative; }
+  .pic span { position: absolute; top: 8px; right: 8px; font-size: 11px; font-weight: 600; background: rgba(0,0,0,.55); color: #fff; padding: 3px 8px; border-radius: 999px; }
+  .typing .bubble { color: var(--text-2); font-style: italic; }
+
+  .c-foot { display: flex; gap: 8px; align-items: center; padding: 8px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card); }
+  .c-foot input {
+    flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--card-2); color: var(--text);
+    border-radius: 999px; padding: 10px 14px; font: inherit; font-size: 16px; outline: none;
+  }
+  .c-foot input:focus { border-color: var(--accent); }
+  .c-foot .round { width: 42px; height: 42px; border-radius: 50%; border: 0; flex-shrink: 0; font-size: 18px; }
+  .c-foot .cam { background: var(--card-2); }
+  .c-foot .send { background: var(--primary); color: #fff; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><span>Pad</span><b>Pal</b></div>
+    <button class="icon-btn" data-soon="New chats" aria-label="New chat">✏️</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="sample-note">🧪 Sample chats for now. Real chat is coming soon.</div>
+  <div class="disclaimer">🕐 Messages disappear after <b>1 month</b> · 📷 Photos after <b>24 hours</b></div>
+  <div class="filters" id="filters">
+    <button class="on" data-filter="all">All</button>
+    <button data-filter="game">🎾 Games</button>
+    <button data-filter="group">👥 Groups</button>
+    <button data-filter="dm">👤 Direct</button>
+  </div>
+  <div id="list"></div>
+</main>
+
+<!-- Bottom tab bar -->
+<nav class="tabbar">
+  <div class="tabs">
+    <a href="feed.html"><span>🏠</span>Feed</a>
+    <a href="play.html"><span>🎾</span>Play</a>
+    <a class="on" href="chat.html"><span>💬</span>Chat</a>
+    <a href="ranks.html"><span>🏆</span>Ranks</a>
+    <a href="profile.html"><span>👤</span>Me</a>
+  </div>
+</nav>
+
+<!-- Conversation -->
+<div class="convo" id="convo">
+  <div class="c-head">
+    <button class="back" id="back" aria-label="Back">‹</button>
+    <div class="avatar" id="cAvatar"></div>
+    <div><div class="nm" id="cName"></div><div class="members" id="cMembers"></div></div>
+  </div>
+  <div class="c-body" id="cBody"></div>
+  <form class="c-foot" id="cForm">
+    <button type="button" class="round cam" data-soon="Sending photos" aria-label="Photo">📷</button>
+    <input id="cInput" placeholder="Message…" autocomplete="off">
+    <button class="round send" aria-label="Send">➤</button>
+  </form>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===== Fake chats (later from the database, live with Supabase real-time) =====
+  var chats = [
+    { id: 1, type: 'game', name: 'Today 19:00 · Court 3', icon: '🎾', members: 'You, Rio, Sari, Andi',
+      sub: 'Game chat · closes 3 days after the game', time: '18:42', unread: 3,
+      game: { when: 'Today · 19:00 – 20:30', where: 'Court 3 · Padel Arena Senayan' },
+      msgs: [
+        { sys: 'Rio created this game' },
+        { sys: 'Sari, Andi and You joined. Game is full! 🎉' },
+        { from: 'Rio', text: 'Who brings balls? 🎾', t: '18:30' },
+        { from: 'me', text: 'I got new ones', t: '18:33' },
+        { from: 'Andi', text: "I'll be 10 min late, traffic 😩", t: '18:40' },
+        { from: 'Sari', pic: '🚗', bg: 'linear-gradient(160deg,#4F7CAC,#24272D)', left: 23, t: '18:41' },
+        { from: 'Sari', text: 'Same here lol', t: '18:42' }
+      ] },
+    { id: 2, type: 'group', name: 'Tuesday Crew 🔥', icon: '👥', members: '8 members',
+      time: '17:05', unread: 12,
+      msgs: [
+        { sys: 'Messages older than 1 month were removed 🧹' },
+        { from: 'Budi', text: 'Saw my rank drop post... thanks a lot guys 😭', t: '16:50' },
+        { from: 'Maya', text: 'Not having fun = you are out 😂', t: '16:52' },
+        { from: 'Dimas', text: 'Americano Saturday? 8 players, 2 courts', t: '17:01' },
+        { from: 'Rio', text: "I'm in. Mexicano maybe? Closer games", t: '17:05' }
+      ] },
+    { id: 3, type: 'dm', name: 'Sari', icon: 'S', members: '🥉 Junior · online', time: '15:20', unread: 0,
+      msgs: [
+        { from: 'Sari', text: 'Your bandeja today was 🔥', t: '15:10' },
+        { from: 'me', text: 'Haha thanks! Rated your víbora 9 😎', t: '15:18' },
+        { from: 'Sari', text: 'Partner again on Saturday?', t: '15:20' }
+      ] },
+    { id: 4, type: 'game', name: 'Sat 08:00 · Americano', icon: '🔄', members: '6 of 8 players',
+      sub: 'Game chat · 2 spots left', time: 'Yesterday', unread: 0,
+      game: { when: 'Sat 26 Oct · 08:00 – 10:00', where: 'Courts 1–2 · Smash Club' },
+      msgs: [
+        { sys: 'Maya created this Americano' },
+        { from: 'Maya', text: 'Need 2 more! Invite your friends 🙏', t: 'Yesterday' }
+      ] },
+    { id: 5, type: 'dm', name: 'Andi', icon: 'A', members: '⚡ Amateur · 2h ago', time: 'Mon', unread: 0,
+      msgs: [
+        { from: 'Andi', text: 'Rematch. Tomorrow. 😤', t: 'Mon' },
+        { from: 'me', text: "You're my nemesis now, it's official 😈", t: 'Mon' }
+      ] },
+    { id: 6, type: 'group', name: 'Office Padel', icon: '💼', members: '5 members', time: 'Sun', unread: 0,
+      msgs: [ { from: 'Kevin', text: 'Lefties unite 🫡', t: 'Sun' } ] }
+  ];
+
+  var COLORS = { Rio: '#B3261E', Sari: '#D9822B', Andi: '#4F7CAC', Budi: '#6E8B5B', Maya: '#7E6AA8', Dimas: '#C9A24A', Kevin: '#B87333' };
+  var REPLIES = ['Haha 😂', 'Deal 🤝', "Let's goooo 🔥", '👍', 'See you on court 🎾', 'Bandeja time 😎'];
+
+  var filter = 'all';
+  var current = null;
+
+  // ===== Helpers =====
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return s.replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+  function lastText(c) {
+    var m = c.msgs[c.msgs.length - 1];
+    if (m.sys) return m.sys;
+    var who = m.from === 'me' ? 'You: ' : (c.type === 'dm' ? '' : m.from + ': ');
+    return who + (m.pic ? '📷 Photo' : m.text);
+  }
+  function now() {
+    var d = new Date();
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+
+  // ===== Chat list =====
+  function renderList() {
+    var shown = chats.filter(function (c) { return filter === 'all' || c.type === filter; });
+    $('list').innerHTML = shown.map(function (c) {
+      return '<button class="chat-row' + (c.unread ? ' unread' : '') + '" data-chat="' + c.id + '">' +
+        '<div class="avatar ' + (c.type !== 'dm' ? c.type : '') + '">' + c.icon + '</div>' +
+        '<div class="mid"><div class="top"><span class="nm">' + c.name + '</span><span class="time">' + c.time + '</span></div>' +
+        '<div class="top"><div class="last">' + esc(lastText(c)) + '</div>' + (c.unread ? '<span class="badge-n">' + c.unread + '</span>' : '') + '</div>' +
+        (c.sub ? '<div class="sub">' + c.sub + '</div>' : '') +
+        '</div></button>';
+    }).join('');
+  }
+
+  // ===== Conversation =====
+  function renderMsgs() {
+    var c = current;
+    var html = '';
+    if (c.game) html += '<div class="game-pin"><b>📌 ' + c.game.when + '</b>📍 ' + c.game.where + '</div>';
+    html += '<div class="sys">🕐 Messages disappear after 1 month</div>';
+    c.msgs.forEach(function (m) {
+      if (m.sys) { html += '<div class="sys">' + m.sys + '</div>'; return; }
+      var mine = m.from === 'me';
+      html += '<div class="msg ' + (mine ? 'me' : 'them') + (m.typing ? ' typing' : '') + '">' +
+        (!mine && c.type !== 'dm' ? '<div class="who" style="color:' + (COLORS[m.from] || 'var(--accent)') + '">' + m.from + '</div>' : '') +
+        (m.pic
+          ? '<div class="pic" style="background:' + m.bg + '">' + m.pic + '<span>⏳ ' + m.left + 'h left</span></div>'
+          : '<div class="bubble">' + esc(m.text) + '</div>') +
+        (m.t ? '<div class="t">' + m.t + '</div>' : '') +
+        '</div>';
+    });
+    $('cBody').innerHTML = html;
+    $('cBody').scrollTop = $('cBody').scrollHeight;
+  }
+
+  function openChat(id) {
+    current = chats.filter(function (c) { return c.id === id; })[0];
+    current.unread = 0;
+    $('cAvatar').textContent = current.icon;
+    $('cAvatar').className = 'avatar ' + (current.type !== 'dm' ? current.type : '');
+    $('cName').textContent = current.name;
+    $('cMembers').textContent = current.members;
+    renderMsgs();
+    $('convo').classList.add('open');
+  }
+  function closeChat() {
+    $('convo').classList.remove('open');
+    current = null;
+    renderList();
+  }
+  $('back').addEventListener('click', closeChat);
+
+  $('cForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = $('cInput').value.trim();
+    if (!text) return;
+    var c = current;
+    c.msgs.push({ from: 'me', text: text, t: now() });
+    c.time = now();
+    $('cInput').value = '';
+    renderMsgs();
+    // a friend answers (fake, just to feel alive)
+    var friend = c.type === 'dm' ? c.name : (c.msgs.filter(function (m) { return m.from && m.from !== 'me'; }).pop() || { from: 'Rio' }).from;
+    setTimeout(function () {
+      if (current !== c) return;
+      c.msgs.push({ from: friend, text: 'typing…', typing: true });
+      renderMsgs();
+      setTimeout(function () {
+        c.msgs.pop();
+        c.msgs.push({ from: friend, text: REPLIES[Math.floor(Math.random() * REPLIES.length)], t: now() });
+        if (current === c) renderMsgs();
+      }, 1200);
+    }, 600);
+  });
+
+  // ===== Clicks =====
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-filter],[data-chat],[data-soon]');
+    if (!el) return;
+    if (el.dataset.filter) {
+      filter = el.dataset.filter;
+      document.querySelectorAll('#filters button').forEach(function (b) { b.classList.toggle('on', b === el); });
+      renderList();
+    } else if (el.dataset.chat) {
+      openChat(+el.dataset.chat);
+    } else if (el.dataset.soon) {
+      e.preventDefault();
+      toast('🚧 ' + el.dataset.soon + ': coming in a later step');
+    }
+  });
+
+  renderList();
+</script>
+</body>
+</html>

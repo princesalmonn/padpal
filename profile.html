@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PadPal Profile</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script>PadPal.me = PadPal.guard(); // members only</script>
+<style>
+  /* ===== Profile-only styles ===== */
+
+  /* Header */
+  .hero { text-align: center; padding: 6px 0 4px; }
+  .hero .avatar { width: 92px; height: 92px; font-size: 36px; margin: 0 auto 10px; border-width: 3px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .hero h1 { margin: 0; font-size: 22px; }
+  .hero .handle { color: var(--text-2); font-size: 14px; margin-top: 2px; }
+  .hero .bio { margin: 10px auto 0; max-width: 320px; font-size: 14px; line-height: 1.45; }
+
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 12px 0 4px; }
+  .chip { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; font-size: 12px; }
+  .chip b { color: var(--text-2); font-weight: 500; margin-right: 3px; }
+
+  /* Rank card */
+  .rank { display: flex; align-items: center; gap: 12px; }
+  .badge {
+    width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; flex-shrink: 0;
+    background: #7E6AA8; box-shadow: inset 0 0 0 2px rgba(255,255,255,.15);
+  }
+  .rank .tier { font-weight: 700; font-size: 17px; }
+  .rank .pts { font-size: 26px; font-weight: 800; margin-left: auto; text-align: right; line-height: 1; }
+  .rank .pts small { display: block; font-size: 11px; font-weight: 500; color: var(--text-2); margin-top: 3px; }
+  .progress { height: 10px; border-radius: 999px; background: var(--card-2); overflow: hidden; margin: 14px 0 6px; }
+  .progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); }
+  .prog-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); }
+  .warn { margin-top: 12px; padding: 8px 10px; border-radius: 10px; font-size: 12px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+
+  .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .quick div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; }
+  .quick strong { display: block; font-size: 20px; }
+  .quick small { color: var(--text-2); font-size: 11px; }
+
+  .row-btns { display: flex; gap: 8px; margin-bottom: 16px; }
+  .row-btns .btn { flex: 1; padding: 10px; font-size: 14px; }
+
+  /* Section tabs: Overview / Stats / History */
+  .seg { display: flex; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 3px; margin-bottom: 14px; position: sticky; top: calc(62px + env(safe-area-inset-top)); z-index: 5; }
+  .seg button { flex: 1; border: 0; background: none; padding: 9px 0; border-radius: 9px; font-size: 14px; color: var(--text-2); font-weight: 600; }
+  .seg button.on { background: var(--primary); color: var(--primary-text); }
+  .panel { display: none; }
+  .panel.on { display: block; }
+
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-2); margin: 18px 0 10px; display: flex; justify-content: space-between; align-items: baseline; }
+  h2 small { text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+  /* 6 pinned photos */
+  .pins { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .pins > * { aspect-ratio: 1; border-radius: 12px; display: grid; place-items: center; font-size: 34px; border: 0; }
+  .pins .empty { background: var(--card); border: 2px dashed var(--line); color: var(--text-2); font-size: 26px; }
+
+  /* Shot chart */
+  .radar { display: block; width: 100%; max-width: 320px; margin: 0 auto; }
+  .radar text { font-size: 11px; fill: var(--text-2); }
+  .radar text.val { fill: var(--text); font-weight: 700; font-size: 12px; }
+  .shots-note { text-align: center; font-size: 12px; color: var(--text-2); margin-top: 4px; }
+
+  .awards { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .award { flex-shrink: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; min-width: 130px; }
+  .award span { font-size: 24px; }
+  .award strong { display: block; font-size: 13px; margin-top: 4px; }
+  .award small { color: var(--text-2); font-size: 11px; }
+
+  /* Stats */
+  .periods { display: flex; gap: 6px; margin-bottom: 12px; }
+  .periods button { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--text-2); }
+  .periods button.on { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .tile small { color: var(--text-2); font-size: 12px; }
+  .tile strong { display: block; font-size: 24px; margin-top: 2px; }
+  .wl { display: flex; height: 8px; border-radius: 999px; overflow: hidden; margin-top: 8px; background: var(--loss); }
+  .wl i { background: var(--win); }
+
+  .people { display: grid; gap: 8px; }
+  .person { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+  .person .label { font-size: 12px; color: var(--text-2); }
+  .person .stat { margin-left: auto; text-align: right; font-weight: 700; }
+  .person .stat small { display: block; font-weight: 500; font-size: 11px; color: var(--text-2); }
+
+  .facts { display: grid; gap: 8px; }
+  .fact { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+
+  /* History */
+  .match-row { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 8px; }
+  .wlb { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-weight: 800; font-size: 13px; flex-shrink: 0; }
+  .wlb.w { background: color-mix(in srgb, var(--win) 22%, transparent); color: var(--win); }
+  .wlb.l { background: color-mix(in srgb, var(--loss) 22%, transparent); color: var(--loss); }
+  .match-row .who { font-size: 13px; line-height: 1.4; min-width: 0; }
+  .match-row .who small { color: var(--text-2); display: block; font-size: 11px; }
+  .match-row .score { margin-left: auto; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; white-space: nowrap; }
+  .match-row .score small { display: block; font-size: 12px; }
+
+  .h2h-pick { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin-bottom: 10px; }
+  .h2h-pick button { flex-shrink: 0; border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+  .h2h-pick button.on { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+  .h2h { display: flex; align-items: center; justify-content: space-around; text-align: center; }
+  .h2h .avatar { width: 52px; height: 52px; margin: 0 auto 6px; font-size: 20px; }
+  .h2h .big { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .h2h-note { text-align: center; font-size: 13px; color: var(--text-2); margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><span>Pad</span><b>Pal</b></div>
+    <button class="icon-btn" id="settingsBtn" aria-label="Settings">⚙️</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <div class="avatar" id="heroAvatar"></div>
+    <h1 id="heroName"></h1>
+    <div class="handle" id="heroHandle"></div>
+    <p class="bio" id="heroBio"></p>
+    <div class="chips" id="heroChips"></div>
+  </section>
+
+  <div class="sample-note" style="margin-top:14px">🧪 Your name and details above are real. Points, stats and photos below are sample data for now.</div>
+
+  <div class="card">
+    <div class="rank">
+      <div class="badge">⚡</div>
+      <div><div class="tier">Amateur</div><div class="meta">#3 in Men's ladder</div></div>
+      <div class="pts">362<small>points</small></div>
+    </div>
+    <div class="progress"><i style="width:62%"></i></div>
+    <div class="prog-label"><span>⚡ Amateur · 300</span><span>38 pts to 🥉 Junior</span></div>
+    <div class="warn">⏳ Last game 4 days ago. Play by <b>Wednesday</b> or lose 5 points!</div>
+  </div>
+
+  <div class="quick">
+    <div><strong>48</strong><small>Matches</small></div>
+    <div><strong>63%</strong><small>Win rate</small></div>
+    <div><strong>🔥 4</strong><small>Win streak</small></div>
+  </div>
+
+  <div class="row-btns">
+    <button class="btn btn-ghost" data-soon="Edit profile">✏️ Edit profile</button>
+    <button class="btn btn-primary" id="inviteBtn">➕ Invite friend</button>
+  </div>
+
+  <div id="segAnchor"></div>
+  <div class="seg" id="seg">
+    <button class="on" data-panel="overview">Overview</button>
+    <button data-panel="stats">Stats</button>
+    <button data-panel="history">History</button>
+  </div>
+
+  <!-- ===== Overview ===== -->
+  <section class="panel on" id="overview">
+    <h2>Pinned photos <small id="pinCount"></small></h2>
+    <div class="pins" id="pins"></div>
+
+    <h2>Shot chart <small>from friends' ratings</small></h2>
+    <div class="card">
+      <svg class="radar" id="radar" viewBox="0 0 320 290"></svg>
+      <div class="shots-note">Based on 23 ratings · ratings shrink if you stop playing 🧊</div>
+    </div>
+
+    <h2>Badges</h2>
+    <div class="awards">
+      <div class="award"><span>🏅</span><strong>Bandeja King</strong><small>12 ratings this month</small></div>
+      <div class="award"><span>🥇</span><strong>Americano winner</strong><small>3× this year</small></div>
+      <div class="award"><span>🔥</span><strong>On fire</strong><small>4 wins in a row</small></div>
+      <div class="award"><span>🌅</span><strong>Early bird</strong><small>10 games before 8am</small></div>
+    </div>
+  </section>
+
+  <!-- ===== Stats ===== -->
+  <section class="panel" id="stats">
+    <div class="periods" id="periods">
+      <button data-period="week">Week</button>
+      <button class="on" data-period="month">Month</button>
+      <button data-period="year">Year</button>
+      <button data-period="all">All time</button>
+    </div>
+    <div class="tiles" id="tiles"></div>
+
+    <h2>Your people</h2>
+    <div class="people" id="people"></div>
+
+    <h2>Fun facts 🤓</h2>
+    <div class="facts" id="facts"></div>
+  </section>
+
+  <!-- ===== History ===== -->
+  <section class="panel" id="history">
+    <h2>Head-to-head</h2>
+    <div class="h2h-pick" id="h2hPick"></div>
+    <div class="card" id="h2hCard"></div>
+
+    <h2>Match history</h2>
+    <div id="matches"></div>
+  </section>
+
+</main>
+
+<!-- Bottom tab bar -->
+<nav class="tabbar">
+  <div class="tabs">
+    <a href="feed.html"><span>🏠</span>Feed</a>
+    <a href="play.html"><span>🎾</span>Play</a>
+    <a href="chat.html"><span>💬</span>Chat</a>
+    <a href="ranks.html"><span>🏆</span>Ranks</a>
+    <a class="on" href="profile.html"><span>👤</span>Me</a>
+  </div>
+</nav>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="settingsSheet">
+  <div class="grab"></div>
+  <h3>Settings</h3>
+  <div style="display:grid;gap:10px">
+    <a class="btn btn-accent" id="adminLink" href="admin.html" style="text-align:center;text-decoration:none" hidden>👑 Admin panel</a>
+    <button class="btn btn-ghost" data-soon="Edit profile">✏️ Edit profile</button>
+    <button class="btn btn-ghost" id="logoutBtn">🚪 Log out</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===== Fake data (later this comes from the real database) =====
+  var pinned = [
+    { art: '🥉', bg: 'linear-gradient(160deg,#C9A24A,#24272D)' },
+    { art: '🌅', bg: 'linear-gradient(160deg,#D9822B,#B3261E 60%,#16181C)' },
+    { art: '🎾', bg: 'linear-gradient(160deg,#B3261E,#D9822B)' },
+    { art: '🍻', bg: 'linear-gradient(160deg,#4F7CAC,#24272D)' }
+  ];
+
+  // Shot ratings (average of friends' 1–10 ratings)
+  var shots = [
+    ['Bandeja', 8.2], ['Víbora', 7.1], ['Smash', 5.9],
+    ['Chiquita', 6.0], ['Lob', 6.5], ['Volley', 7.8]
+  ];
+
+  var periods = {
+    week:  { matches: 3,  wins: 2,  pts: '+18', hours: 4,  streak: 2,
+             partner: ['Sari', '2-0'], nemesis: ['Andi', '0-1'], most: ['Rio', 3],
+             facts: ['You played 3 games in 7 days. Your points are safe 🛡️', 'Your only loss this week was a golden point 😩'] },
+    month: { matches: 11, wins: 7,  pts: '+46', hours: 15, streak: 4,
+             partner: ['Sari', '5-1'], nemesis: ['Andi', '1-3'], most: ['Rio', 8],
+             facts: ['You played 15 hours of padel this month ⏱️', 'You win 80% of golden points 🧊', 'Your best day is Saturday (6-1) 📅', 'You and Sari are 5-1 together 🤝'] },
+    year:  { matches: 41, wins: 26, pts: '+212', hours: 58, streak: 6,
+             partner: ['Sari', '14-4'], nemesis: ['Andi', '4-9'], most: ['Rio', 27],
+             facts: ['Longest match: 2h 05m vs Andi & Budi 🥵', 'You came back from 0-4 down 3 times 💪', 'You ranked up twice this year 📈'] },
+    all:   { matches: 48, wins: 30, pts: '+362', hours: 67, streak: 6,
+             partner: ['Sari', '16-4'], nemesis: ['Andi', '5-11'], most: ['Rio', 31],
+             facts: ['First PadPal match: 12 Feb 2026 🎂', 'You have played with 9 different friends 👥', 'Most common score: 6-4 🎾'] }
+  };
+
+  var friends = {
+    Andi: { initial: 'A', you: 5, them: 11, note: 'Andi is your nemesis 😈 Last time you lost 4-6 6-7' },
+    Rio:  { initial: 'R', you: 9, them: 7,  note: 'Close rivalry! You won the last 2 🔥' },
+    Budi: { initial: 'B', you: 6, them: 1,  note: 'Budi has beaten you only once 😎' },
+    Maya: { initial: 'M', you: 3, them: 3,  note: 'Dead even. Next match decides it! ⚖️' }
+  };
+
+  var matches = [
+    { win: true,  partner: 'Sari', vs: 'Andi & Budi', score: '6-4 7-5', pts: '+10', when: 'Today · Court 3' },
+    { win: true,  partner: 'Rio',  vs: 'Maya & Sari', score: '28-20',   pts: '+8',  when: 'Sat · Americano' },
+    { win: true,  partner: 'Maya', vs: 'Rio & Budi',  score: '6-3 6-2', pts: '+5',  when: 'Thu · Court 1' },
+    { win: true,  partner: 'Sari', vs: 'Rio & Andi',  score: '7-6 6-4', pts: '+18', when: 'Tue · Court 2' },
+    { win: false, partner: 'Budi', vs: 'Andi & Rio',  score: '4-6 6-7', pts: '−5',  when: 'Last week' },
+    { win: false, partner: 'Maya', vs: 'Andi & Sari', score: '3-6 2-6', pts: '−2',  when: 'Last week' }
+  ];
+
+  // ===== Helpers =====
+  function $(id) { return document.getElementById(id); }
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+
+  // ===== Pinned photos (max 6) =====
+  function renderPins() {
+    var html = '';
+    for (var i = 0; i < 6; i++) {
+      var p = pinned[i];
+      html += p
+        ? '<div style="background:' + p.bg + '">' + p.art + '</div>'
+        : '<button class="empty" data-soon="Pinning photos">+</button>';
+    }
+    $('pins').innerHTML = html;
+    $('pinCount').textContent = pinned.length + ' / 6 used';
+  }
+
+  // ===== Shot chart (spider graph, drawn with SVG) =====
+  function renderRadar() {
+    var cx = 160, cy = 145, r = 100, n = shots.length;
+    function point(i, value) {
+      var angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+      return [cx + Math.cos(angle) * r * value / 10, cy + Math.sin(angle) * r * value / 10];
+    }
+    var svg = '';
+    // background rings at 2.5, 5, 7.5, 10
+    [2.5, 5, 7.5, 10].forEach(function (lvl) {
+      var pts = shots.map(function (_, i) { return point(i, lvl).join(','); }).join(' ');
+      svg += '<polygon points="' + pts + '" fill="none" stroke="var(--line)" stroke-width="1"/>';
+    });
+    // spokes
+    shots.forEach(function (_, i) {
+      var p = point(i, 10);
+      svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + p[0] + '" y2="' + p[1] + '" stroke="var(--line)"/>';
+    });
+    // your shape
+    var shape = shots.map(function (s, i) { return point(i, s[1]).join(','); }).join(' ');
+    svg += '<polygon points="' + shape + '" fill="var(--accent)" fill-opacity=".28" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>';
+    shots.forEach(function (s, i) {
+      var p = point(i, s[1]);
+      svg += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="4" fill="var(--primary)" stroke="var(--card)" stroke-width="2"/>';
+    });
+    // labels
+    shots.forEach(function (s, i) {
+      var p = point(i, 12.6);
+      var anchor = Math.abs(p[0] - cx) < 5 ? 'middle' : (p[0] > cx ? 'start' : 'end');
+      svg += '<text x="' + p[0] + '" y="' + (p[1] - 2) + '" text-anchor="' + anchor + '">' + s[0] + '</text>' +
+             '<text class="val" x="' + p[0] + '" y="' + (p[1] + 12) + '" text-anchor="' + anchor + '">' + s[1].toFixed(1) + '</text>';
+    });
+    $('radar').innerHTML = svg;
+  }
+
+  // ===== Stats for the chosen time period =====
+  function renderStats(key) {
+    var s = periods[key];
+    var rate = Math.round(s.wins / s.matches * 100);
+    $('tiles').innerHTML =
+      '<div class="tile"><small>Matches</small><strong>' + s.matches + '</strong><div class="meta">' + s.wins + 'W · ' + (s.matches - s.wins) + 'L</div></div>' +
+      '<div class="tile"><small>Win rate</small><strong>' + rate + '%</strong><div class="wl"><i style="width:' + rate + '%"></i></div></div>' +
+      '<div class="tile"><small>Points</small><strong class="plus">' + s.pts + '</strong><div class="meta">gained</div></div>' +
+      '<div class="tile"><small>Best streak</small><strong>🔥 ' + s.streak + '</strong><div class="meta">' + s.hours + 'h on court</div></div>';
+    $('people').innerHTML =
+      person('🤝', 'Best partner', s.partner[0], s.partner[1], 'together') +
+      person('😈', 'Nemesis', s.nemesis[0], s.nemesis[1], 'vs them') +
+      person('👥', 'Most played with', s.most[0], s.most[1], 'games');
+    $('facts').innerHTML = s.facts.map(function (f) { return '<div class="fact">' + f + '</div>'; }).join('');
+  }
+  function person(icon, label, name, stat, sub) {
+    return '<div class="person"><div class="avatar">' + name[0] + '</div>' +
+      '<div><div class="label">' + icon + ' ' + label + '</div><div class="name">' + name + '</div></div>' +
+      '<div class="stat">' + stat + '<small>' + sub + '</small></div></div>';
+  }
+
+  // ===== History =====
+  function renderH2H(name) {
+    var f = friends[name];
+    $('h2hPick').innerHTML = Object.keys(friends).map(function (n) {
+      return '<button class="' + (n === name ? 'on' : '') + '" data-h2h="' + n + '">vs ' + n + '</button>';
+    }).join('');
+    $('h2hCard').innerHTML =
+      '<div class="h2h">' +
+        '<div><div class="avatar">Y</div><div class="name">You</div></div>' +
+        '<div class="big"><span class="' + (f.you >= f.them ? 'plus' : '') + '">' + f.you + '</span> – <span class="' + (f.them > f.you ? 'minus' : '') + '">' + f.them + '</span></div>' +
+        '<div><div class="avatar">' + f.initial + '</div><div class="name">' + name + '</div></div>' +
+      '</div><div class="h2h-note">' + f.note + '</div>';
+  }
+  function renderMatches() {
+    $('matches').innerHTML = matches.map(function (m) {
+      return '<div class="match-row">' +
+        '<div class="wlb ' + (m.win ? 'w' : 'l') + '">' + (m.win ? 'W' : 'L') + '</div>' +
+        '<div class="who">with <b>' + m.partner + '</b> vs ' + m.vs + '<small>' + m.when + '</small></div>' +
+        '<div class="score">' + m.score + '<small class="' + (m.win ? 'plus' : 'minus') + '">' + m.pts + '</small></div>' +
+        '</div>';
+    }).join('');
+  }
+
+  // ===== Clicks =====
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-panel],[data-period],[data-h2h],[data-soon]');
+    if (!el) return;
+    if (el.dataset.panel) {
+      document.querySelectorAll('#seg button').forEach(function (b) { b.classList.toggle('on', b === el); });
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.toggle('on', p.id === el.dataset.panel); });
+      // if we've scrolled past the tabs, jump back so the new section starts at its top
+      var top = $('segAnchor').getBoundingClientRect().top + window.scrollY - document.querySelector('.topbar').offsetHeight;
+      if (window.scrollY > top) window.scrollTo(0, top);
+    } else if (el.dataset.period) {
+      document.querySelectorAll('#periods button').forEach(function (b) { b.classList.toggle('on', b === el); });
+      renderStats(el.dataset.period);
+    } else if (el.dataset.h2h) {
+      renderH2H(el.dataset.h2h);
+    } else if (el.dataset.soon) {
+      e.preventDefault();
+      toast('🚧 ' + el.dataset.soon + ': coming in a later step');
+    }
+  });
+
+  renderPins();
+  renderRadar();
+  renderStats('month');
+  renderH2H('Andi');
+  renderMatches();
+
+  // ===== Real data from your account (the rest above is still sample data) =====
+  var SIDES = { right: '➡️ Right (drive)', left: '⬅️ Left (revés)', both: '↔️ Both' };
+  var HANDS = { right: '✋ Right', left: '🤚 Left' };
+  var LADDERS = { m: '👨 Men', f: '👩 Women' };
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  PadPal.me.then(function (me) {
+    if (!me) return;
+    var p = me.profile;
+    $('heroAvatar').textContent = (p.display_name || p.username)[0].toUpperCase();
+    $('heroName').textContent = p.display_name || p.username;
+    $('heroHandle').textContent = '@' + p.username;
+    $('heroBio').textContent = p.bio || '';
+    $('heroBio').hidden = !p.bio;
+    var chips = [];
+    if (p.side) chips.push(['Side', SIDES[p.side]]);
+    if (p.hand) chips.push(['Hand', HANDS[p.hand]]);
+    if (p.fav_shot) chips.push(['Fav shot', '🎯 ' + p.fav_shot]);
+    if (p.gender) chips.push(['Ladder', LADDERS[p.gender]]);
+    $('heroChips').innerHTML = chips.map(function (c) { return '<span class="chip"><b>' + c[0] + '</b>' + esc(c[1]) + '</span>'; }).join('');
+    $('adminLink').hidden = !p.is_admin;
+  });
+
+  // Settings sheet
+  function closeSettings() { $('settingsSheet').classList.remove('open'); $('backdrop').classList.remove('open'); }
+  $('settingsBtn').addEventListener('click', function () { $('settingsSheet').classList.add('open'); $('backdrop').classList.add('open'); });
+  $('backdrop').addEventListener('click', closeSettings);
+  $('logoutBtn').addEventListener('click', async function () {
+    await PadPal.signOut();
+    location.replace('login.html');
+  });
+
+  // Real invite links
+  $('inviteBtn').addEventListener('click', async function () {
+    var btn = this;
+    btn.disabled = true;
+    try {
+      var result = await PadPal.shareInvite();
+      if (result === 'copied') toast('📋 Invite link copied! Send it to your friend');
+      else if (result === 'shared') toast('🎟️ Invite sent!');
+      else if (result !== 'cancelled') toast('Invite link: ' + result);
+    } catch (err) {
+      toast(PadPal.friendlyError(err));
+    }
+    btn.disabled = false;
+  });
+</script>
+</body>
+</html>

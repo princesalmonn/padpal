@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PadPal Ranks</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script>PadPal.me = PadPal.guard(); // members only</script>
+<style>
+  /* ===== Ranks-only styles ===== */
+  .disclaimer {
+    border: 1px dashed var(--accent); color: var(--accent); border-radius: 12px;
+    padding: 9px 12px; font-size: 13px; text-align: center; margin: 4px 0 12px; font-weight: 600;
+  }
+
+  .search { position: relative; margin-bottom: 12px; }
+  .search input {
+    width: 100%; border: 1px solid var(--line); background: var(--card); color: var(--text);
+    border-radius: 12px; padding: 11px 14px 11px 38px; font: inherit; font-size: 16px; outline: none;
+  }
+  .search input:focus { border-color: var(--accent); }
+  .search span { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 15px; opacity: .7; }
+
+  .seg { display: flex; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 3px; margin-bottom: 10px; }
+  .seg button { flex: 1; border: 0; background: none; padding: 9px 0; border-radius: 9px; font-size: 14px; color: var(--text-2); font-weight: 600; }
+  .seg button.on { background: var(--primary); color: var(--primary-text); }
+
+  .periods { display: flex; gap: 6px; margin-bottom: 6px; }
+  .periods button { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--text-2); }
+  .periods button.on { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .explain { font-size: 12px; color: var(--text-2); margin: 0 0 14px; }
+
+  /* Podium (top 3) */
+  .podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; align-items: end; gap: 8px; margin-bottom: 14px; }
+  .step { text-align: center; border: 0; background: none; padding: 0; }
+  .step .avatar { margin: 0 auto 6px; }
+  .step .crown { font-size: 20px; height: 24px; }
+  .step .nm { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .step .pt { font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
+  .block { border-radius: 12px 12px 4px 4px; display: grid; place-items: center; font-weight: 800; font-size: 22px; color: #1C1F24; }
+  .p1 .block { height: 92px; background: linear-gradient(180deg, #E3C46F, #A88330); }
+  .p2 .block { height: 68px; background: linear-gradient(180deg, #D6DAE0, #8E959F); }
+  .p3 .block { height: 52px; background: linear-gradient(180deg, #D9A066, #B87333); }
+  .p1 .avatar { width: 62px; height: 62px; font-size: 22px; border-color: var(--gold); }
+  .p2 .avatar, .p3 .avatar { width: 50px; height: 50px; font-size: 18px; }
+
+  /* List */
+  .zone { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); margin: 14px 0 8px; font-weight: 600; }
+  .zone::before, .zone::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .zone.locked { color: var(--gold); }
+  .row {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 8px;
+  }
+  .row.me { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+  .row .pos { width: 24px; text-align: center; font-weight: 800; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .row .info { min-width: 0; flex: 1; }
+  .row .nm { font-weight: 600; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .row .sub { font-size: 12px; color: var(--text-2); display: flex; gap: 6px; align-items: center; margin-top: 2px; flex-wrap: wrap; }
+  .row .score { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .row .score small { display: block; font-size: 11px; font-weight: 600; }
+  .up { color: var(--win); }
+  .down { color: var(--loss); }
+  .same { color: var(--text-2); }
+  .ice { font-size: 11px; background: color-mix(in srgb, #4F7CAC 25%, transparent); color: #8FB3DA; padding: 1px 6px; border-radius: 999px; }
+  .empty { text-align: center; color: var(--text-2); padding: 30px 0; }
+
+  /* Player pop-up */
+  .pp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .pp-head .avatar { width: 56px; height: 56px; font-size: 22px; }
+  .pp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .pp-grid div { background: var(--card-2); border-radius: 12px; padding: 10px; text-align: center; }
+  .pp-grid strong { display: block; font-size: 18px; }
+  .pp-grid small { font-size: 11px; color: var(--text-2); }
+  .pp-btns { display: flex; gap: 8px; }
+  .pp-btns .btn { flex: 1; padding: 11px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><span>Pad</span><b>Pal</b></div>
+    <button class="icon-btn" data-soon="Rank rules page" aria-label="How ranking works">❔</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="sample-note">🧪 Sample rankings for now. Real points start in Stage 2.</div>
+  <div class="disclaimer">⚠️ If you're not having fun, you're out! 😄</div>
+
+  <div class="search"><span>🔍</span><input id="search" placeholder="Search players…" autocomplete="off"></div>
+
+  <div class="seg" id="ladders">
+    <button class="on" data-ladder="men">👨 Men</button>
+    <button data-ladder="women">👩 Women</button>
+    <button data-ladder="mixed">🔀 Mixed</button>
+  </div>
+
+  <div class="periods" id="periods">
+    <button data-period="week">Week</button>
+    <button data-period="month">Month</button>
+    <button data-period="year">Year</button>
+    <button class="on" data-period="all">All time</button>
+  </div>
+  <p class="explain" id="explain"></p>
+
+  <div id="podium" class="podium"></div>
+  <div id="list"></div>
+</main>
+
+<!-- Bottom tab bar -->
+<nav class="tabbar">
+  <div class="tabs">
+    <a href="feed.html"><span>🏠</span>Feed</a>
+    <a href="play.html"><span>🎾</span>Play</a>
+    <a href="chat.html"><span>💬</span>Chat</a>
+    <a class="on" href="ranks.html"><span>🏆</span>Ranks</a>
+    <a href="profile.html"><span>👤</span>Me</a>
+  </div>
+</nav>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="playerSheet">
+  <div class="grab"></div>
+  <div id="playerBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===== Tiers (from our level system) =====
+  var TIERS = [
+    { min: 0,   name: 'First Timer', icon: '🐣', color: '#6B7280' },
+    { min: 100, name: 'Newbie',      icon: '🌱', color: '#6E8B5B' },
+    { min: 200, name: 'Beginner',    icon: '🎾', color: '#4F7CAC' },
+    { min: 300, name: 'Amateur',     icon: '⚡', color: '#7E6AA8' },
+    { min: 400, name: 'Junior',      icon: '🥉', color: '#B87333' },
+    { min: 501, name: 'Pro',         icon: '🥈', color: '#A8B0BA' },
+    { min: 626, name: 'Pro-Star',    icon: '💎', color: '#D9822B' },
+    { min: 751, name: 'Star',        icon: '⭐', color: '#C9A24A' },
+    { min: 876, name: 'Legend',      icon: '👑', color: '#B3261E' }
+  ];
+  function tierOf(points) {
+    var t = TIERS[0];
+    TIERS.forEach(function (x) { if (points >= x.min) t = x; });
+    return t;
+  }
+
+  // ===== Fake players (later from the database) =====
+  // gained = points won in [week, month, year]; move = places up/down this week; idle = days since last game
+  var players = [
+    { name: 'Rio',    user: 'rio_padel',    g: 'm', pts: 512, gained: [12, 41, 230], move: 0,  idle: 1,  wl: [58, 21], shot: 'Smash' },
+    { name: 'Dimas',  user: 'dimas.smash',  g: 'm', pts: 431, gained: [0, 18, 160],  move: 1,  idle: 3,  wl: [44, 25], shot: 'Víbora' },
+    { name: 'Yoga',   user: 'yoga.bandeja', g: 'm', pts: 362, gained: [18, 46, 212], move: 1,  idle: 4,  wl: [30, 18], shot: 'Bandeja', me: true },
+    { name: 'Andi',   user: 'andi',         g: 'm', pts: 355, gained: [-5, 22, 190], move: -2, idle: 2,  wl: [33, 20], shot: 'Lob' },
+    { name: 'Fajar',  user: 'fajar_volley', g: 'm', pts: 288, gained: [8, 30, 140],  move: 0,  idle: 5,  wl: [25, 22], shot: 'Volley' },
+    { name: 'Kevin',  user: 'kev.lefty',    g: 'm', pts: 214, gained: [20, 52, 120], move: 2,  idle: 0,  wl: [19, 17], shot: 'Chiquita' },
+    { name: 'Budi',   user: 'budi_lob',     g: 'm', pts: 186, gained: [-10, -25, 60], move: -1, idle: 23, wl: [15, 20], shot: 'Lob' },
+    { name: 'Tono',   user: 'tono',         g: 'm', pts: 120, gained: [6, 14, 120],  move: 0,  idle: 6,  wl: [9, 12],  shot: 'Bandeja' },
+    { name: 'Gilang', user: 'gilang22',     g: 'm', pts: 64,  gained: [14, 40, 64],  move: 1,  idle: 1,  wl: [5, 6],   shot: 'Smash' },
+    { name: 'Hendra', user: 'hendra',       g: 'm', pts: 22,  gained: [0, 22, 22],   move: -1, idle: 12, wl: [2, 4],   shot: 'Lob' },
+
+    { name: 'Sari',   user: 'sari.vibora',  g: 'f', pts: 404, gained: [15, 48, 250], move: 0,  idle: 0,  wl: [40, 15], shot: 'Víbora' },
+    { name: 'Maya',   user: 'maya',         g: 'f', pts: 297, gained: [10, 27, 170], move: 1,  idle: 3,  wl: [28, 19], shot: 'Volley' },
+    { name: 'Lia',    user: 'lia.padel',    g: 'f', pts: 268, gained: [-5, 12, 150], move: -1, idle: 9,  wl: [22, 20], shot: 'Lob' },
+    { name: 'Dewi',   user: 'dewi_d',       g: 'f', pts: 205, gained: [18, 44, 205], move: 1,  idle: 1,  wl: [18, 14], shot: 'Bandeja' },
+    { name: 'Nina',   user: 'nina',         g: 'f', pts: 131, gained: [4, 9, 131],   move: 0,  idle: 6,  wl: [10, 13], shot: 'Chiquita' },
+    { name: 'Putri',  user: 'putri.p',      g: 'f', pts: 77,  gained: [11, 31, 77],  move: 0,  idle: 2,  wl: [6, 8],   shot: 'Smash' }
+  ];
+  // Mixed games only: [wins, losses]
+  var mixed = { Rio: [14, 6], Sari: [15, 4], Yoga: [9, 6], Maya: [11, 7], Andi: [8, 9], Dewi: [7, 5], Dimas: [6, 6], Lia: [5, 8], Kevin: [4, 3], Budi: [2, 7] };
+
+  var state = { ladder: 'men', period: 'all', q: '' };
+  var PERIOD_INDEX = { week: 0, month: 1, year: 2 };
+
+  // ===== Helpers =====
+  function $(id) { return document.getElementById(id); }
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+  function avatar(p) {
+    return '<div class="avatar" style="border-color:' + tierOf(p.pts).color + '">' + p.name[0] + '</div>';
+  }
+  function pill(p) {
+    var t = tierOf(p.pts);
+    return '<span class="pill">' + t.icon + ' ' + t.name + '</span>';
+  }
+
+  // Build the sorted list for the current choices
+  function currentRanking() {
+    var list;
+    if (state.ladder === 'mixed') {
+      list = players.filter(function (p) { return mixed[p.name]; }).map(function (p) {
+        var r = mixed[p.name];
+        return { p: p, value: Math.round(r[0] / (r[0] + r[1]) * 100), label: r[0] + 'W ' + r[1] + 'L' };
+      });
+    } else {
+      var g = state.ladder === 'men' ? 'm' : 'f';
+      list = players.filter(function (p) { return p.g === g; }).map(function (p) {
+        var v = state.period === 'all' ? p.pts : p.gained[PERIOD_INDEX[state.period]];
+        return { p: p, value: v };
+      });
+    }
+    list.sort(function (a, b) { return b.value - a.value; });
+    list.forEach(function (x, i) { x.rank = i + 1; });
+    return list;
+  }
+
+  function valueText(x) {
+    if (state.ladder === 'mixed') return x.value + '%';
+    if (state.period === 'all') return x.value;
+    return (x.value > 0 ? '+' : '') + x.value;
+  }
+
+  // ===== Draw the screen =====
+  function render() {
+    var explain = {
+      all: 'Total points. Top 3 get the podium 🏆',
+      week: 'Most points gained this week',
+      month: 'Most points gained this month',
+      year: 'Most points gained this year'
+    }[state.period];
+    if (state.ladder === 'mixed') explain = 'Mixed games only (1 man + 1 woman per team), ranked by win rate. Uses the 0.75 Strength Factor.';
+    $('explain').textContent = explain;
+    $('periods').style.display = state.ladder === 'mixed' ? 'none' : 'flex';
+
+    var ranking = currentRanking();
+    var q = state.q.toLowerCase();
+    var searching = q.length > 0;
+    var shown = ranking.filter(function (x) {
+      return !searching || x.p.name.toLowerCase().indexOf(q) > -1 || x.p.user.indexOf(q) > -1;
+    });
+
+    // Podium only when not searching
+    var podiumEl = $('podium');
+    if (!searching && shown.length >= 3) {
+      var order = [shown[1], shown[0], shown[2]];
+      var cls = ['p2', 'p1', 'p3'];
+      podiumEl.innerHTML = order.map(function (x, i) {
+        return '<button class="step ' + cls[i] + '" data-player="' + x.p.name + '">' +
+          '<div class="crown">' + (cls[i] === 'p1' ? '👑' : '') + '</div>' +
+          avatar(x.p) +
+          '<div class="nm">' + x.p.name + (x.p.me ? ' (you)' : '') + '</div>' +
+          '<div class="pt">' + valueText(x) + (state.ladder === 'mixed' ? ' wins' : ' pts') + '</div>' +
+          '<div class="block">' + x.rank + '</div></button>';
+      }).join('');
+      podiumEl.style.display = 'grid';
+    } else {
+      podiumEl.style.display = 'none';
+    }
+
+    var rest = searching ? shown : shown.slice(3);
+    if (!rest.length && searching) {
+      $('list').innerHTML = '<div class="empty">No player called "' + state.q.replace(/</g, '&lt;') + '" 🤷</div>';
+      return;
+    }
+
+    var html = '';
+    var lastZone = null;
+    rest.forEach(function (x) {
+      // In "All time" men/women, show a divider when we enter a new tier zone
+      if (state.period === 'all' && state.ladder !== 'mixed' && !searching) {
+        var t = tierOf(x.p.pts);
+        if (t.name !== lastZone) {
+          html += '<div class="zone">' + t.icon + ' ' + t.name + ' zone</div>';
+          lastZone = t.name;
+        }
+      }
+      var p = x.p;
+      var move = p.move > 0 ? '<span class="up">▲' + p.move + '</span>'
+               : p.move < 0 ? '<span class="down">▼' + (-p.move) + '</span>'
+               : '<span class="same">–</span>';
+      html += '<button class="row' + (p.me ? ' me' : '') + '" data-player="' + p.name + '">' +
+        '<div class="pos">' + x.rank + '</div>' + avatar(p) +
+        '<div class="info"><div class="nm">' + p.name + (p.me ? ' <span class="meta">(you)</span>' : '') + '</div>' +
+        '<div class="sub">' + pill(p) + (p.idle >= 7 ? '<span class="ice">🧊 ' + p.idle + 'd idle</span>' : '') + '</div></div>' +
+        '<div class="score">' + valueText(x) +
+        '<small>' + (state.ladder === 'mixed' ? x.label : move) + '</small></div></button>';
+    });
+    $('list').innerHTML = html;
+  }
+
+  // ===== Player pop-up =====
+  function openPlayer(name) {
+    var p = players.filter(function (x) { return x.name === name; })[0];
+    var t = tierOf(p.pts);
+    var rate = Math.round(p.wl[0] / (p.wl[0] + p.wl[1]) * 100);
+    $('playerBody').innerHTML =
+      '<div class="pp-head">' + avatar(p) +
+        '<div><div class="name">' + p.name + (p.me ? ' (you)' : '') + '</div><div class="meta">@' + p.user + '</div>' +
+        '<div style="margin-top:4px">' + pill(p) + '</div></div></div>' +
+      '<div class="pp-grid">' +
+        '<div><strong>' + p.pts + '</strong><small>Points</small></div>' +
+        '<div><strong>' + rate + '%</strong><small>Win rate</small></div>' +
+        '<div><strong>' + p.wl[0] + '-' + p.wl[1] + '</strong><small>W-L</small></div>' +
+      '</div>' +
+      '<p class="meta" style="margin:0 0 12px">🎯 Best shot: <b style="color:var(--text)">' + p.shot + '</b>' +
+        (p.idle >= 7 ? ' · 🧊 Hasn\'t played for ' + p.idle + ' days' : ' · Last game ' + (p.idle === 0 ? 'today' : p.idle + 'd ago')) + '</p>' +
+      (p.me
+        ? '<div class="pp-btns"><a class="btn btn-primary" href="profile.html" style="text-align:center;text-decoration:none">View my profile</a></div>'
+        : '<div class="pp-btns"><button class="btn btn-ghost" data-soon="Friend profiles">👤 Profile</button><button class="btn btn-primary" data-soon="Challenges">⚔️ Challenge</button></div>');
+    $('playerSheet').classList.add('open');
+    $('backdrop').classList.add('open');
+  }
+  function closePlayer() {
+    $('playerSheet').classList.remove('open');
+    $('backdrop').classList.remove('open');
+  }
+  $('backdrop').addEventListener('click', closePlayer);
+
+  // ===== Clicks & typing =====
+  $('search').addEventListener('input', function () { state.q = this.value.trim(); render(); });
+
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-ladder],[data-period],[data-player],[data-soon]');
+    if (!el) return;
+    if (el.dataset.ladder) {
+      state.ladder = el.dataset.ladder;
+      document.querySelectorAll('#ladders button').forEach(function (b) { b.classList.toggle('on', b === el); });
+      render();
+    } else if (el.dataset.period) {
+      state.period = el.dataset.period;
+      document.querySelectorAll('#periods button').forEach(function (b) { b.classList.toggle('on', b === el); });
+      render();
+    } else if (el.dataset.player) {
+      openPlayer(el.dataset.player);
+    } else if (el.dataset.soon) {
+      e.preventDefault();
+      closePlayer();
+      toast('🚧 ' + el.dataset.soon + ': coming in a later step');
+    }
+  });
+
+  render();
+</script>
+</body>
+</html>

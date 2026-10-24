@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PadPal Play</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script>PadPal.me = PadPal.guard(); // members only</script>
+<style>
+  /* ===== Play-only styles ===== */
+  .seg { display: flex; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 3px; margin: 4px 0 14px; }
+  .seg button { flex: 1; border: 0; background: none; padding: 9px 0; border-radius: 9px; font-size: 14px; color: var(--text-2); font-weight: 600; }
+  .seg button.on { background: var(--primary); color: var(--primary-text); }
+  .panel { display: none; }
+  .panel.on { display: block; }
+
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-2); margin: 18px 0 10px; }
+  .big-btn { width: 100%; margin-bottom: 12px; padding: 14px; font-size: 16px; }
+
+  /* Open games */
+  .game .when { font-weight: 700; font-size: 16px; }
+  .game .where { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .game .tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .tag { font-size: 12px; background: var(--card-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; }
+  .slots { display: flex; align-items: center; gap: 6px; }
+  .slots .avatar { width: 36px; height: 36px; font-size: 14px; }
+  .slots .free { width: 36px; height: 36px; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; color: var(--text-2); font-size: 13px; }
+  .slots .need { font-size: 13px; font-weight: 700; color: var(--accent); margin-left: 4px; white-space: nowrap; }
+  .slots .btn { margin-left: auto; padding: 9px 14px; font-size: 14px; white-space: nowrap; }
+  .slots .joined { background: var(--card-2); color: var(--win); border: 1px solid var(--win); }
+
+  /* Formats */
+  .quick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+  .quick-row button { border: 0; border-radius: 16px; padding: 16px 12px; text-align: left; color: #fff; }
+  .quick-row span { font-size: 28px; display: block; margin-bottom: 4px; }
+  .quick-row strong { display: block; font-size: 15px; }
+  .quick-row small { font-size: 12px; opacity: .85; }
+  .formats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .format { border: 1px solid var(--line); background: var(--card); border-radius: 14px; padding: 12px; text-align: left; }
+  .format span { font-size: 22px; }
+  .format strong { display: block; font-size: 14px; margin-top: 4px; }
+  .format small { color: var(--text-2); font-size: 12px; }
+
+  .guide p, .guide li { font-size: 14px; line-height: 1.5; }
+  .guide ol { padding-left: 20px; margin: 8px 0 14px; }
+  .guide .ex { background: var(--card-2); border-radius: 12px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; }
+
+  /* Session setup */
+  .label { font-size: 13px; color: var(--text-2); margin: 14px 0 8px; font-weight: 600; }
+  .pick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pick button { border: 1px solid var(--line); background: var(--card-2); border-radius: 999px; padding: 7px 12px; font-size: 14px; }
+  .pick button.on { background: var(--primary); border-color: var(--primary); color: var(--primary-text); font-weight: 600; }
+  .note { font-size: 12px; color: var(--text-2); margin-top: 8px; }
+
+  /* Session view */
+  .session-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .session-top h3 { margin: 0; font-size: 18px; }
+  .rounds { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-bottom: 12px; }
+  .rounds button { flex-shrink: 0; border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--text-2); }
+  .rounds button.on { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .rounds button.done::after { content: " ✓"; color: var(--win); }
+  .court { width: 100%; text-align: left; display: block; }
+  .court .ct { font-size: 12px; color: var(--text-2); margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .court .vs { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+  .court .tm { font-weight: 600; font-size: 14px; }
+  .court .tm:last-child { text-align: right; }
+  .court .sc { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .court .tap { font-size: 12px; color: var(--accent); margin-top: 8px; text-align: center; }
+  .rest { font-size: 13px; color: var(--text-2); margin: 4px 0 12px; }
+  .lb-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .lb-row:first-child { border-top: 0; }
+  .lb-row .pos { width: 24px; text-align: center; font-weight: 800; }
+  .lb-row .pts { margin-left: auto; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .lb-row small { color: var(--text-2); }
+
+  /* Tournaments */
+  .locked { text-align: center; padding: 22px 16px; }
+  .locked .big { font-size: 46px; }
+  .locked h3 { margin: 6px 0; }
+  .locked p { color: var(--text-2); font-size: 14px; margin: 0 0 12px; }
+  .progress { height: 10px; border-radius: 999px; background: var(--card-2); overflow: hidden; margin: 10px 0 6px; }
+  .progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); }
+
+  /* ===== Score tracker (full screen, big buttons for on court) ===== */
+  .tracker {
+    position: fixed; inset: 0; z-index: 60; background: var(--bg);
+    display: none; flex-direction: column; max-width: 440px; margin: 0 auto;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    user-select: none; -webkit-user-select: none;
+  }
+  .tracker.open { display: flex; }
+  .t-bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; }
+  .t-bar .title { font-weight: 700; flex: 1; text-align: center; font-size: 14px; }
+  .t-bar button { border: 0; background: var(--card); border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 600; }
+  .zone {
+    flex: 1; margin: 6px 12px; border-radius: 22px; border: 0; color: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;
+    transition: transform .08s;
+  }
+  .zone:active { transform: scale(.98); }
+  .zone.a { background: linear-gradient(160deg, #B3261E, #7A1712); }
+  .zone.b { background: linear-gradient(160deg, #3A3F48, #1C1F24); border: 2px solid #D9822B; }
+  .zone .nm { font-size: 16px; font-weight: 600; opacity: .9; }
+  .zone .pt { font-size: 96px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; margin: 6px 0; }
+  .zone .gm { font-size: 14px; opacity: .85; font-variant-numeric: tabular-nums; }
+  .zone .flag { position: absolute; top: 12px; right: 14px; font-size: 12px; font-weight: 700; background: rgba(0,0,0,.35); padding: 3px 9px; border-radius: 999px; }
+  .t-mid { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 2px 12px; font-size: 13px; color: var(--text-2); }
+  .t-mid .sets { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+  .t-mid .gp { color: var(--accent); font-weight: 700; }
+  .t-foot { display: flex; gap: 8px; padding: 8px 12px 12px; }
+  .t-foot button { flex: 1; padding: 14px; font-size: 16px; }
+
+  .done-screen { position: absolute; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 10px; }
+  .done-screen.open { display: flex; }
+  .done-screen .big { font-size: 64px; }
+  .done-screen h3 { margin: 0; font-size: 22px; }
+  .done-screen .final { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .done-screen .btn { width: 100%; max-width: 320px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><span>Pad</span><b>Pal</b></div>
+    <button class="icon-btn" data-open-guide="list" aria-label="Format guide">📖</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="sample-note">🧪 Sample games for now. The score tracker and Americano work, but nothing is saved yet.</div>
+  <div class="seg" id="seg">
+    <button class="on" data-panel="open">📣 Open games</button>
+    <button data-panel="organize">🎯 Organize</button>
+    <button data-panel="tourney">🏆 Tourneys</button>
+  </div>
+
+  <!-- ===== Open games ===== -->
+  <section class="panel on" id="open">
+    <button class="btn btn-primary big-btn" data-soon="Creating open games">📣 Create open game</button>
+    <div id="games"></div>
+  </section>
+
+  <!-- ===== Organize ===== -->
+  <section class="panel" id="organize">
+    <div id="sessionArea"></div>
+    <div id="organizeHome">
+      <h2>Quick start</h2>
+      <div class="quick-row">
+        <button style="background:linear-gradient(150deg,#B3261E,#7A1712)" data-match="1"><span>🎾</span><strong>Normal match</strong><small>Sets · 15-30-40</small></button>
+        <button style="background:linear-gradient(150deg,#D9822B,#9C4F12)" data-setup="americano"><span>🔄</span><strong>Americano</strong><small>Rotate partners</small></button>
+      </div>
+      <h2>All formats <span style="text-transform:none;letter-spacing:0;font-weight:500">· tap for how it works</span></h2>
+      <div class="formats" id="formats"></div>
+    </div>
+  </section>
+
+  <!-- ===== Tournaments ===== -->
+  <section class="panel" id="tourney">
+    <div class="card locked">
+      <div class="big">🔒</div>
+      <h3>Official PadPal Tournaments</h3>
+      <p>Reach <b>500 points</b> (max Junior) to unlock. Only way to become 🥈 Pro and beyond!</p>
+      <div class="progress"><i style="width:72%"></i></div>
+      <div class="meta">You: 362 / 500 points</div>
+    </div>
+    <h2>Upcoming</h2>
+    <div class="card">
+      <div class="user"><div class="avatar">🏆</div><div><div class="name">PadPal Cup #1 · Men's</div><div class="meta">Sat 14 Nov · Groups + Knockout · 1 of 8 qualified (Rio)</div></div></div>
+    </div>
+    <div class="card">
+      <div class="user"><div class="avatar">🎉</div><div><div class="name">Season 0 Friendly Cup</div><div class="meta">Open to everyone · no points · just for fun</div></div></div>
+      <button class="btn btn-accent" style="width:100%;margin-top:12px" data-soon="Friendly tournaments">I'm in!</button>
+    </div>
+  </section>
+</main>
+
+<!-- Bottom tab bar -->
+<nav class="tabbar">
+  <div class="tabs">
+    <a href="feed.html"><span>🏠</span>Feed</a>
+    <a class="on" href="play.html"><span>🎾</span>Play</a>
+    <a href="chat.html"><span>💬</span>Chat</a>
+    <a href="ranks.html"><span>🏆</span>Ranks</a>
+    <a href="profile.html"><span>👤</span>Me</a>
+  </div>
+</nav>
+
+<!-- Pop-up sheet (format guides + session setup) -->
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div id="sheetBody"></div></div>
+
+<!-- Full-screen score tracker -->
+<div class="tracker" id="tracker">
+  <div class="t-bar">
+    <button id="tClose">✕</button>
+    <div class="title" id="tTitle">Normal match</div>
+    <button id="tMode"></button>
+  </div>
+  <button class="zone a" data-point="0">
+    <span class="flag" id="flag0"></span>
+    <div class="nm" id="nm0"></div><div class="pt" id="pt0">0</div><div class="gm" id="gm0"></div>
+  </button>
+  <div class="t-mid" id="tMid"></div>
+  <button class="zone b" data-point="1">
+    <span class="flag" id="flag1"></span>
+    <div class="nm" id="nm1"></div><div class="pt" id="pt1">0</div><div class="gm" id="gm1"></div>
+  </button>
+  <div class="t-foot">
+    <button class="btn btn-ghost" id="tUndo">↩️ Undo</button>
+  </div>
+  <div class="done-screen" id="doneScreen"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===== Helpers =====
+  function $(id) { return document.getElementById(id); }
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+  function openSheet(html) {
+    $('sheetBody').innerHTML = html;
+    $('sheet').scrollTop = 0;
+    $('sheet').classList.add('open');
+    $('backdrop').classList.add('open');
+  }
+  function closeSheet() {
+    $('sheet').classList.remove('open');
+    $('backdrop').classList.remove('open');
+  }
+  $('backdrop').addEventListener('click', closeSheet);
+
+  // ===== Friends (fake) =====
+  var FRIENDS = [
+    { name: 'Yoga', g: 'm', me: true }, { name: 'Rio', g: 'm' }, { name: 'Sari', g: 'f' }, { name: 'Andi', g: 'm' },
+    { name: 'Maya', g: 'f' }, { name: 'Budi', g: 'm' }, { name: 'Dimas', g: 'm' }, { name: 'Dewi', g: 'f' },
+    { name: 'Kevin', g: 'm' }, { name: 'Lia', g: 'f' }
+  ];
+
+  // =====================================================
+  // 1. OPEN GAMES
+  // =====================================================
+  var games = [
+    { when: 'Today · 19:00 – 20:30', where: 'Court 3 · Padel Arena Senayan', level: '⚡ Amateur ± 1 tier', type: 'Friendly match', players: ['Rio', 'Sari', 'Andi'], price: 'Rp 100k / person' },
+    { when: 'Sat 26 Oct · 08:00 – 10:00', where: 'Courts 1–2 · Smash Club', level: 'All levels', type: '🔄 Americano · 8 players', players: ['Maya', 'Dewi', 'Kevin', 'Lia', 'Dimas'], price: 'Rp 120k / person', size: 8 },
+    { when: 'Sun 27 Oct · 07:00 – 08:30', where: 'Court 2 · Padel Arena Senayan', level: '🌱 Newbie – 🎾 Beginner', type: 'Mixed match', players: ['Budi', 'Dewi'], price: 'Rp 90k / person' }
+  ];
+
+  function renderGames() {
+    $('games').innerHTML = games.map(function (g, i) {
+      var size = g.size || 4;
+      var free = size - g.players.length;
+      // show max 3 faces + a "+N" bubble so big games still fit on a phone
+      var shown = g.players.slice(0, 3).map(function (n) { return '<div class="avatar">' + n[0] + '</div>'; }).join('');
+      if (g.players.length > 3) shown += '<div class="free" style="border-style:solid">+' + (g.players.length - 3) + '</div>';
+      var empties = '';
+      for (var k = 0; k < Math.min(free, size > 4 ? 1 : 2); k++) empties += '<div class="free">+</div>';
+      return '<article class="card game">' +
+        '<div class="when">' + g.when + '</div>' +
+        '<div class="where">📍 ' + g.where + '</div>' +
+        '<div class="tags"><span class="tag">' + g.type + '</span><span class="tag">' + g.level + '</span><span class="tag">💸 ' + g.price + '</span></div>' +
+        '<div class="slots">' + shown + empties +
+          (free > 0 ? '<span class="need">Need ' + free + '</span>' : '<span class="need" style="color:var(--win)">Full ✓</span>') +
+          (g.joined
+            ? '<button class="btn joined" data-leave="' + i + '">✓ Joined</button>'
+            : (free > 0 ? '<button class="btn btn-primary" data-join="' + i + '">Join</button>' : '')) +
+        '</div></article>';
+    }).join('');
+  }
+
+  // =====================================================
+  // 2. FORMATS + HOW-TO GUIDES
+  // =====================================================
+  var FORMATS = [
+    { id: 'americano', icon: '🔄', name: 'Americano', short: 'New partner every round', ready: true,
+      how: ['Everyone plays with a different partner each round.', 'Each game is played to a fixed number of points (e.g. 21 or 32 total points).', 'Every point you win goes into YOUR personal total.', 'After all rounds, the player with the most points wins.'],
+      ex: '8 players, 2 courts, 7 rounds. You score 18–14 with Rio → you get 18 points, Rio gets 18.',
+      tip: 'Great for big groups and mixed levels. Everyone plays everyone.' },
+    { id: 'mexicano', icon: '🌮', name: 'Mexicano', short: 'Matched by ranking', ready: true,
+      how: ['Round 1 is random.', 'After each round, players are re-ranked by total points.', 'Then #1 + #4 play #2 + #3 on court 1, #5 + #8 vs #6 + #7 on court 2, and so on.', 'Most points at the end wins.'],
+      ex: 'After round 2 you are #1 → you partner #4 against #2 & #3. Close games every time!',
+      tip: 'Best when levels are very different. Games get more even each round.' },
+    { id: 'mixicano', icon: '🔀', name: 'Mixicano', short: 'Mexicano, always mixed',
+      how: ['Same as Mexicano, but every team is 1 man + 1 woman.', 'Men and women are ranked separately.', 'Top man partners with the lowest-ranked woman in his group, and so on.'],
+      ex: 'Needs equal numbers of men and women (e.g. 4 + 4).', tip: 'Uses the 0.75 Strength Factor when balancing.' },
+    { id: 'team', icon: '🤝', name: 'Team Americano', short: 'Fixed partner',
+      how: ['You keep the SAME partner all session.', 'Each round you face a different team.', 'Your team collects points together.'],
+      ex: '4 teams → every team plays every other team once (3 rounds).', tip: 'Perfect when you come with your usual partner.' },
+    { id: 'robin', icon: '⭕', name: 'Round Robin', short: 'Everyone vs everyone',
+      how: ['Fixed teams.', 'Every team plays every other team once.', 'Win = 3 pts, draw = 1 pt. Most points wins.'],
+      ex: '5 teams = 10 matches.', tip: 'Fair but takes longer.' },
+    { id: 'king', icon: '👑', name: 'King of the Court', short: 'Winners move up',
+      how: ['Courts are ranked: Court 1 is the "King" court.', 'Play a short timed game (e.g. 10 min).', 'Winners move UP one court, losers move DOWN.', 'Whoever wins on Court 1 at the end is King/Queen.'],
+      ex: '3 courts, 12 players, 6 rounds of 10 minutes.', tip: 'Very fun and very competitive 😈' },
+    { id: 'knockout', icon: '⚔️', name: 'Knockout', short: 'Lose and you\'re out',
+      how: ['Teams are placed in a bracket.', 'Lose once → you\'re out.', 'Winners continue until the final.'],
+      ex: '8 teams → quarter-finals, semi-finals, final.', tip: 'Add a "consolation" bracket so losers keep playing.' },
+    { id: 'groups', icon: '🌍', name: 'Groups + Knockout', short: 'Like the World Cup',
+      how: ['Teams play round robin in small groups.', 'Top 2 of each group go to the knockout bracket.', 'Knockout until the final.'],
+      ex: '12 teams → 4 groups of 3 → quarter-finals.', tip: 'Format used for official PadPal tournaments.' },
+    { id: 'box', icon: '📦', name: 'Box League', short: 'Over several weeks',
+      how: ['Players are put in "boxes" of 4–5 by level.', 'Over 2–4 weeks, play everyone in your box (schedule it yourselves).', 'Top of the box moves up, bottom moves down next season.'],
+      ex: 'Box A (best) … Box D. Season = 1 month.', tip: 'Keeps everyone playing weekly, so no inactivity loss!' },
+    { id: 'custom', icon: '🛠️', name: 'Custom', short: 'Your own rules',
+      how: ['Fixed mix: you choose the exact pairs.', 'Fixed partner: pairs never change.', 'Gender-weighted: teams balanced with the Strength Factor.', 'Choose scoring: points (Americano style) or sets (15-30-40).'],
+      ex: '"Boys vs Girls night" with gender weighting on.', tip: 'Coming in a later step.' }
+  ];
+
+  function renderFormats() {
+    $('formats').innerHTML = FORMATS.map(function (f) {
+      return '<button class="format" data-guide="' + f.id + '"><span>' + f.icon + '</span><strong>' + f.name + '</strong><small>' + f.short + '</small></button>';
+    }).join('');
+  }
+
+  function guideHtml(id) {
+    var f = FORMATS.filter(function (x) { return x.id === id; })[0];
+    return '<div class="guide"><h3>' + f.icon + ' ' + f.name + '</h3>' +
+      '<p class="meta" style="margin-top:-6px">How it works</p>' +
+      '<ol>' + f.how.map(function (h) { return '<li>' + h + '</li>'; }).join('') + '</ol>' +
+      '<div class="ex">📝 <b>Example:</b> ' + f.ex + '</div>' +
+      '<div class="ex">💡 ' + f.tip + '</div>' +
+      (f.ready
+        ? '<button class="btn btn-primary" style="width:100%" data-setup="' + f.id + '">Start ' + f.name + '</button>'
+        : '<button class="btn btn-ghost" style="width:100%" data-soon="' + f.name + ' sessions">Start ' + f.name + '</button>') +
+      '</div>';
+  }
+
+  function guideListHtml() {
+    return '<h3>📖 Format guide</h3>' + FORMATS.map(function (f) {
+      return '<button class="format" style="width:100%;margin-bottom:8px;display:flex;gap:12px;align-items:center" data-guide="' + f.id + '">' +
+        '<span>' + f.icon + '</span><div><strong style="margin:0">' + f.name + '</strong><small>' + f.short + '</small></div></button>';
+    }).join('');
+  }
+
+  // =====================================================
+  // 3. AMERICANO / MEXICANO SESSIONS
+  // =====================================================
+  var setup = null;    // choices while setting up
+  var session = null;  // the running session
+
+  function openSetup(format) {
+    setup = setup && setup.format === format ? setup : {
+      format: format,
+      picked: ['Yoga', 'Rio', 'Sari', 'Andi', 'Maya', 'Budi', 'Dimas', 'Dewi'],
+      target: 21,
+      courts: 2
+    };
+    renderSetup();
+  }
+
+  function renderSetup() {
+    var f = FORMATS.filter(function (x) { return x.id === setup.format; })[0];
+    var n = setup.picked.length;
+    var maxCourts = Math.max(1, Math.floor(n / 4));
+    if (setup.courts > maxCourts) setup.courts = maxCourts;
+    var resting = n - setup.courts * 4;
+    openSheet(
+      '<h3>' + f.icon + ' New ' + f.name + '</h3>' +
+      '<div class="label">Players (' + n + ' picked)</div>' +
+      '<div class="pick">' + FRIENDS.map(function (p) {
+        return '<button class="' + (setup.picked.indexOf(p.name) > -1 ? 'on' : '') + '" data-pick="' + p.name + '">' + (p.g === 'f' ? '👩 ' : '👨 ') + p.name + (p.me ? ' (you)' : '') + '</button>';
+      }).join('') + '</div>' +
+      '<div class="label">Points per game</div>' +
+      '<div class="pick">' + [16, 21, 24, 32].map(function (t) {
+        return '<button class="' + (setup.target === t ? 'on' : '') + '" data-target="' + t + '">' + t + '</button>';
+      }).join('') + '</div>' +
+      '<div class="label">Courts</div>' +
+      '<div class="pick">' + [1, 2, 3].map(function (c) {
+        return '<button class="' + (setup.courts === c ? 'on' : '') + '" data-courts="' + c + '"' + (c > maxCourts ? ' disabled style="opacity:.35"' : '') + '>' + c + '</button>';
+      }).join('') + '</div>' +
+      '<p class="note">' + (n < 4 ? '⚠️ Pick at least 4 players.'
+        : resting > 0 ? '🪑 ' + resting + ' player' + (resting > 1 ? 's' : '') + ' will rest each round. The app rotates who rests, fairly.'
+        : '✅ Everyone plays every round.') + '</p>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:14px" data-start="1"' + (n < 4 ? ' disabled style="opacity:.4;width:100%;margin-top:14px"' : '') + '>🚀 Create rounds</button>'
+    );
+  }
+
+  // How many times two players have been partners
+  function partnerKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+
+  // Make the next round: who plays, who rests, who partners whom
+  function makeRound() {
+    var s = session;
+    var courtsNeeded = s.courts * 4;
+    var order;
+    if (s.format === 'mexicano' && s.rounds.length > 0) {
+      // ranking order (most points first), but people who rested least sit out first
+      order = s.players.slice().sort(function (a, b) {
+        return (s.played[a] - s.played[b]) || (s.points[b] - s.points[a]);
+      });
+      var playing = order.slice(0, courtsNeeded).sort(function (a, b) { return s.points[b] - s.points[a]; });
+      var resting = order.slice(courtsNeeded);
+      var matches = [];
+      for (var c = 0; c < s.courts; c++) {
+        var g = playing.slice(c * 4, c * 4 + 4);
+        matches.push({ a: [g[0], g[3]], b: [g[1], g[2]], score: null });
+      }
+      return { matches: matches, resting: resting };
+    }
+    // Americano (and Mexicano round 1): fewest games first, then avoid repeat partners
+    var shuffled = s.players.slice().sort(function () { return Math.random() - 0.5; });
+    order = shuffled.sort(function (a, b) { return s.played[a] - s.played[b]; });
+    var playing2 = order.slice(0, courtsNeeded);
+    var resting2 = order.slice(courtsNeeded);
+    var ms = [];
+    for (var k = 0; k < s.courts; k++) {
+      var q = playing2.slice(k * 4, k * 4 + 4);
+      var options = [[[q[0], q[1]], [q[2], q[3]]], [[q[0], q[2]], [q[1], q[3]]], [[q[0], q[3]], [q[1], q[2]]]];
+      options.sort(function (x, y) {
+        function cost(o) { return (s.partners[partnerKey(o[0][0], o[0][1])] || 0) + (s.partners[partnerKey(o[1][0], o[1][1])] || 0); }
+        return cost(x) - cost(y);
+      });
+      ms.push({ a: options[0][0], b: options[0][1], score: null });
+    }
+    return { matches: ms, resting: resting2 };
+  }
+
+  function startSession() {
+    var s = session = {
+      format: setup.format,
+      players: setup.picked.slice(),
+      target: setup.target,
+      courts: setup.courts,
+      totalRounds: Math.min(7, Math.max(3, setup.picked.length - 1)),
+      rounds: [], view: 0,
+      points: {}, played: {}, partners: {}
+    };
+    s.players.forEach(function (p) { s.points[p] = 0; s.played[p] = 0; });
+    s.rounds.push(makeRound());
+    closeSheet();
+    renderSession();
+  }
+
+  function saveScore(roundIdx, matchIdx, a, b) {
+    var s = session;
+    var m = s.rounds[roundIdx].matches[matchIdx];
+    if (m.score) { // undo the old score first if re-entered
+      m.a.forEach(function (p) { s.points[p] -= m.score[0]; s.played[p]--; });
+      m.b.forEach(function (p) { s.points[p] -= m.score[1]; s.played[p]--; });
+      s.partners[partnerKey(m.a[0], m.a[1])]--; s.partners[partnerKey(m.b[0], m.b[1])]--;
+    }
+    m.score = [a, b];
+    m.a.forEach(function (p) { s.points[p] += a; s.played[p]++; });
+    m.b.forEach(function (p) { s.points[p] += b; s.played[p]++; });
+    s.partners[partnerKey(m.a[0], m.a[1])] = (s.partners[partnerKey(m.a[0], m.a[1])] || 0) + 1;
+    s.partners[partnerKey(m.b[0], m.b[1])] = (s.partners[partnerKey(m.b[0], m.b[1])] || 0) + 1;
+  }
+
+  function roundDone(r) { return r.matches.every(function (m) { return m.score; }); }
+
+  function leaderboard() {
+    var s = session;
+    return s.players.slice().sort(function (a, b) { return s.points[b] - s.points[a]; });
+  }
+
+  function renderSession() {
+    var area = $('sessionArea');
+    if (!session) { area.innerHTML = ''; $('organizeHome').style.display = ''; return; }
+    $('organizeHome').style.display = 'none';
+    var s = session;
+    var f = FORMATS.filter(function (x) { return x.id === s.format; })[0];
+    var r = s.rounds[s.view];
+    var isLast = s.view === s.rounds.length - 1;
+    var finished = s.rounds.length === s.totalRounds && roundDone(s.rounds[s.rounds.length - 1]);
+
+    var html = '<div class="session-top"><h3>' + f.icon + ' ' + f.name + '</h3>' +
+      '<button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-end="1">End</button></div>' +
+      '<p class="meta" style="margin:0 0 10px">' + s.players.length + ' players · ' + s.courts + ' court' + (s.courts > 1 ? 's' : '') + ' · ' + s.target + ' pts per game</p>' +
+      '<div class="rounds">';
+    for (var i = 0; i < s.totalRounds; i++) {
+      var exists = i < s.rounds.length;
+      html += '<button class="' + (i === s.view ? 'on ' : '') + (exists && roundDone(s.rounds[i]) ? 'done' : '') + '"' +
+        (exists ? ' data-view="' + i + '"' : ' disabled style="opacity:.4"') + '>Round ' + (i + 1) + '</button>';
+    }
+    html += '</div>';
+
+    r.matches.forEach(function (m, mi) {
+      html += '<button class="card court" data-score="' + mi + '">' +
+        '<div class="ct"><span>Court ' + (mi + 1) + '</span><span>' + (m.score ? '✅ Done' : '⏳ Playing') + '</span></div>' +
+        '<div class="vs"><div class="tm">' + m.a.join(' & ') + '</div>' +
+        '<div class="sc">' + (m.score ? m.score[0] + ' – ' + m.score[1] : 'vs') + '</div>' +
+        '<div class="tm">' + m.b.join(' & ') + '</div></div>' +
+        '<div class="tap">' + (m.score ? 'Tap to fix score' : '👆 Tap to keep score') + '</div></button>';
+    });
+    if (r.resting.length) html += '<div class="rest">🪑 Resting this round: <b>' + r.resting.join(', ') + '</b></div>';
+
+    if (isLast && roundDone(r) && !finished) {
+      html += '<button class="btn btn-primary big-btn" data-next="1">Next round ➡️</button>';
+    } else if (finished && isLast) {
+      html += '<button class="btn btn-accent big-btn" data-finish="1">🏁 Finish & post results</button>';
+    }
+
+    html += '<h2>Live leaderboard</h2><div class="card">' + leaderboard().map(function (p, i) {
+      var medal = ['🥇', '🥈', '🥉'][i] || (i + 1);
+      return '<div class="lb-row"><span class="pos">' + medal + '</span><span>' + p + '</span><small>' + s.played[p] + ' games</small><span class="pts">' + s.points[p] + '</span></div>';
+    }).join('') + '</div>';
+    area.innerHTML = html;
+  }
+
+  // =====================================================
+  // 4. SCORE TRACKERS (big buttons)
+  // =====================================================
+  // mode 'sets' = normal padel scoring; mode 'points' = Americano/Mexicano points
+  var T = null;
+  var undoStack = [];
+
+  function openTracker(opts) {
+    T = opts;
+    undoStack = [];
+    $('doneScreen').classList.remove('open');
+    $('tracker').classList.add('open');
+    renderTracker();
+  }
+  function closeTracker() { $('tracker').classList.remove('open'); T = null; }
+
+  function newMatch() {
+    openTracker({
+      mode: 'sets', title: 'Normal match', names: ['You & Sari', 'Andi & Rio'],
+      golden: true, pts: [0, 0], games: [0, 0], sets: [], setsWon: [0, 0], tiebreak: false, over: false
+    });
+  }
+
+  var LABELS = ['0', '15', '30', '40'];
+  function pointLabel(t) {
+    var p = T.pts, o = 1 - t;
+    if (T.tiebreak) return String(p[t]);
+    if (p[0] >= 3 && p[1] >= 3) {
+      if (p[t] === p[o]) return '40';
+      return p[t] > p[o] ? 'AD' : '40';
+    }
+    return LABELS[p[t]];
+  }
+
+  function winGame(t) {
+    var o = 1 - t;
+    T.games[t]++;
+    T.pts = [0, 0];
+    if (T.tiebreak || (T.games[t] >= 6 && T.games[t] - T.games[o] >= 2)) {
+      T.sets.push(T.games.slice());
+      T.setsWon[t]++;
+      T.games = [0, 0];
+      T.tiebreak = false;
+      if (T.setsWon[t] === 2) T.over = true;
+    } else if (T.games[0] === 6 && T.games[1] === 6) {
+      T.tiebreak = true;
+    }
+  }
+
+  function addPoint(t) {
+    if (!T || T.over) return;
+    undoStack.push(JSON.stringify(T));
+    var o = 1 - t;
+    if (T.mode === 'points') {
+      T.pts[t]++;
+      if (T.pts[0] + T.pts[1] >= T.target) T.over = true;
+    } else if (T.tiebreak) {
+      T.pts[t]++;
+      if (T.pts[t] >= 7 && T.pts[t] - T.pts[o] >= 2) winGame(t);
+    } else {
+      T.pts[t]++;
+      var golden = T.golden && T.pts[t] === 4 && T.pts[o] === 3;
+      if ((T.pts[t] >= 4 && T.pts[t] - T.pts[o] >= 2) || golden) winGame(t);
+    }
+    if (navigator.vibrate) navigator.vibrate(15);
+    renderTracker();
+  }
+
+  function undo() {
+    if (!undoStack.length) return;
+    T = JSON.parse(undoStack.pop());
+    $('doneScreen').classList.remove('open');
+    renderTracker();
+  }
+
+  function renderTracker() {
+    $('tTitle').textContent = T.title;
+    for (var t = 0; t < 2; t++) {
+      $('nm' + t).textContent = T.names[t];
+      if (T.mode === 'points') {
+        $('pt' + t).textContent = T.pts[t];
+        $('gm' + t).textContent = '';
+        $('flag' + t).textContent = '';
+      } else {
+        $('pt' + t).textContent = pointLabel(t);
+        $('gm' + t).textContent = 'Games ' + T.games[t] + '  ·  Sets ' + T.setsWon[t];
+        var p = T.pts, o = 1 - t;
+        var flag = '';
+        if (T.tiebreak) flag = 'TIEBREAK';
+        else if (T.golden && p[0] === 3 && p[1] === 3) flag = 'GOLDEN POINT';
+        else if ((p[t] >= 3 && p[t] > p[o]) || (p[t] === 3 && p[o] < 3)) flag = T.games[t] >= 5 && T.games[t] > T.games[o] ? 'SET POINT' : 'GAME POINT';
+        $('flag' + t).textContent = flag;
+      }
+    }
+    if (T.mode === 'points') {
+      $('tMode').textContent = T.target + ' pts';
+      $('tMid').innerHTML = '<span>Points played</span><span class="sets">' + (T.pts[0] + T.pts[1]) + ' / ' + T.target + '</span>';
+    } else {
+      $('tMode').textContent = T.golden ? '⚡ Golden' : '🔁 Advantage';
+      var sets = T.sets.map(function (s) { return s[0] + '-' + s[1]; }).join('  ');
+      $('tMid').innerHTML = '<span>Sets</span><span class="sets">' + (sets || '–') + '</span>' +
+        (T.golden ? '<span class="gp">· golden point on</span>' : '');
+    }
+    if (T.over) showDone();
+  }
+
+  function showDone() {
+    var win = T.mode === 'points' ? (T.pts[0] >= T.pts[1] ? 0 : 1) : (T.setsWon[0] > T.setsWon[1] ? 0 : 1);
+    var final = T.mode === 'points'
+      ? T.pts[0] + ' – ' + T.pts[1]
+      : T.sets.map(function (s) { return s[0] + '-' + s[1]; }).join('  ');
+    $('doneScreen').innerHTML =
+      '<div class="big">🏆</div><h3>' + T.names[win] + ' win!</h3>' +
+      '<div class="final">' + final + '</div>' +
+      (T.mode === 'sets' ? '<p class="meta">Winners <span class="plus">+10</span> · Losers <span class="minus">−5</span> (example)</p>' : '') +
+      (T.onSave
+        ? '<button class="btn btn-primary" data-save-score="1">✅ Save score</button>'
+        : '<button class="btn btn-primary" data-soon="Posting results">📣 Post to feed</button>' +
+          '<button class="btn btn-accent" data-soon="Shot ratings">🎾 Rate shots</button>') +
+      '<button class="btn btn-ghost" data-undo-last="1">↩️ Undo last point</button>';
+    $('doneScreen').classList.add('open');
+  }
+
+  // "Are you sure?" without pop-up dialogs: tap once to warn, tap again within 3s to do it
+  var armed = {};
+  function tapTwice(key, warning) {
+    if (armed[key]) { armed[key] = false; return true; }
+    armed[key] = true;
+    toast(warning);
+    setTimeout(function () { armed[key] = false; }, 3000);
+    return false;
+  }
+
+  $('tClose').addEventListener('click', function () {
+    var started = T && !T.over && (T.pts[0] + T.pts[1] > 0 || (T.games && T.games[0] + T.games[1] > 0));
+    if (started && !tapTwice('leave', 'Tap ✕ again to leave. This score will be lost.')) return;
+    closeTracker();
+  });
+  $('tUndo').addEventListener('click', undo);
+  $('tMode').addEventListener('click', function () {
+    if (T.mode !== 'sets') return;
+    T.golden = !T.golden;
+    toast(T.golden ? '⚡ Golden point: at 40-40 next point wins' : '🔁 Advantage: must win by 2 at deuce');
+    renderTracker();
+  });
+
+  // =====================================================
+  // CLICKS
+  // =====================================================
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-panel],[data-join],[data-leave],[data-guide],[data-open-guide],[data-setup],[data-pick],[data-target],[data-courts],[data-start],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-soon]');
+    if (!el) return;
+    var d = el.dataset;
+
+    if (d.panel) {
+      document.querySelectorAll('#seg button').forEach(function (b) { b.classList.toggle('on', b === el); });
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.toggle('on', p.id === d.panel); });
+    }
+    else if (d.join !== undefined) {
+      var g = games[d.join];
+      g.players.push('Yoga'); g.joined = true;
+      renderGames();
+      toast('🎾 You joined! Game chat created 💬');
+    }
+    else if (d.leave !== undefined) {
+      var g2 = games[d.leave];
+      g2.players.pop(); g2.joined = false;
+      renderGames();
+      toast('You left the game');
+    }
+    else if (d.openGuide) openSheet(guideListHtml());
+    else if (d.guide) openSheet(guideHtml(d.guide));
+    else if (d.setup) {
+      if (session) { closeSheet(); toast('Finish the current session first'); return; }
+      document.querySelector('[data-panel=organize]').click();
+      openSetup(d.setup);
+    }
+    else if (d.pick) {
+      var i = setup.picked.indexOf(d.pick);
+      if (i > -1) setup.picked.splice(i, 1); else setup.picked.push(d.pick);
+      renderSetup();
+    }
+    else if (d.target) { setup.target = +d.target; renderSetup(); }
+    else if (d.courts) { setup.courts = +d.courts; renderSetup(); }
+    else if (d.start) startSession();
+    else if (d.view !== undefined) { session.view = +d.view; renderSession(); }
+    else if (d.score !== undefined) {
+      var ri = session.view, mi = +d.score;
+      var m = session.rounds[ri].matches[mi];
+      openTracker({
+        mode: 'points', title: 'Round ' + (ri + 1) + ' · Court ' + (mi + 1),
+        names: [m.a.join(' & '), m.b.join(' & ')], target: session.target, pts: [0, 0], over: false,
+        onSave: function () { saveScore(ri, mi, T.pts[0], T.pts[1]); closeTracker(); renderSession(); toast('✅ Score saved'); }
+      });
+    }
+    else if (d.saveScore) T.onSave();
+    else if (d.undoLast) undo();
+    else if (d.next) {
+      session.rounds.push(makeRound());
+      session.view = session.rounds.length - 1;
+      renderSession();
+      window.scrollTo(0, 0);
+    }
+    else if (d.finish) {
+      var top = leaderboard();
+      toast('🏆 ' + top[0] + ' wins! Results posted to the feed (coming in Stage 1)');
+      session = null; setup = null;
+      renderSession();
+    }
+    else if (d.end) {
+      if (tapTwice('end', 'Tap End again to stop. Scores will be lost.')) { session = null; renderSession(); }
+    }
+    else if (d.match) newMatch();
+    else if (d.point !== undefined) addPoint(+d.point);
+    else if (d.soon) {
+      e.preventDefault();
+      closeSheet();
+      toast('🚧 ' + d.soon + ': coming in a later step');
+    }
+  });
+
+  renderGames();
+  renderFormats();
+</script>
+</body>
+</html>

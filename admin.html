@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PadPal Admin</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<style>
+  /* ===== Admin-only styles ===== */
+  .back { text-decoration: none; color: var(--accent); font-weight: 600; font-size: 15px; }
+  h1 { font-size: 24px; margin: 6px 0 4px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-2); margin: 22px 0 10px; display: flex; justify-content: space-between; }
+  .count { background: var(--primary); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 12px; letter-spacing: 0; }
+  .person { display: flex; align-items: center; gap: 12px; }
+  .person .info { flex: 1; min-width: 0; }
+  .person .meta b { color: var(--text); font-weight: 600; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; }
+  .actions .btn { flex: 1; padding: 10px; font-size: 14px; }
+  .btn-approve { background: var(--win); color: #fff; }
+  .empty { text-align: center; color: var(--text-2); padding: 18px 0; font-size: 14px; }
+  .member { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .member:first-child { border-top: 0; }
+  .member .info { flex: 1; min-width: 0; }
+  .link-box { margin-top: 12px; display: flex; gap: 8px; }
+  .link-box input { flex: 1; min-width: 0; font-size: 13px; }
+  .soon { opacity: .6; }
+</style>
+</head>
+<body>
+
+<main class="wrap" style="padding-top:calc(16px + env(safe-area-inset-top))">
+  <a class="back" href="profile.html">‹ Back to profile</a>
+  <h1>👑 Admin panel</h1>
+  <p class="meta">Only you can see this page.</p>
+
+  <h2>Waiting for approval <span class="count" id="pendingCount">0</span></h2>
+  <div id="pending"><div class="empty">Loading…</div></div>
+
+  <h2>Invite someone</h2>
+  <div class="card">
+    <p class="meta" style="margin:0 0 12px">Each link works for one person. They still need your approval after signing up.</p>
+    <button class="btn btn-primary" style="width:100%" id="makeInvite">🎟️ Create invite link</button>
+    <div class="link-box" id="linkBox" hidden>
+      <input class="input" id="linkText" readonly aria-label="Invite link">
+      <button class="btn btn-ghost" id="copyLink">Copy</button>
+    </div>
+  </div>
+
+  <h2>Members <span class="count" id="memberCount">0</span></h2>
+  <div class="card" id="members"></div>
+
+  <h2>Settings</h2>
+  <div class="card soon">
+    <div class="name">⚖️ Strength Factor: 0.75</div>
+    <div class="meta">For mixed games. Editable when the points system arrives (Stage 2).</div>
+  </div>
+
+  <div class="error-box" id="error" role="alert" hidden></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  var db = PadPal.db;
+  var people = [];
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2500);
+  }
+  function showError(err) { $('error').textContent = PadPal.friendlyError(err); $('error').hidden = false; }
+  function ago(iso) {
+    var mins = Math.round((Date.now() - new Date(iso)) / 60000);
+    if (mins < 60) return mins + ' min ago';
+    if (mins < 1440) return Math.round(mins / 60) + 'h ago';
+    return Math.round(mins / 1440) + 'd ago';
+  }
+  function nameOf(id) {
+    var p = people.filter(function (x) { return x.id === id; })[0];
+    return p ? (p.display_name || p.username || 'someone') : 'someone';
+  }
+  var LADDER = { m: '👨 Men', f: '👩 Women' };
+
+  async function load() {
+    var r = await db.from('profiles')
+      .select('id, username, display_name, gender, status, is_admin, invited_by, created_at')
+      .order('created_at');
+    if (r.error) return showError(r.error);
+    people = r.data;
+    render();
+  }
+
+  function render() {
+    var pending = people.filter(function (p) { return p.status === 'pending'; });
+    var members = people.filter(function (p) { return p.status === 'approved'; });
+    $('pendingCount').textContent = pending.length;
+    $('memberCount').textContent = members.length;
+
+    $('pending').innerHTML = pending.length ? pending.map(function (p) {
+      return '<div class="card"><div class="person"><div class="avatar">' + esc((p.display_name || p.username || '?')[0].toUpperCase()) + '</div>' +
+        '<div class="info"><div class="name">' + esc(p.display_name || 'No name yet') + '</div>' +
+        '<div class="meta">' + (p.username ? '@' + esc(p.username) + ' · ' : '⚠️ profile not filled in yet · ') + (LADDER[p.gender] || '') + '</div>' +
+        '<div class="meta">Invited by <b>' + esc(nameOf(p.invited_by)) + '</b> · ' + ago(p.created_at) + '</div></div></div>' +
+        '<div class="actions"><button class="btn btn-ghost" data-reject="' + p.id + '">❌ Reject</button>' +
+        '<button class="btn btn-approve" data-approve="' + p.id + '">✅ Approve</button></div></div>';
+    }).join('') : '<div class="card empty">Nobody is waiting. 👍</div>';
+
+    $('members').innerHTML = members.map(function (p) {
+      return '<div class="member"><div class="avatar">' + esc((p.display_name || p.username || '?')[0].toUpperCase()) + '</div>' +
+        '<div class="info"><div class="name">' + esc(p.display_name || p.username) + (p.is_admin ? ' <span class="pill">👑 Admin</span>' : '') + '</div>' +
+        '<div class="meta">@' + esc(p.username) + ' · ' + (LADDER[p.gender] || '') + '</div></div></div>';
+    }).join('');
+  }
+
+  async function setStatus(id, status, btn) {
+    btn.disabled = true;
+    var r = await db.rpc('set_member_status', { member: id, new_status: status });
+    if (r.error) { btn.disabled = false; return showError(r.error); }
+    toast(status === 'approved' ? '✅ ' + nameOf(id) + ' is in!' : '❌ ' + nameOf(id) + ' was rejected');
+    load();
+  }
+
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-approve],[data-reject]');
+    if (!el) return;
+    if (el.dataset.approve) setStatus(el.dataset.approve, 'approved', el);
+    else setStatus(el.dataset.reject, 'rejected', el);
+  });
+
+  $('makeInvite').addEventListener('click', async function () {
+    this.disabled = true;
+    try {
+      var link = await PadPal.createInvite();
+      $('linkText').value = link;
+      $('linkBox').hidden = false;
+      toast('🎟️ Invite link ready');
+    } catch (err) { showError(err); }
+    this.disabled = false;
+  });
+  $('copyLink').addEventListener('click', async function () {
+    try { await navigator.clipboard.writeText($('linkText').value); toast('📋 Copied!'); }
+    catch (err) { $('linkText').select(); toast('Select the link and copy it'); }
+  });
+
+  PadPal.guard({ admin: true }).then(function (me) { if (me) load(); });
+</script>
+</body>
+</html>

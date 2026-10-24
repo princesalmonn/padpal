@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PadPal Login</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<style>
+  /* ===== Login-only styles ===== */
+  .auth { max-width: 420px; margin: 0 auto; padding: calc(40px + env(safe-area-inset-top)) 16px 40px; }
+  .brand { text-align: center; margin-bottom: 24px; }
+  .brand .logo { font-size: 44px; }
+  .brand p { margin: 4px 0 0; color: var(--text-2); }
+  .auth .card { padding: 20px; }
+  .auth h1 { font-size: 22px; margin: 0 0 6px; }
+  .auth .lead { color: var(--text-2); margin: 0 0 18px; font-size: 15px; line-height: 1.45; }
+  .auth .btn { width: 100%; padding: 14px; font-size: 16px; }
+  .hint { font-size: 13px; color: var(--text-2); text-align: center; margin: 14px 0 0; line-height: 1.45; }
+  .invite-banner { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); border-radius: 12px; padding: 10px 12px; font-weight: 600; font-size: 14px; margin-bottom: 16px; text-align: center; }
+  .code-input { text-align: center; font-size: 28px; letter-spacing: 8px; font-variant-numeric: tabular-nums; }
+  .linkish { border: 0; background: none; color: var(--accent); font-weight: 600; font-size: 14px; padding: 12px 0 0; width: 100%; }
+  .big-emoji { font-size: 56px; text-align: center; margin-bottom: 6px; }
+  .center { text-align: center; }
+  .stack { display: grid; gap: 10px; }
+  #error { margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<main class="auth">
+  <div class="brand">
+    <div class="logo"><span>Pad</span><b>Pal</b></div>
+    <p>Padel with your crew 🎾</p>
+  </div>
+
+  <!-- Loading -->
+  <section class="card center" id="stepLoading"><p class="meta">Loading…</p></section>
+
+  <!-- 1. Email -->
+  <section class="card" id="stepEmail" hidden>
+    <div class="invite-banner" id="inviteBanner" hidden>🎟️ You've been invited to PadPal!</div>
+    <h1>Log in or join</h1>
+    <p class="lead">No password needed. We'll email you a login link.</p>
+    <form id="emailForm">
+      <div class="field">
+        <label for="email">Your email</label>
+        <input class="input" id="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@email.com">
+      </div>
+      <button class="btn btn-primary" id="emailBtn">Send me a login link</button>
+    </form>
+    <p class="hint">PadPal is invite-only. New here? Ask a member for an invite link.</p>
+  </section>
+
+  <!-- 2. Code -->
+  <section class="card" id="stepCode" hidden>
+    <h1>Check your email 📬</h1>
+    <p class="lead">We sent an email to <b id="sentTo"></b>. <b>Tap the link in it</b> on this device to log in. It can take a minute, so check spam too.</p>
+    <form id="codeForm">
+      <div class="field">
+        <label for="code">Or type the code, if the email shows one</label>
+        <input class="input code-input" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required placeholder="••••••">
+      </div>
+      <button class="btn btn-primary" id="codeBtn">Log in</button>
+    </form>
+    <button class="linkish" id="changeEmail" type="button">Use a different email</button>
+  </section>
+
+  <!-- 3. Profile setup (first time only) -->
+  <section class="card" id="stepSetup" hidden>
+    <h1>Set up your profile</h1>
+    <p class="lead">Your friends will see this. You can change it later.</p>
+    <form id="setupForm">
+      <div class="field">
+        <label for="username">Username *</label>
+        <input class="input" id="username" required autocomplete="username" autocapitalize="none" placeholder="yoga.bandeja" maxlength="20">
+        <small>3–20 characters: lowercase letters, numbers, dots and underscores</small>
+      </div>
+      <div class="field">
+        <label for="displayName">Your name *</label>
+        <input class="input" id="displayName" required autocomplete="name" maxlength="40" placeholder="Yoga Pratama">
+      </div>
+      <div class="field">
+        <span class="label">Ladder *</span>
+        <div class="choices">
+          <label><input type="radio" name="gender" value="m" required><span>👨 Men</span></label>
+          <label><input type="radio" name="gender" value="f"><span>👩 Women</span></label>
+        </div>
+        <small>Decides which ranking ladder you play in</small>
+      </div>
+      <div class="field">
+        <span class="label">Side (optional)</span>
+        <div class="choices">
+          <label><input type="radio" name="side" value="right"><span>➡️ Right (drive)</span></label>
+          <label><input type="radio" name="side" value="left"><span>⬅️ Left (revés)</span></label>
+          <label><input type="radio" name="side" value="both"><span>↔️ Both</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label">Hand (optional)</span>
+        <div class="choices">
+          <label><input type="radio" name="hand" value="right"><span>✋ Right</span></label>
+          <label><input type="radio" name="hand" value="left"><span>🤚 Left</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="favShot">Favourite shot (optional)</label>
+        <select class="input" id="favShot">
+          <option value="">Choose…</option>
+          <option>Bandeja</option><option>Víbora</option><option>Smash</option><option>Por 3 / Por 4</option>
+          <option>Chiquita</option><option>Lob</option><option>Bajada</option><option>Rulo</option>
+          <option>Volley</option><option>Wall exit</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="setupBtn">Save profile</button>
+    </form>
+  </section>
+
+  <!-- 4. Waiting for approval -->
+  <section class="card center" id="stepWaiting" hidden>
+    <div class="big-emoji">⏳</div>
+    <h1>Waiting for approval</h1>
+    <p class="lead">You're on the list! The admin will approve you soon. Come back and tap the button below.</p>
+    <div class="stack">
+      <button class="btn btn-primary" id="checkAgain">Check again</button>
+      <button class="btn btn-ghost" data-signout>Log out</button>
+    </div>
+  </section>
+
+  <!-- 5. Rejected -->
+  <section class="card center" id="stepRejected" hidden>
+    <div class="big-emoji">🚫</div>
+    <h1>Not approved</h1>
+    <p class="lead">The admin didn't approve this account. Talk to the friend who invited you.</p>
+    <button class="btn btn-ghost" data-signout>Log out</button>
+  </section>
+
+  <div class="error-box" id="error" role="alert" hidden></div>
+</main>
+
+<script>
+  var db = PadPal.db;
+  var STEPS = ['stepLoading', 'stepEmail', 'stepCode', 'stepSetup', 'stepWaiting', 'stepRejected'];
+  var email = '';
+
+  function $(id) { return document.getElementById(id); }
+  function show(step) {
+    STEPS.forEach(function (s) { $(s).hidden = s !== step; });
+    hideError();
+  }
+  function showError(err) { $('error').textContent = PadPal.friendlyError(err); $('error').hidden = false; }
+  function hideError() { $('error').hidden = true; }
+  function busy(btn, label) { btn.disabled = !!label; if (label) { btn.dataset.text = btn.textContent; btn.textContent = label; } else if (btn.dataset.text) btn.textContent = btn.dataset.text; }
+
+  // Remember the invite code even if the page reloads
+  var invite = new URLSearchParams(location.search).get('invite');
+  try {
+    if (invite) localStorage.setItem('padpal_invite', invite);
+    else invite = localStorage.getItem('padpal_invite');
+  } catch (e) {}
+  $('inviteBanner').hidden = !invite;
+
+  // Decide which screen this person should see
+  async function route() {
+    var me;
+    try { me = await PadPal.myProfile(); } catch (e) { show('stepEmail'); showError(e); return; }
+    if (!me) return show('stepEmail');
+    var p = me.profile;
+    if (!p) { show('stepEmail'); showError('Your account has no PadPal profile. Ask the admin for help.'); return; }
+    if (p.status === 'rejected') return show('stepRejected');
+    if (!p.username) return fillSetup(p);
+    if (p.status === 'pending') return show('stepWaiting');
+    location.replace('feed.html');
+  }
+
+  // 1. Send the code
+  $('emailForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideError();
+    email = $('email').value.trim().toLowerCase();
+    busy($('emailBtn'), 'Sending…');
+    var r = await db.auth.signInWithOtp({
+      email: email,
+      options: {
+        shouldCreateUser: true,
+        data: invite ? { invite_code: invite } : {},
+        // the link in the email brings you back here
+        emailRedirectTo: new URL('login.html', location.href).href
+      }
+    });
+    busy($('emailBtn'));
+    if (r.error) return showError(r.error);
+    $('sentTo').textContent = email;
+    $('code').value = '';
+    show('stepCode');
+    $('code').focus();
+  });
+
+  // 2. Check the code
+  $('codeForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideError();
+    busy($('codeBtn'), 'Checking…');
+    var r = await db.auth.verifyOtp({ email: email, token: $('code').value.trim(), type: 'email' });
+    busy($('codeBtn'));
+    if (r.error) return showError(r.error);
+    try { localStorage.removeItem('padpal_invite'); } catch (err) {}
+    route();
+  });
+  $('changeEmail').addEventListener('click', function () { show('stepEmail'); });
+
+  // 3. Profile setup
+  function fillSetup(p) {
+    $('username').value = p.username || '';
+    $('displayName').value = p.display_name || '';
+    ['gender', 'side', 'hand'].forEach(function (name) {
+      document.querySelectorAll('input[name=' + name + ']').forEach(function (r) { r.checked = r.value === p[name]; });
+    });
+    $('favShot').value = p.fav_shot || '';
+    show('stepSetup');
+  }
+  function picked(name) {
+    var el = document.querySelector('input[name=' + name + ']:checked');
+    return el ? el.value : null;
+  }
+  $('username').addEventListener('input', function () {
+    this.value = this.value.toLowerCase().replace(/[^a-z0-9._]/g, '');
+  });
+  $('setupForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideError();
+    busy($('setupBtn'), 'Saving…');
+    var me = await PadPal.myProfile();
+    var r = await db.from('profiles').update({
+      username: $('username').value.trim(),
+      display_name: $('displayName').value.trim(),
+      gender: picked('gender'),
+      side: picked('side'),
+      hand: picked('hand'),
+      fav_shot: $('favShot').value || null
+    }).eq('id', me.session.user.id);
+    busy($('setupBtn'));
+    if (r.error) return showError(r.error);
+    route();
+  });
+
+  // 4. Waiting
+  $('checkAgain').addEventListener('click', route);
+  document.querySelectorAll('[data-signout]').forEach(function (b) {
+    b.addEventListener('click', async function () { await PadPal.signOut(); show('stepEmail'); });
+  });
+
+  route();
+</script>
+</body>
+</html>

@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PadPal Feed</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script>PadPal.me = PadPal.guard(); // members only</script>
+<style>
+  /* ===== Feed-only styles ===== */
+
+  /* 24h photo row (like Instagram Stories) */
+  .stories { display: flex; gap: 14px; overflow-x: auto; padding: 6px 0 14px; scrollbar-width: none; }
+  .stories::-webkit-scrollbar { display: none; }
+  .story { border: 0; background: none; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 66px; flex-shrink: 0; }
+  .ring { width: 64px; height: 64px; border-radius: 50%; padding: 3px; background: linear-gradient(135deg, var(--primary), var(--accent), var(--gold)); }
+  .ring.seen { background: var(--line); }
+  .ring .avatar { width: 100%; height: 100%; border: 3px solid var(--bg); font-size: 20px; }
+  .story small { font-size: 11px; color: var(--text-2); max-width: 66px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .story .add { position: relative; }
+  .story .add::after {
+    content: "+"; position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--primary); color: #fff; border: 2px solid var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 15px; line-height: 1;
+  }
+
+  /* Post */
+  .post-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .post-text { margin: 0 0 4px; line-height: 1.45; font-size: 15px; }
+  .actions { display: flex; gap: 18px; margin-top: 12px; color: var(--text-2); font-size: 14px; }
+  .actions button { border: 0; background: none; padding: 4px 0; color: inherit; display: flex; align-items: center; gap: 5px; }
+  .actions button.liked { color: var(--primary); font-weight: 700; }
+  .actions .heart { display: inline-block; transition: transform .15s; }
+  .actions .liked .heart { transform: scale(1.25); }
+
+  /* Match result */
+  .match { background: var(--card-2); border-radius: 12px; padding: 10px 12px; }
+  .team { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+  .team + .team { border-top: 1px solid var(--line); }
+  .team .players { font-size: 14px; }
+  .team.win .players { font-weight: 700; }
+  .sets { display: flex; gap: 12px; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .team:not(.win) .sets { color: var(--text-2); font-weight: 500; }
+  .result { display: flex; justify-content: space-between; margin-top: 10px; font-size: 13px; gap: 8px; flex-wrap: wrap; }
+
+  /* Americano session leaderboard */
+  .podium { background: var(--card-2); border-radius: 12px; padding: 4px 12px; }
+  .podium .row { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; }
+  .podium .row + .row { border-top: 1px solid var(--line); }
+  .podium .pos { width: 22px; text-align: center; }
+  .podium .pts { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* Rank up / down announcement */
+  .announce { text-align: center; padding: 18px 14px; }
+  .announce.up { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, var(--card)), var(--card)); }
+  .announce.down { background: linear-gradient(160deg, color-mix(in srgb, var(--loss) 18%, var(--card)), var(--card)); }
+  .announce .big { font-size: 40px; }
+  .announce h4 { margin: 6px 0 4px; font-size: 17px; }
+  .announce p { margin: 0; color: var(--text-2); font-size: 13px; }
+  .tier-change { display: inline-flex; align-items: center; gap: 8px; margin: 10px 0 2px; font-weight: 700; font-size: 14px; }
+
+  /* Photo post (fake photo for now) */
+  .photo {
+    position: relative; aspect-ratio: 4 / 5; border-radius: 12px; overflow: hidden;
+    display: grid; place-items: center; font-size: 72px; margin: 0 -2px;
+  }
+  .timer {
+    position: absolute; top: 10px; right: 10px; font-size: 12px; font-weight: 600;
+    background: rgba(0,0,0,.55); color: #fff; padding: 4px 10px; border-radius: 999px;
+  }
+  .timer.pinned { background: var(--gold); color: #1C1F24; }
+
+  /* Story viewer (full screen) */
+  .viewer {
+    position: fixed; inset: 0; z-index: 50; background: #000; color: #fff;
+    display: none; flex-direction: column; max-width: 440px; margin: 0 auto;
+  }
+  .viewer.open { display: flex; }
+  .viewer .bar { height: 3px; background: rgba(255,255,255,.3); margin: calc(10px + env(safe-area-inset-top)) 12px 0; border-radius: 2px; overflow: hidden; }
+  .viewer .bar i { display: block; height: 100%; width: 0; background: #fff; }
+  .viewer.open .bar i { animation: fill 5s linear forwards; }
+  @keyframes fill { to { width: 100%; } }
+  .viewer .vhead { display: flex; align-items: center; gap: 10px; padding: 12px; }
+  .viewer .vhead .avatar { width: 34px; height: 34px; color: var(--text); }
+  .viewer .close { margin-left: auto; border: 0; background: none; color: #fff; font-size: 26px; }
+  .viewer .vphoto { flex: 1; display: grid; place-items: center; font-size: 110px; margin: 0 12px; border-radius: 16px; }
+  .viewer .vfoot { padding: 14px 12px calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
+
+  /* Comments sheet */
+  .comment { display: flex; gap: 10px; padding: 8px 0; font-size: 14px; }
+  .comment .avatar { width: 32px; height: 32px; font-size: 13px; }
+  .comment b { margin-right: 4px; }
+  .comment-box { display: flex; gap: 8px; margin-top: 10px; }
+  .comment-box input {
+    flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--card-2); color: var(--text);
+    border-radius: 999px; padding: 10px 14px; font: inherit; font-size: 16px; outline: none;
+  }
+  .comment-box input:focus { border-color: var(--accent); }
+
+  /* "New" menu */
+  .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .menu button { border: 1px solid var(--line); background: var(--card-2); border-radius: 14px; padding: 16px 10px; text-align: left; }
+  .menu span { font-size: 26px; display: block; margin-bottom: 6px; }
+  .menu small { color: var(--text-2); display: block; font-size: 12px; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><span>Pad</span><b>Pal</b></div>
+    <button class="icon-btn" id="bell" aria-label="Notifications">🔔<i class="dot"></i></button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="sample-note">🧪 Sample posts for now. Real posts, photos and likes are coming soon.</div>
+  <div class="stories" id="stories"></div>
+  <div id="feed"></div>
+</main>
+
+<!-- Bottom tab bar -->
+<button class="fab" id="fab" aria-label="New">+</button>
+<nav class="tabbar">
+  <div class="tabs">
+    <a class="on" href="feed.html"><span>🏠</span>Feed</a>
+    <a href="play.html"><span>🎾</span>Play</a>
+    <a href="chat.html"><span>💬</span>Chat</a>
+    <a href="ranks.html"><span>🏆</span>Ranks</a>
+    <a href="profile.html"><span>👤</span>Me</a>
+  </div>
+</nav>
+
+<!-- Pop-ups -->
+<div class="backdrop" id="backdrop"></div>
+
+<div class="sheet" id="commentsSheet">
+  <div class="grab"></div>
+  <h3>Comments</h3>
+  <div id="commentList"></div>
+  <form class="comment-box" id="commentForm">
+    <input id="commentInput" placeholder="Add a comment…" autocomplete="off">
+    <button class="btn btn-primary" style="padding:10px 16px">Send</button>
+  </form>
+</div>
+
+<div class="sheet" id="newSheet">
+  <div class="grab"></div>
+  <h3>Create</h3>
+  <div class="menu">
+    <button data-soon="Photo posts"><span>📷</span>Photo<small>Gone in 24h unless pinned</small></button>
+    <button data-soon="Text posts"><span>✏️</span>Text post<small>Stays forever</small></button>
+    <button data-soon="Logging matches"><span>🎾</span>Log a match<small>Earn points</small></button>
+    <button data-soon="Open games"><span>📣</span>Open game<small>"Need 1 more!"</small></button>
+  </div>
+</div>
+
+<div class="viewer" id="viewer">
+  <div class="bar"><i></i></div>
+  <div class="vhead">
+    <div class="avatar" id="vAvatar"></div>
+    <div><div class="name" id="vName"></div><div style="font-size:12px;opacity:.7" id="vAgo"></div></div>
+    <button class="close" id="vClose" aria-label="Close">×</button>
+  </div>
+  <div class="vphoto" id="vPhoto"></div>
+  <div class="vfoot">
+    <span id="vLeft"></span>
+    <button class="btn btn-accent" id="vPin" style="padding:8px 14px;font-size:13px">📌 Pin to profile</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===== Fake data (later this comes from the real database) =====
+  var TIERS = {
+    first: '🐣 First Timer', newbie: '🌱 Newbie', beginner: '🎾 Beginner',
+    amateur: '⚡ Amateur', junior: '🥉 Junior', pro: '🥈 Pro'
+  };
+
+  var stories = [
+    { user: 'rio_padel',  initial: 'R', hoursLeft: 18, art: '🎾', bg: 'linear-gradient(160deg,#B3261E,#D9822B)' },
+    { user: 'sari.vibora', initial: 'S', hoursLeft: 9,  art: '🏆', bg: 'linear-gradient(160deg,#C9A24A,#7A1712)' },
+    { user: 'andi',       initial: 'A', hoursLeft: 5,  art: '🥵', bg: 'linear-gradient(160deg,#4F7CAC,#24272D)' },
+    { user: 'budi_lob',   initial: 'B', hoursLeft: 2,  art: '🍻', bg: 'linear-gradient(160deg,#D9822B,#2E323A)', seen: true },
+    { user: 'maya',       initial: 'M', hoursLeft: 1,  art: '📸', bg: 'linear-gradient(160deg,#7E6AA8,#B3261E)', seen: true }
+  ];
+
+  var posts = [
+    { type: 'rankup', user: 'sari.vibora', initial: 'S', ago: '20m',
+      from: TIERS.newbie, to: TIERS.beginner, points: 204, likes: 18, comments: [
+        { user: 'rio_padel', initial: 'R', text: 'Monster víbora today 🔥' }] },
+
+    { type: 'americano', user: 'rio_padel', initial: 'R', tier: TIERS.amateur, ago: '2h',
+      title: 'Saturday Americano · 8 players · 32 pts',
+      ranking: [ ['🥇', 'Rio', 112], ['🥈', 'Sari', 104], ['🥉', 'Maya', 97], ['4', 'Andi', 90] ],
+      likes: 12, comments: [] },
+
+    { type: 'photo', user: 'maya', initial: 'M', tier: TIERS.beginner, ago: '3h',
+      text: 'Sunset session with the crew 🌅', art: '🌅', bg: 'linear-gradient(160deg,#D9822B,#B3261E 60%,#16181C)',
+      hoursLeft: 21, likes: 9, comments: [] },
+
+    { type: 'match', user: 'rio_padel', initial: 'R', tier: TIERS.amateur, ago: '5h',
+      place: 'Court 3',
+      winners: 'Rio & Sari', losers: 'Andi & Budi', sets: [[6, 4], [7, 5]],
+      change: 'Rio <span class="plus">+10</span> · Sari <span class="plus">+10</span>',
+      changeLose: 'Andi <span class="minus">−5</span> · Budi <span class="minus">−5</span>',
+      likes: 7, comments: [ { user: 'andi', initial: 'A', text: 'Rematch. Tomorrow. 😤' } ] },
+
+    { type: 'rankdown', user: 'budi_lob', initial: 'B', ago: '8h',
+      from: TIERS.beginner, to: TIERS.newbie, reason: "Didn't play for 3 weeks 🧊", likes: 24, comments: [
+        { user: 'maya', initial: 'M', text: 'Not having fun = you are out 😂' },
+        { user: 'budi_lob', initial: 'B', text: 'I was on holiday!!' }] },
+
+    { type: 'text', user: 'andi', initial: 'A', tier: TIERS.beginner, ago: '1d',
+      text: 'Anyone up for Sunday 8am? Need 2 more 🙏', likes: 3, comments: [] },
+
+    { type: 'photo', user: 'sari.vibora', initial: 'S', tier: TIERS.beginner, ago: '2d',
+      text: 'First tournament medal 🥉', art: '🥉', bg: 'linear-gradient(160deg,#C9A24A,#24272D)',
+      pinned: true, likes: 31, comments: [] }
+  ];
+
+  // ===== Helpers =====
+  function $(id) { return document.getElementById(id); }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+
+  // ===== 24h photo row =====
+  function renderStories() {
+    var html = '<button class="story" data-mine="1"><div class="ring seen add"><div class="avatar">Y</div></div><small>Your photo</small></button>';
+    stories.forEach(function (s, i) {
+      html += '<button class="story" data-story="' + i + '">' +
+        '<div class="ring' + (s.seen ? ' seen' : '') + '"><div class="avatar">' + s.initial + '</div></div>' +
+        '<small>' + s.user + '</small></button>';
+    });
+    $('stories').innerHTML = html;
+  }
+
+  // ===== Posts =====
+  function postHead(p) {
+    return '<div class="post-head"><div class="user">' +
+      '<div class="avatar">' + p.initial + '</div>' +
+      '<div><div class="name">' + p.user + (p.tier ? ' <span class="pill">' + p.tier + '</span>' : '') + '</div>' +
+      '<div class="meta">' + (p.place ? p.place + ' · ' : '') + p.ago + ' ago</div></div>' +
+      '</div></div>';
+  }
+
+  function postActions(p, i) {
+    return '<div class="actions">' +
+      '<button class="' + (p.liked ? 'liked' : '') + '" data-like="' + i + '"><span class="heart">' + (p.liked ? '❤️' : '🤍') + '</span>' + p.likes + '</button>' +
+      '<button data-comments="' + i + '">💬 ' + p.comments.length + '</button>' +
+      (p.type === 'match' || p.type === 'americano' ? '<button data-soon="Shot ratings">🎾 Rate shots</button>' : '') +
+      '</div>';
+  }
+
+  function renderPost(p, i) {
+    var body = '';
+    if (p.type === 'rankup' || p.type === 'rankdown') {
+      var up = p.type === 'rankup';
+      return '<article class="card announce ' + (up ? 'up' : 'down') + '">' +
+        '<div class="big">' + (up ? '🎉' : '😱') + '</div>' +
+        '<h4>' + p.user + (up ? ' ranked up!' : ' dropped a tier!') + '</h4>' +
+        '<div class="tier-change"><span class="pill">' + p.from + '</span>→<span class="pill">' + p.to + '</span></div>' +
+        '<p>' + (up ? p.points + ' points · keep grinding 💪' : p.reason) + '</p>' +
+        '<div style="display:flex;justify-content:center">' + postActions(p, i) + '</div>' +
+        '</article>';
+    }
+    if (p.type === 'match') {
+      body = '<div class="match">' +
+        '<div class="team win"><div class="players">🏆 ' + p.winners + '</div><div class="sets">' + p.sets.map(function (s) { return '<span>' + s[0] + '</span>'; }).join('') + '</div></div>' +
+        '<div class="team"><div class="players">' + p.losers + '</div><div class="sets">' + p.sets.map(function (s) { return '<span>' + s[1] + '</span>'; }).join('') + '</div></div>' +
+        '</div>' +
+        '<div class="result"><span>' + p.change + '</span><span>' + p.changeLose + '</span></div>';
+    }
+    if (p.type === 'americano') {
+      body = '<p class="post-text" style="font-weight:600">' + p.title + '</p><div class="podium">' +
+        p.ranking.map(function (r) {
+          return '<div class="row"><span class="pos">' + r[0] + '</span><span>' + r[1] + '</span><span class="pts">' + r[2] + ' pts</span></div>';
+        }).join('') + '</div>';
+    }
+    if (p.type === 'photo') {
+      body = '<p class="post-text">' + p.text + '</p>' +
+        '<div class="photo" style="background:' + p.bg + '">' + p.art +
+        (p.pinned ? '<span class="timer pinned">📌 Pinned</span>' : '<span class="timer">⏳ ' + p.hoursLeft + 'h left</span>') +
+        '</div>';
+    }
+    if (p.type === 'text') {
+      body = '<p class="post-text">' + p.text + '</p>';
+    }
+    return '<article class="card">' + postHead(p) + body + postActions(p, i) + '</article>';
+  }
+
+  function renderFeed() {
+    $('feed').innerHTML = posts.map(renderPost).join('');
+  }
+
+  // ===== Pop-up sheets =====
+  var openSheetEl = null;
+  function openSheet(el) {
+    openSheetEl = el;
+    el.classList.add('open');
+    $('backdrop').classList.add('open');
+  }
+  function closeSheet() {
+    if (openSheetEl) openSheetEl.classList.remove('open');
+    openSheetEl = null;
+    $('backdrop').classList.remove('open');
+  }
+  $('backdrop').addEventListener('click', closeSheet);
+
+  // Comments
+  var commentsFor = null;
+  function renderComments() {
+    var list = posts[commentsFor].comments;
+    $('commentList').innerHTML = list.length
+      ? list.map(function (c) {
+          return '<div class="comment"><div class="avatar">' + c.initial + '</div><div><b>' + c.user + '</b>' + escapeHtml(c.text) + '</div></div>';
+        }).join('')
+      : '<p class="meta">No comments yet. Be the first! 🎾</p>';
+  }
+  $('commentForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = $('commentInput').value.trim();
+    if (!text) return;
+    posts[commentsFor].comments.push({ user: 'you', initial: 'Y', text: text });
+    $('commentInput').value = '';
+    renderComments();
+    renderFeed();
+  });
+
+  // Story viewer
+  var viewerTimer;
+  function openStory(i) {
+    var s = stories[i];
+    $('vAvatar').textContent = s.initial;
+    $('vName').textContent = s.user;
+    $('vAgo').textContent = (24 - s.hoursLeft) + 'h ago';
+    $('vPhoto').textContent = s.art;
+    $('vPhoto').style.background = s.bg;
+    $('vLeft').textContent = '⏳ Disappears in ' + s.hoursLeft + 'h';
+    $('vPin').style.display = 'none'; // only the owner can pin their own photo
+    var v = $('viewer');
+    v.classList.remove('open'); void v.offsetWidth; // restart the progress bar
+    v.classList.add('open');
+    s.seen = true;
+    clearTimeout(viewerTimer);
+    viewerTimer = setTimeout(closeStory, 5000);
+  }
+  function closeStory() {
+    clearTimeout(viewerTimer);
+    $('viewer').classList.remove('open');
+    renderStories();
+  }
+  $('vClose').addEventListener('click', closeStory);
+
+  // ===== One click handler for everything on the page =====
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-like],[data-comments],[data-story],[data-mine],[data-soon],#fab,#bell');
+    if (!el) return;
+
+    if (el.dataset.like !== undefined) {
+      var p = posts[el.dataset.like];
+      p.liked = !p.liked;
+      p.likes += p.liked ? 1 : -1;
+      renderFeed();
+    } else if (el.dataset.comments !== undefined) {
+      commentsFor = +el.dataset.comments;
+      renderComments();
+      openSheet($('commentsSheet'));
+    } else if (el.dataset.story !== undefined) {
+      openStory(+el.dataset.story);
+    } else if (el.dataset.mine) {
+      toast('📷 Adding photos comes in Stage 1');
+    } else if (el.id === 'fab') {
+      openSheet($('newSheet'));
+    } else if (el.id === 'bell') {
+      toast('🔔 Notifications come in a later step');
+    } else if (el.dataset.soon) {
+      e.preventDefault();
+      closeSheet();
+      toast('🚧 ' + el.dataset.soon + ': coming in a later step');
+    }
+  });
+
+  renderStories();
+  renderFeed();
+</script>
+</body>
+</html>
