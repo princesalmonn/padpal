@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="rate.js"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Play-only styles ===== */
@@ -659,7 +660,8 @@
           '<span class="pts ' + (x.change >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(x.change) + '</span></div>';
       }).join('') + '</div>' +
       '<p class="note">Posted to the Feed 📣 Points are on everyone\'s profile.</p>' +
-      '<button class="btn btn-primary" style="width:100%;margin-top:12px" data-close-sheet="1">Done</button>');
+      '<button class="btn btn-accent" style="width:100%;margin-top:12px" data-rate="' + res.map(function (x) { return x.user_id; }).join(',') + '">🎯 Rate their shots</button>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:8px" data-close-sheet="1">Done</button>');
     session = null; sessionGame = null;
     renderSession();
     loadGames();
@@ -918,6 +920,7 @@
             '<small>' + tier.icon + ' ' + PadPal.fmt(c.points) + '</small>' +
             '<span class="pts ' + (c.change >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(c.change) + '</span></div>';
         }).join('') + '</div>' +
+        '<button class="btn btn-accent" data-rate="' + T.players.a.concat(T.players.b).join(',') + '">🎯 Rate their shots</button>' +
         '<button class="btn btn-primary" data-close-tracker="1">Done</button>';
     } else if (T.players) {
       buttons = '<button class="btn btn-primary" data-save-match="1">💾 Save match</button>' +
@@ -960,7 +963,7 @@
   // CLICKS
   // =====================================================
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-gsession],[data-close-sheet],[data-guide],[data-open-guide],[data-setup],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
+    var el = e.target.closest('[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-gsession],[data-close-sheet],[data-rate],[data-guide],[data-open-guide],[data-setup],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
     if (!el) return;
     var d = el.dataset;
 
@@ -1002,6 +1005,7 @@
       openCreate(d.setup);
     }
     else if (d.gsession) startSessionFromLobby(gameById(lobbyId));
+    else if (d.rate) { closeSheet(); PadPal.openRating(d.rate.split(',')); }
     else if (d.closeSheet) closeSheet();
     else if (d.view !== undefined) { session.view = +d.view; renderSession(); }
     else if (d.score !== undefined) {

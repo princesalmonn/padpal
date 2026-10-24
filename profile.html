@@ -159,7 +159,7 @@
     <div class="chips" id="heroChips"></div>
   </section>
 
-  <div class="sample-note" style="margin-top:14px">🧪 Points, rank and match history are real. Shot chart, badges and the Stats tab are still samples.</div>
+  <div class="sample-note" style="margin-top:14px">🧪 Everything here is real except the Stats tab, which is still a sample.</div>
 
   <div class="card">
     <div class="rank">
@@ -200,16 +200,11 @@
     <h2>Shot chart <small>from friends' ratings</small></h2>
     <div class="card">
       <svg class="radar" id="radar" viewBox="0 0 320 290"></svg>
-      <div class="shots-note">Based on 23 ratings · ratings shrink if you stop playing 🧊</div>
+      <div class="shots-note" id="shotsNote">Loading…</div>
     </div>
 
     <h2>Badges</h2>
-    <div class="awards">
-      <div class="award"><span>🏅</span><strong>Bandeja King</strong><small>12 ratings this month</small></div>
-      <div class="award"><span>🥇</span><strong>Americano winner</strong><small>3× this year</small></div>
-      <div class="award"><span>🔥</span><strong>On fire</strong><small>4 wins in a row</small></div>
-      <div class="award"><span>🌅</span><strong>Early bird</strong><small>10 games before 8am</small></div>
-    </div>
+    <div class="awards" id="awards"></div>
   </section>
 
   <!-- ===== Stats ===== -->
@@ -348,11 +343,10 @@
 <script>
   // ===== Sample data (stats, history: becomes real in Stage 2) =====
 
-  // Shot ratings (average of friends' 1–10 ratings)
-  var shots = [
-    ['Bandeja', 8.2], ['Víbora', 7.1], ['Smash', 5.9],
-    ['Chiquita', 6.0], ['Lob', 6.5], ['Volley', 7.8]
-  ];
+  // Shot chart: your average rating per shot (real, filled in by loadShots)
+  var shots = [['Bandeja', 0], ['Víbora', 0], ['Smash', 0], ['Chiquita', 0], ['Lob', 0], ['Volley', 0]];
+  var shotMax = 7;        // 1–7 below Pro, 1–10 for Pro and up
+  var shotStats = {};     // shot → { avg, count }
 
   var periods = {
     week:  { matches: 3,  wins: 2,  pts: '+18', hours: 4,  streak: 2,
@@ -385,17 +379,17 @@
     var cx = 160, cy = 145, r = 100, n = shots.length;
     function point(i, value) {
       var angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-      return [cx + Math.cos(angle) * r * value / 10, cy + Math.sin(angle) * r * value / 10];
+      return [cx + Math.cos(angle) * r * value / shotMax, cy + Math.sin(angle) * r * value / shotMax];
     }
     var svg = '';
-    // background rings at 2.5, 5, 7.5, 10
-    [2.5, 5, 7.5, 10].forEach(function (lvl) {
+    // background rings at a quarter, half, three quarters and the top of the scale
+    [0.25, 0.5, 0.75, 1].map(function (f) { return f * shotMax; }).forEach(function (lvl) {
       var pts = shots.map(function (_, i) { return point(i, lvl).join(','); }).join(' ');
       svg += '<polygon points="' + pts + '" fill="none" stroke="var(--line)" stroke-width="1"/>';
     });
     // spokes
     shots.forEach(function (_, i) {
-      var p = point(i, 10);
+      var p = point(i, shotMax);
       svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + p[0] + '" y2="' + p[1] + '" stroke="var(--line)"/>';
     });
     // your shape
@@ -407,12 +401,49 @@
     });
     // labels
     shots.forEach(function (s, i) {
-      var p = point(i, 12.6);
+      var p = point(i, shotMax * 1.26);
       var anchor = Math.abs(p[0] - cx) < 5 ? 'middle' : (p[0] > cx ? 'start' : 'end');
       svg += '<text x="' + p[0] + '" y="' + (p[1] - 2) + '" text-anchor="' + anchor + '">' + s[0] + '</text>' +
-             '<text class="val" x="' + p[0] + '" y="' + (p[1] + 12) + '" text-anchor="' + anchor + '">' + s[1].toFixed(1) + '</text>';
+             '<text class="val" x="' + p[0] + '" y="' + (p[1] + 12) + '" text-anchor="' + anchor + '">' + (s[1] ? s[1].toFixed(1) : '–') + '</text>';
     });
     $('radar').innerHTML = svg;
+  }
+
+  // Real ratings friends gave you
+  async function loadShots() {
+    shotMax = Number(profile.points) >= 501 ? 10 : 7;
+    var r = await db.from('shot_ratings').select('shot, rating').eq('ratee_id', profile.id);
+    if (r.error) { $('shotsNote').textContent = 'Shot ratings appear after you run 08_ratings.sql.'; renderRadar(); return; }
+    shotStats = {};
+    r.data.forEach(function (x) {
+      var s = shotStats[x.shot] = shotStats[x.shot] || { sum: 0, count: 0 };
+      s.sum += Number(x.rating); s.count++;
+    });
+    Object.keys(shotStats).forEach(function (k) { shotStats[k].avg = shotStats[k].sum / shotStats[k].count; });
+    shots = shots.map(function (s) { return [s[0], shotStats[s[0]] ? Math.min(shotMax, shotStats[s[0]].avg) : 0]; });
+    renderRadar();
+    $('shotsNote').textContent = r.data.length
+      ? 'Based on ' + r.data.length + ' rating' + (r.data.length === 1 ? '' : 's') + ' from friends · scale 1–' + shotMax
+      : 'No ratings yet. After a match, friends can rate your shots 🎯';
+    renderBadges();
+  }
+
+  // Badges earned from real data
+  function renderBadges() {
+    var list = [];
+    var best = Object.keys(shotStats).filter(function (k) { return shotStats[k].count >= 2; })
+      .sort(function (a, b) { return shotStats[b].avg - shotStats[a].avg; })[0];
+    if (best) list.push(['🏅', best + (profile.gender === 'f' ? ' Queen' : ' King'), shotStats[best].avg.toFixed(1) + ' avg · ' + shotStats[best].count + ' ratings']);
+    var streak = 0;
+    for (var i = 0; i < myMatches.length && myMatches[i].won; i++) streak++;
+    if (streak >= 3) list.push(['🔥', 'On fire', streak + ' wins in a row']);
+    if (myMatches.length >= 10) list.push(['🎾', 'Regular', myMatches.length + ' matches played']);
+    if (Number(profile.mixed_points) >= 20) list.push(['🔀', 'Mixed master', PadPal.fmt(profile.mixed_points) + ' mixed pts']);
+    var t = PadPal.tierOf(profile.points);
+    if (t.min >= 100) list.push([t.icon, t.name + ' reached', PadPal.fmt(profile.points) + ' pts']);
+    $('awards').innerHTML = list.length
+      ? list.map(function (b) { return '<div class="award"><span>' + b[0] + '</span><strong>' + esc(b[1]) + '</strong><small>' + esc(b[2]) + '</small></div>'; }).join('')
+      : '<p class="meta" style="margin:0">No badges yet. Play, win and get rated to earn them! 🏅</p>';
   }
 
   // ===== Stats for the chosen time period =====
@@ -579,7 +610,7 @@
     profile = me.profile;
     renderHero();
     loadPins();
-    loadGame();
+    loadGame().then(loadShots);
   });
 
   // ===== Your header (name, picture, chips) =====

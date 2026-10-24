@@ -113,6 +113,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn:disabled { opacity: .5; cursor: default; }
 .error-box { background: color-mix(in srgb, var(--loss) 15%, transparent); color: var(--loss); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
 
+/* Shot rating pop-up */
+.rate-card { padding: 12px; }
+.rate-card .pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.rate-card .pick button { border: 1px solid var(--line); background: var(--card-2); border-radius: 999px; padding: 6px 10px; font-size: 13px; }
+.rate-card .pick button.on { background: var(--primary); border-color: var(--primary); color: var(--primary-text); font-weight: 600; }
+.rate-row { margin-top: 10px; }
+.rate-row span { font-size: 13px; font-weight: 600; }
+.rate-nums { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.rate-num { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--card-2); font-weight: 700; font-size: 14px; padding: 0; }
+.rate-num.on { background: var(--accent); border-color: var(--accent); color: #1C1F24; }
+
 /* Bottom tab bar + floating ➕ */
 nav.tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;

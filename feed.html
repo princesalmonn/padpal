@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="rate.js"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Feed-only styles ===== */
@@ -410,6 +411,8 @@
       '<button class="' + (liked ? 'liked' : '') + '" data-like="' + p.id + '"><span class="heart">' + (liked ? '❤️' : '🤍') + '</span>' + p.likes.length + '</button>' +
       '<button data-comments="' + p.id + '">💬 ' + nComments + '</button>' +
       (mine && p.kind === 'photo' && !myPins[p.photo_path] ? '<button data-pin="' + p.id + '">📌 Pin to profile</button>' : '') +
+      (p.kind === 'match' && canReport(matches[p.match_id]) ? '<button data-rate="' + matchPlayers(matches[p.match_id]) + '">🎯 Rate shots</button>' : '') +
+      (p.kind === 'session' && canReportSession(sessions[p.game_id]) ? '<button data-rate="' + Object.keys(sessions[p.game_id].changes).join(',') + '">🎯 Rate shots</button>' : '') +
       (p.kind === 'match' && canReport(matches[p.match_id]) ? '<button data-report="' + p.match_id + '">⚠️ Wrong score?</button>' : '') +
       (p.kind === 'session' && canReportSession(sessions[p.game_id]) ? '<button data-report-session="' + p.game_id + '">⚠️ Wrong score?</button>' : '') +
       '</div></article>';
@@ -422,6 +425,7 @@
     var played = [m.a1, m.a2, m.b1, m.b2].indexOf(profile.id) > -1;
     return played && Date.now() - new Date(m.played_at) < 24 * 3600000;
   }
+  function matchPlayers(m) { return [m.a1, m.a2, m.b1, m.b2].join(','); }
   function canReportSession(g) {
     return g && g.changes[profile.id] && Date.now() - new Date(g.finished) < 24 * 3600000;
   }
@@ -639,10 +643,11 @@
 
   // ===== One click handler for the feed =====
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-report],[data-report-session],[data-soon]');
+    var el = e.target.closest('[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-report],[data-report-session],[data-rate],[data-soon]');
     if (!el) return;
     var d = el.dataset;
-    if (d.report) openReport(d.report, 'match');
+    if (d.rate) PadPal.openRating(d.rate.split(','));
+    else if (d.report) openReport(d.report, 'match');
     else if (d.reportSession) openReport(d.reportSession, 'session');
     else if (d.like) toggleLike(d.like);
     else if (d.comments) openComments(d.comments);
