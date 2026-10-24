@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PadPal Notifications</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-title" content="PadPal">
+<meta name="theme-color" content="#0B1426">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script>PadPal.me = PadPal.guard(); // members only</script>
+<style>
+  /* ===== Notifications-only styles ===== */
+  .back { text-decoration: none; color: var(--accent); font-weight: 600; font-size: 15px; }
+  h1 { font-size: 24px; margin: 6px 0 14px; }
+  .day { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-2); margin: 16px 0 8px; font-weight: 600; }
+  .note-row {
+    display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; text-decoration: none; color: var(--text);
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 8px;
+  }
+  .note-row.unread { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+  .note-row .ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; flex-shrink: 0; background: var(--card-2); overflow: hidden; }
+  .note-row .ic img { width: 100%; height: 100%; object-fit: cover; }
+  .note-row .txt { flex: 1; min-width: 0; }
+  .note-row .title { font-weight: 600; font-size: 14px; line-height: 1.35; }
+  .note-row .body { font-size: 13px; color: var(--text-2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note-row .time { font-size: 11px; color: var(--text-2); flex-shrink: 0; margin-top: 2px; }
+  .dotnew { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 6px; }
+  .empty { text-align: center; color: var(--text-2); padding: 40px 16px; }
+  .empty .big { font-size: 46px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><img class="logo-img logo-for-dark" src="logo-dark.svg" alt=""><img class="logo-img logo-for-light" src="logo-light.svg" alt=""><span>Pad</span><b>Pal</b></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <a class="back" href="javascript:history.length > 1 ? history.back() : location.href = 'feed.html'">‹ Back</a>
+  <h1>🔔 Notifications</h1>
+  <div class="error-box" id="error" role="alert" hidden></div>
+  <div id="list"><div class="empty">Loading…</div></div>
+</main>
+
+<nav class="tabbar">
+  <div class="tabs">
+    <a href="feed.html"><span>🏠</span>Feed</a>
+    <a href="play.html"><span>🎾</span>Play</a>
+    <a href="chat.html"><span>💬</span>Chat</a>
+    <a href="ranks.html"><span>🏆</span>Ranks</a>
+    <a href="profile.html"><span>👤</span>Me</a>
+  </div>
+</nav>
+
+<script>
+  var db = PadPal.db;
+  var ICONS = { invite: '🎟️', join: '🎾', like: '❤️', comment: '💬', message: '✉️', points: '🏆', rating: '🎯',
+                inactive: '🧊', warning: '⏳', tier: '🎉', welcome: '✅', approval: '👑', report: '⚠️' };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function ago(iso) {
+    var mins = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
+    if (mins < 1) return 'now';
+    if (mins < 60) return mins + 'm';
+    if (mins < 1440) return Math.round(mins / 60) + 'h';
+    return Math.round(mins / 1440) + 'd';
+  }
+  function dayLabel(iso) {
+    var d = new Date(iso), now = new Date();
+    if (d.toDateString() === now.toDateString()) return 'Today';
+    if (d.toDateString() === new Date(now - 86400000).toDateString()) return 'Yesterday';
+    if (now - d < 7 * 86400000) return 'This week';
+    return 'Earlier';
+  }
+
+  PadPal.me.then(async function (who) {
+    if (!who) return;
+    var r = await db.from('notifications').select('id, actor_id, kind, title, body, link, created_at, read_at')
+      .order('created_at', { ascending: false }).limit(100);
+    if (r.error) {
+      $('list').innerHTML = '';
+      $('error').textContent = /notifications/.test(r.error.message) ? 'Notifications are not set up yet. Run 11_notifications.sql in Supabase.' : PadPal.friendlyError(r.error);
+      $('error').hidden = false;
+      return;
+    }
+    // profile pictures of the people who caused them
+    var people = {}, urls = {};
+    try {
+      (await PadPal.members()).forEach(function (m) { people[m.id] = m; });
+      urls = await PadPal.photoUrls(r.data.map(function (n) { return n.actor_id && people[n.actor_id] && people[n.actor_id].avatar_url; }));
+    } catch (e) {}
+
+    if (!r.data.length) {
+      $('list').innerHTML = '<div class="empty"><div class="big">🔔</div><p><b>Nothing yet.</b></p><p>Invites, likes, messages and points will show up here.</p></div>';
+    } else {
+      var html = '', lastDay = null;
+      r.data.forEach(function (n) {
+        var day = dayLabel(n.created_at);
+        if (day !== lastDay) { html += '<div class="day">' + day + '</div>'; lastDay = day; }
+        var p = n.actor_id && people[n.actor_id];
+        var pic = p && p.avatar_url && urls[p.avatar_url];
+        html += '<a class="note-row' + (n.read_at ? '' : ' unread') + '" href="' + esc(n.link || 'feed.html') + '">' +
+          '<div class="ic">' + (pic ? '<img src="' + pic + '" alt="">' : (ICONS[n.kind] || '🔔')) + '</div>' +
+          '<div class="txt"><div class="title">' + esc(n.title) + '</div>' + (n.body ? '<div class="body">' + esc(n.body) + '</div>' : '') + '</div>' +
+          '<div class="time">' + ago(n.created_at) + '</div>' + (n.read_at ? '' : '<span class="dotnew"></span>') + '</a>';
+      });
+      $('list').innerHTML = html;
+    }
+    // opening this page = everything read
+    await db.rpc('mark_notifications_read');
+  });
+</script>
+</body>
+</html>

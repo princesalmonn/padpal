@@ -53,8 +53,42 @@
         return null;
       }
       document.documentElement.style.visibility = '';
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountBell);
+      else mountBell();
       return me;
     });
+  }
+
+  // ===== 🔔 The bell in the top bar of every screen =====
+  function mountBell() {
+    var bar = document.querySelector('.topbar-inner');
+    if (!bar || document.getElementById('padpalBell') || /notifications\.html/.test(location.pathname)) return;
+    var box = document.createElement('div');
+    box.className = 'top-actions';
+    var bell = document.createElement('a');
+    bell.id = 'padpalBell';
+    bell.className = 'icon-btn bell';
+    bell.href = 'notifications.html';
+    bell.setAttribute('aria-label', 'Notifications');
+    bell.innerHTML = '🔔<b class="bell-count" hidden></b>';
+    var right = bar.children.length > 1 ? bar.lastElementChild : null;
+    if (right) bar.replaceChild(box, right);
+    else bar.appendChild(box);
+    box.appendChild(bell);
+    if (right) box.appendChild(right);
+    refreshBell();
+    setInterval(refreshBell, 30000);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshBell(); });
+  }
+  async function refreshBell() {
+    var el = document.querySelector('#padpalBell .bell-count');
+    if (!el) return;
+    try {
+      var r = await db.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null);
+      var n = r.count || 0;
+      el.textContent = n > 9 ? '9+' : n;
+      el.hidden = !n;
+    } catch (e) {}
   }
 
   async function signOut() {
@@ -225,6 +259,6 @@
     uploadPhoto: uploadPhoto, photoUrls: photoUrls,
     remembered: remembered, setRemember: setRemember,
     TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, fmt: fmt, fmtChange: fmtChange,
-    inactivity: inactivity
+    inactivity: inactivity, refreshBell: refreshBell, mountBell: mountBell
   };
 })();
