@@ -43,6 +43,17 @@
   .actions .heart { display: inline-block; transition: transform .15s; }
   .actions .liked .heart { transform: scale(1.25); }
 
+  /* Rank up / down announcement */
+  .announce { text-align: center; padding: 18px 14px; }
+  .announce.up { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, var(--card)), var(--card)); }
+  .announce.down { background: linear-gradient(160deg, color-mix(in srgb, var(--loss) 18%, var(--card)), var(--card)); }
+  .announce .big { font-size: 40px; }
+  .announce .avatar { margin: 8px auto 0; width: 52px; height: 52px; font-size: 20px; }
+  .announce h4 { margin: 8px 0 4px; font-size: 17px; }
+  .announce p { margin: 0; color: var(--text-2); font-size: 13px; }
+  .tier-change { display: inline-flex; align-items: center; gap: 8px; margin: 8px 0 4px; font-weight: 700; font-size: 14px; }
+  .announce .actions { justify-content: center; }
+
   /* Match result */
   .match { background: var(--card-2); border-radius: 12px; padding: 10px 12px; }
   .team { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; gap: 8px; }
@@ -347,7 +358,34 @@
   }
 
   // ===== Posts =====
+  // 🎉 / 😱 posted automatically when someone moves to another tier
+  function tierByName(n) { return PadPal.TIERS.filter(function (t) { return t.name === n; })[0] || { icon: '', name: n }; }
+  function rankPostHtml(p) {
+    var a = p.author || {};
+    var parts = (p.body || '').split('|');
+    var from = tierByName(parts[0]), to = tierByName(parts[1]);
+    var up = p.kind === 'rankup';
+    var liked = p.likes.some(function (l) { return l.user_id === profile.id; });
+    var nComments = p.comments && p.comments[0] ? p.comments[0].count : 0;
+    var lines = up
+      ? ['keep grinding 💪', 'the climb continues 🧗', 'who can stop this? 🔥']
+      : ["didn't play enough? 🧊", 'time for revenge 😤', 'not having fun = you\'re out 😂'];
+    var line = lines[p.id.charCodeAt(0) % lines.length];
+    return '<article class="card announce ' + (up ? 'up' : 'down') + '">' +
+      '<div class="big">' + (up ? '🎉' : '😱') + '</div>' +
+      '<div class="avatar">' + avatarHtml(a) + '</div>' +
+      '<h4>' + esc(nameOf(a)) + (up ? ' ranked up!' : ' dropped a tier!') + '</h4>' +
+      '<div class="tier-change"><span class="pill">' + from.icon + ' ' + esc(from.name) + '</span>→<span class="pill">' + to.icon + ' ' + esc(to.name) + '</span></div>' +
+      '<p>' + PadPal.fmt(parts[2]) + ' points · ' + line + ' · ' + ago(p.created_at) + '</p>' +
+      '<div class="actions">' +
+        '<button class="' + (liked ? 'liked' : '') + '" data-like="' + p.id + '"><span class="heart">' + (liked ? '❤️' : '🤍') + '</span>' + p.likes.length + '</button>' +
+        '<button data-comments="' + p.id + '">💬 ' + nComments + '</button>' +
+        (profile.is_admin ? '<button data-delete="' + p.id + '">🗑️</button>' : '') +
+      '</div></article>';
+  }
+
   function renderPost(p) {
+    if (p.kind === 'rankup' || p.kind === 'rankdown') return rankPostHtml(p);
     var a = p.author || {};
     var mine = p.author_id === profile.id;
     var liked = p.likes.some(function (l) { return l.user_id === profile.id; });
