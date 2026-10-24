@@ -235,7 +235,7 @@
 
   async function load() {
     var r = await db.from('posts')
-      .select('id, kind, body, photo_path, expires_at, created_at, author_id, author:profiles(id, username, display_name, avatar_url), likes(user_id), comments(count)')
+      .select('id, kind, body, photo_path, expires_at, created_at, author_id, author:profiles!posts_author_id_fkey(id, username, display_name, avatar_url), likes(user_id), comments(count)')
       .order('created_at', { ascending: false })
       .limit(50);
     if (r.error) {
@@ -351,7 +351,7 @@
   }
   async function renderComments() {
     var r = await db.from('comments')
-      .select('id, body, created_at, author:profiles(username, display_name, avatar_url)')
+      .select('id, body, created_at, author:profiles!comments_author_id_fkey(username, display_name, avatar_url)')
       .eq('post_id', commentsFor).order('created_at');
     if (r.error) { $('commentList').innerHTML = '<p class="meta">' + esc(PadPal.friendlyError(r.error)) + '</p>'; return; }
     var paths = r.data.map(function (c) { return c.author && c.author.avatar_url; }).filter(function (x) { return x && !urls[x]; });
