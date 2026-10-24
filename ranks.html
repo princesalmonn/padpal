@@ -328,7 +328,8 @@
         ' · ' + (idle === null ? 'No games yet' : idle === 0 ? 'Played today 🔥' : 'Last game ' + idle + 'd ago') + '</p>' +
       (p.id === me.id
         ? '<div class="pp-btns"><a class="btn btn-primary" href="profile.html" style="text-align:center;text-decoration:none">View my profile</a></div>'
-        : '<div class="pp-btns"><a class="btn btn-primary" href="play.html" style="text-align:center;text-decoration:none">🎾 Play a match</a></div>');
+        : '<div class="pp-btns"><a class="btn btn-ghost" href="chat.html?with=' + p.id + '" style="text-align:center;text-decoration:none">💬 Message</a>' +
+          '<a class="btn btn-primary" href="play.html" style="text-align:center;text-decoration:none">🎾 Play a match</a></div>');
     $('playerSheet').classList.add('open');
     $('backdrop').classList.add('open');
   }

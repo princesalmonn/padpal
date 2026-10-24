@@ -23,19 +23,24 @@
   .filters button { flex-shrink: 0; border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 14px; font-size: 13px; color: var(--text-2); }
   .filters button.on { border-color: var(--accent); color: var(--accent); font-weight: 700; }
 
+  .avatar { overflow: hidden; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+
   /* Chat list */
   .chat-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 0; background: none; padding: 10px 2px; border-bottom: 1px solid var(--line); }
   .chat-row .avatar { width: 50px; height: 50px; font-size: 20px; }
   .chat-row .avatar.group { border-radius: 14px; border-color: var(--gold); }
-  .chat-row .avatar.game { border-radius: 14px; border-color: var(--primary); background: color-mix(in srgb, var(--primary) 25%, var(--card)); }
+  .chat-row .avatar.game { border-radius: 14px; border-color: var(--primary); background: color-mix(in srgb, var(--primary) 20%, var(--card)); }
   .chat-row .mid { flex: 1; min-width: 0; }
-  .chat-row .top { display: flex; justify-content: space-between; gap: 8px; }
+  .chat-row .top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
   .chat-row .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chat-row .time { font-size: 12px; color: var(--text-2); flex-shrink: 0; }
   .chat-row .last { font-size: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
   .chat-row.unread .last { color: var(--text); font-weight: 600; }
   .chat-row .sub { font-size: 11px; color: var(--accent); margin-top: 2px; }
-  .badge-n { background: var(--primary); color: var(--primary-text); font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; padding: 0 6px; }
+  .badge-n { background: var(--primary); color: var(--primary-text); font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; padding: 0 6px; flex-shrink: 0; }
+  .empty { text-align: center; color: var(--text-2); padding: 40px 16px; }
+  .empty .big { font-size: 46px; }
 
   /* Conversation (full screen) */
   .convo {
@@ -44,28 +49,31 @@
   }
   .convo.open { display: flex; }
   .c-head { display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; border-bottom: 1px solid var(--line); background: var(--card); }
-  .c-head .back { border: 0; background: none; font-size: 26px; padding: 0 6px 0 0; line-height: 1; color: var(--accent); }
+  .c-head .back { border: 0; background: none; font-size: 30px; padding: 0 6px 0 0; line-height: 1; color: var(--accent); }
   .c-head .avatar { width: 38px; height: 38px; font-size: 16px; }
-  .c-head .nm { font-weight: 700; }
-  .c-head .members { font-size: 12px; color: var(--text-2); }
+  .c-head .who { flex: 1; min-width: 0; }
+  .c-head .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-head .members { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-head .info { border: 0; background: var(--card-2); border-radius: 50%; width: 36px; height: 36px; font-size: 16px; }
   .c-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 
-  .game-pin { background: var(--card); border: 1px solid var(--primary); border-radius: 14px; padding: 10px 12px; font-size: 13px; margin-bottom: 6px; }
+  .game-pin { background: var(--card); border: 1px solid var(--primary); border-radius: 14px; padding: 10px 12px; font-size: 13px; margin-bottom: 6px; text-decoration: none; color: var(--text); display: block; }
   .game-pin b { display: block; font-size: 14px; margin-bottom: 2px; }
   .sys { align-self: center; font-size: 12px; color: var(--text-2); background: var(--card); border-radius: 999px; padding: 4px 12px; margin: 6px 0; text-align: center; }
 
   .msg { max-width: 78%; display: flex; flex-direction: column; }
   .msg .who { font-size: 11px; color: var(--accent); font-weight: 700; margin: 0 0 2px 10px; }
-  .bubble { padding: 9px 13px; border-radius: 18px; font-size: 15px; line-height: 1.35; word-wrap: break-word; }
+  .bubble { padding: 9px 13px; border-radius: 18px; font-size: 15px; line-height: 1.35; word-wrap: break-word; white-space: pre-wrap; }
   .msg.them { align-self: flex-start; }
   .msg.them .bubble { background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 6px; }
   .msg.me { align-self: flex-end; }
   .msg.me .bubble { background: var(--primary); color: var(--primary-text); border-bottom-right-radius: 6px; }
   .msg .t { font-size: 10px; color: var(--text-2); margin: 2px 10px 0; }
   .msg.me .t { text-align: right; }
-  .pic { width: 200px; aspect-ratio: 4 / 5; border-radius: 16px; display: grid; place-items: center; font-size: 60px; position: relative; }
+  .pic { position: relative; border-radius: 16px; overflow: hidden; max-width: 220px; }
+  .pic img { width: 100%; display: block; }
   .pic span { position: absolute; top: 8px; right: 8px; font-size: 11px; font-weight: 600; background: rgba(0,0,0,.55); color: #fff; padding: 3px 8px; border-radius: 999px; }
-  .typing .bubble { color: var(--text-2); font-style: italic; }
+  .pic-gone { font-size: 13px; color: var(--text-2); font-style: italic; }
 
   .c-foot { display: flex; gap: 8px; align-items: center; padding: 8px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card); }
   .c-foot input {
@@ -76,6 +84,16 @@
   .c-foot .round { width: 42px; height: 42px; border-radius: 50%; border: 0; flex-shrink: 0; font-size: 18px; }
   .c-foot .cam { background: var(--card-2); }
   .c-foot .send { background: var(--primary); color: var(--primary-text); }
+
+  /* Sheets */
+  .pick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pick button { border: 1px solid var(--line); background: var(--card-2); border-radius: 999px; padding: 7px 12px; font-size: 14px; }
+  .pick button.on { background: var(--primary); border-color: var(--primary); color: var(--primary-text); font-weight: 600; }
+  .person-row { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 8px 0; text-align: left; border-bottom: 1px solid var(--line); }
+  .person-row .avatar { width: 38px; height: 38px; font-size: 15px; }
+  .seg { display: flex; background: var(--card-2); border-radius: 12px; padding: 3px; margin-bottom: 12px; }
+  .seg button { flex: 1; border: 0; background: none; padding: 8px 0; border-radius: 9px; font-size: 14px; color: var(--text-2); font-weight: 600; }
+  .seg button.on { background: var(--primary); color: var(--primary-text); }
 </style>
 </head>
 <body>
@@ -83,12 +101,11 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="logo"><img class="logo-img logo-for-dark" src="logo-dark.svg" alt=""><img class="logo-img logo-for-light" src="logo-light.svg" alt=""><span>Pad</span><b>Pal</b></div>
-    <button class="icon-btn" data-soon="New chats" aria-label="New chat">✏️</button>
+    <button class="icon-btn" id="newBtn" aria-label="New chat">✏️</button>
   </div>
 </header>
 
 <main class="wrap">
-  <div class="sample-note">🧪 Sample chats for now. Real chat is coming soon.</div>
   <div class="disclaimer">🕐 Messages disappear after <b>1 month</b> · 📷 Photos after <b>24 hours</b></div>
   <div class="filters" id="filters">
     <button class="on" data-filter="all">All</button>
@@ -96,7 +113,8 @@
     <button data-filter="group">👥 Groups</button>
     <button data-filter="dm">👤 Direct</button>
   </div>
-  <div id="list"></div>
+  <div class="error-box" id="error" role="alert" hidden></div>
+  <div id="list"><div class="empty">Loading…</div></div>
 </main>
 
 <!-- Bottom tab bar -->
@@ -115,183 +133,382 @@
   <div class="c-head">
     <button class="back" id="back" aria-label="Back">‹</button>
     <div class="avatar" id="cAvatar"></div>
-    <div><div class="nm" id="cName"></div><div class="members" id="cMembers"></div></div>
+    <div class="who"><div class="nm" id="cName"></div><div class="members" id="cMembers"></div></div>
+    <button class="info" id="infoBtn" aria-label="Chat info">ℹ️</button>
   </div>
   <div class="c-body" id="cBody"></div>
   <form class="c-foot" id="cForm">
-    <button type="button" class="round cam" data-soon="Sending photos" aria-label="Photo">📷</button>
-    <input id="cInput" placeholder="Message…" autocomplete="off">
+    <button type="button" class="round cam" id="camBtn" aria-label="Send a photo">📷</button>
+    <input id="cInput" placeholder="Message…" autocomplete="off" maxlength="1000">
     <button class="round send" aria-label="Send">➤</button>
   </form>
+  <input type="file" id="photoInput" accept="image/*" hidden>
 </div>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="sheet" style="z-index:60"><div class="grab"></div><div id="sheetBody"></div></div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-  // ===== Fake chats (later from the database, live with Supabase real-time) =====
-  var chats = [
-    { id: 1, type: 'game', name: 'Today 19:00 · Court 3', icon: '🎾', members: 'You, Rio, Sari, Andi',
-      sub: 'Game chat · closes 3 days after the game', time: '18:42', unread: 3,
-      game: { when: 'Today · 19:00 – 20:30', where: 'Court 3 · Padel Arena Senayan' },
-      msgs: [
-        { sys: 'Rio created this game' },
-        { sys: 'Sari, Andi and You joined. Game is full! 🎉' },
-        { from: 'Rio', text: 'Who brings balls? 🎾', t: '18:30' },
-        { from: 'me', text: 'I got new ones', t: '18:33' },
-        { from: 'Andi', text: "I'll be 10 min late, traffic 😩", t: '18:40' },
-        { from: 'Sari', pic: '🚗', bg: 'linear-gradient(160deg,#4F7CAC,#24272D)', left: 23, t: '18:41' },
-        { from: 'Sari', text: 'Same here lol', t: '18:42' }
-      ] },
-    { id: 2, type: 'group', name: 'Tuesday Crew 🔥', icon: '👥', members: '8 members',
-      time: '17:05', unread: 12,
-      msgs: [
-        { sys: 'Messages older than 1 month were removed 🧹' },
-        { from: 'Budi', text: 'Saw my rank drop post... thanks a lot guys 😭', t: '16:50' },
-        { from: 'Maya', text: 'Not having fun = you are out 😂', t: '16:52' },
-        { from: 'Dimas', text: 'Americano Saturday? 8 players, 2 courts', t: '17:01' },
-        { from: 'Rio', text: "I'm in. Mexicano maybe? Closer games", t: '17:05' }
-      ] },
-    { id: 3, type: 'dm', name: 'Sari', icon: 'S', members: '🥉 Junior · online', time: '15:20', unread: 0,
-      msgs: [
-        { from: 'Sari', text: 'Your bandeja today was 🔥', t: '15:10' },
-        { from: 'me', text: 'Haha thanks! Rated your víbora 9 😎', t: '15:18' },
-        { from: 'Sari', text: 'Partner again on Saturday?', t: '15:20' }
-      ] },
-    { id: 4, type: 'game', name: 'Sat 08:00 · Americano', icon: '🔄', members: '6 of 8 players',
-      sub: 'Game chat · 2 spots left', time: 'Yesterday', unread: 0,
-      game: { when: 'Sat 26 Oct · 08:00 – 10:00', where: 'Courts 1–2 · Smash Club' },
-      msgs: [
-        { sys: 'Maya created this Americano' },
-        { from: 'Maya', text: 'Need 2 more! Invite your friends 🙏', t: 'Yesterday' }
-      ] },
-    { id: 5, type: 'dm', name: 'Andi', icon: 'A', members: '⚡ Amateur · 2h ago', time: 'Mon', unread: 0,
-      msgs: [
-        { from: 'Andi', text: 'Rematch. Tomorrow. 😤', t: 'Mon' },
-        { from: 'me', text: "You're my nemesis now, it's official 😈", t: 'Mon' }
-      ] },
-    { id: 6, type: 'group', name: 'Office Padel', icon: '💼', members: '5 members', time: 'Sun', unread: 0,
-      msgs: [ { from: 'Kevin', text: 'Lefties unite 🫡', t: 'Sun' } ] }
-  ];
-
-  var COLORS = { Rio: '#B3261E', Sari: '#D9822B', Andi: '#4F7CAC', Budi: '#6E8B5B', Maya: '#7E6AA8', Dimas: '#C9A24A', Kevin: '#B87333' };
-  var REPLIES = ['Haha 😂', 'Deal 🤝', "Let's goooo 🔥", '👍', 'See you on court 🎾', 'Bandeja time 😎'];
-
+  var db = PadPal.db;
+  var me = null;
+  var people = {};        // member id → profile
+  var urls = {};          // avatar / photo links
+  var chats = [];         // my chats, newest first
   var filter = 'all';
-  var current = null;
+  var current = null;     // the open chat
+  var msgs = [];          // messages of the open chat
+  var channel = null;     // live updates for the open chat
+  var pollTimer = null;
 
   // ===== Helpers =====
   function $(id) { return document.getElementById(id); }
-  function esc(s) { return s.replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   var toastTimer;
   function toast(msg) {
     var t = $('toast');
     t.textContent = msg;
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2500);
   }
-  function lastText(c) {
-    var m = c.msgs[c.msgs.length - 1];
-    if (m.sys) return m.sys;
-    var who = m.from === 'me' ? 'You: ' : (c.type === 'dm' ? '' : m.from + ': ');
-    return who + (m.pic ? '📷 Photo' : m.text);
+  function nameOf(id) { var p = people[id]; return p ? (p.display_name || p.username) : 'Someone'; }
+  function avatarInner(id) {
+    var p = people[id];
+    var url = p && p.avatar_url && urls[p.avatar_url];
+    return url ? '<img src="' + url + '" alt="">' : esc(nameOf(id)[0].toUpperCase());
   }
-  function now() {
-    var d = new Date();
-    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  function timeText(iso) {
+    var d = new Date(iso), now = new Date();
+    if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    if (now - d < 6 * 86400000) return d.toLocaleDateString(undefined, { weekday: 'short' });
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+  function gameWhen(g) {
+    var d = new Date(g.scheduled_at);
+    return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+  function photoAlive(m) { return Date.now() - new Date(m.created_at) < 24 * 3600000; }
+  function openSheet(html) { $('sheetBody').innerHTML = html; $('sheet').classList.add('open'); $('backdrop').classList.add('open'); }
+  function closeSheet() { $('sheet').classList.remove('open'); $('backdrop').classList.remove('open'); }
+  $('backdrop').addEventListener('click', closeSheet);
+
+  // ===== Load my chats =====
+  PadPal.me.then(async function (who) {
+    if (!who) return;
+    me = who.profile;
+    (await PadPal.members()).forEach(function (m) { people[m.id] = m; });
+    try { urls = await PadPal.photoUrls(Object.keys(people).map(function (id) { return people[id].avatar_url; })); } catch (e) {}
+    await loadChats();
+    cleanupMyOldPhotos();
+    // opened with ?with=<member id> (e.g. from Ranks) → straight into the DM
+    var withId = new URLSearchParams(location.search).get('with');
+    if (withId) { history.replaceState(null, '', 'chat.html'); startDm(withId); }
+  });
+
+  async function loadChats() {
+    var r = await db.from('chat_members').select('chat_id, last_read_at, chats(id, kind, name, game_id, last_message_at)').eq('user_id', me.id);
+    if (r.error) {
+      $('list').innerHTML = '';
+      $('error').textContent = /chat_members/.test(r.error.message) ? 'Chat is not set up yet. Run 10_chat.sql in Supabase.' : PadPal.friendlyError(r.error);
+      $('error').hidden = false;
+      return;
+    }
+    $('error').hidden = true;
+    var mine = r.data.filter(function (x) { return x.chats; });
+    var ids = mine.map(function (x) { return x.chat_id; });
+    var members = {}, last = {}, unread = {}, games = {};
+    if (ids.length) {
+      var mr = await db.from('chat_members').select('chat_id, user_id').in('chat_id', ids);
+      (mr.data || []).forEach(function (x) { (members[x.chat_id] = members[x.chat_id] || []).push(x.user_id); });
+      var lr = await db.from('messages').select('chat_id, author_id, body, photo_path, created_at').in('chat_id', ids)
+        .order('created_at', { ascending: false }).limit(800);
+      var readAt = {};
+      mine.forEach(function (x) { readAt[x.chat_id] = new Date(x.last_read_at); });
+      (lr.data || []).forEach(function (m) {
+        if (!last[m.chat_id]) last[m.chat_id] = m;
+        if (m.author_id && m.author_id !== me.id && new Date(m.created_at) > readAt[m.chat_id]) unread[m.chat_id] = (unread[m.chat_id] || 0) + 1;
+      });
+      var gameIds = mine.filter(function (x) { return x.chats.game_id; }).map(function (x) { return x.chats.game_id; });
+      if (gameIds.length) {
+        var gr = await db.from('games').select('id, kind, scheduled_at, place, status').in('id', gameIds);
+        (gr.data || []).forEach(function (g) { games[g.id] = g; });
+      }
+    }
+    chats = mine.map(function (x) {
+      var c = x.chats;
+      var others = (members[c.id] || []).filter(function (id) { return id !== me.id; });
+      return { id: c.id, kind: c.kind, name: c.name, game: games[c.game_id], members: members[c.id] || [], others: others,
+               last: last[c.id], unread: unread[c.id] || 0, at: c.last_message_at };
+    }).sort(function (a, b) { return new Date(b.at) - new Date(a.at); });
+    renderList();
   }
 
-  // ===== Chat list =====
+  function chatTitle(c) {
+    if (c.kind === 'dm') return c.others[0] ? nameOf(c.others[0]) : 'Just you';
+    if (c.kind === 'group') return c.name || 'Group';
+    var g = c.game;
+    return g ? (g.kind === 'match' ? '🎾 Match' : g.kind === 'americano' ? '🔄 Americano' : '🌮 Mexicano') + ' · ' + gameWhen(g) : 'Game chat';
+  }
+  function chatAvatar(c) {
+    if (c.kind === 'dm') return '<div class="avatar">' + (c.others[0] ? avatarInner(c.others[0]) : '?') + '</div>';
+    if (c.kind === 'group') return '<div class="avatar group">👥</div>';
+    return '<div class="avatar game">' + (c.game && c.game.kind !== 'match' ? '🔄' : '🎾') + '</div>';
+  }
+  function lastText(c) {
+    var m = c.last;
+    if (!m) return 'No messages yet. Say hi! 👋';
+    var who = !m.author_id ? '' : m.author_id === me.id ? 'You: ' : (c.kind === 'dm' ? '' : nameOf(m.author_id) + ': ');
+    return who + (m.photo_path ? '📷 Photo' : m.body);
+  }
+
   function renderList() {
-    var shown = chats.filter(function (c) { return filter === 'all' || c.type === filter; });
+    var shown = chats.filter(function (c) { return filter === 'all' || c.kind === filter; });
+    if (!shown.length) {
+      $('list').innerHTML = '<div class="empty"><div class="big">💬</div><p><b>No chats here yet.</b></p><p>Tap ✏️ to message a friend or start a group. Game chats appear when you join a game. 🎾</p></div>';
+      return;
+    }
     $('list').innerHTML = shown.map(function (c) {
-      return '<button class="chat-row' + (c.unread ? ' unread' : '') + '" data-chat="' + c.id + '">' +
-        '<div class="avatar ' + (c.type !== 'dm' ? c.type : '') + '">' + c.icon + '</div>' +
-        '<div class="mid"><div class="top"><span class="nm">' + c.name + '</span><span class="time">' + c.time + '</span></div>' +
+      var sub = c.kind === 'game' ? 'Game chat · ' + c.members.length + ' players' + (c.game && c.game.place ? ' · ' + c.game.place : '')
+        : c.kind === 'group' ? c.members.length + ' members' : '';
+      return '<button class="chat-row' + (c.unread ? ' unread' : '') + '" data-chat="' + c.id + '">' + chatAvatar(c) +
+        '<div class="mid"><div class="top"><span class="nm">' + esc(chatTitle(c)) + '</span><span class="time">' + (c.last ? timeText(c.last.created_at) : '') + '</span></div>' +
         '<div class="top"><div class="last">' + esc(lastText(c)) + '</div>' + (c.unread ? '<span class="badge-n">' + c.unread + '</span>' : '') + '</div>' +
-        (c.sub ? '<div class="sub">' + c.sub + '</div>' : '') +
-        '</div></button>';
+        (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') + '</div></button>';
     }).join('');
   }
 
-  // ===== Conversation =====
+  // ===== A conversation =====
+  async function openChat(id) {
+    current = chats.filter(function (c) { return c.id === id; })[0];
+    if (!current) { await loadChats(); current = chats.filter(function (c) { return c.id === id; })[0]; }
+    if (!current) return toast('Chat not found');
+    $('cAvatar').outerHTML = chatAvatar(current).replace('class="avatar', 'id="cAvatar" class="avatar');
+    $('cName').textContent = chatTitle(current);
+    $('cMembers').textContent = current.kind === 'dm' ? '@' + ((people[current.others[0]] || {}).username || '') : current.members.map(nameOf).join(', ');
+    $('cBody').innerHTML = '<p class="meta" style="text-align:center">Loading…</p>';
+    $('convo').classList.add('open');
+    var r = await db.from('messages').select('id, chat_id, author_id, body, photo_path, created_at')
+      .eq('chat_id', id).order('created_at', { ascending: false }).limit(200);
+    msgs = (r.data || []).reverse();
+    await signPhotos(msgs);
+    renderMsgs();
+    db.rpc('mark_read', { p_chat: id });
+    current.unread = 0;
+    listenLive(id);
+  }
+
+  async function signPhotos(list) {
+    var paths = list.filter(function (m) { return m.photo_path && photoAlive(m) && !urls[m.photo_path]; }).map(function (m) { return m.photo_path; });
+    try { Object.assign(urls, await PadPal.photoUrls(paths)); } catch (e) {}
+  }
+
   function renderMsgs() {
     var c = current;
     var html = '';
-    if (c.game) html += '<div class="game-pin"><b>📌 ' + c.game.when + '</b>📍 ' + c.game.where + '</div>';
+    if (c.kind === 'game' && c.game) {
+      html += '<a class="game-pin" href="play.html"><b>📌 ' + esc(chatTitle(c)) + '</b>' + (c.game.place ? '📍 ' + esc(c.game.place) + ' · ' : '') + 'Tap to open Play</a>';
+    }
     html += '<div class="sys">🕐 Messages disappear after 1 month</div>';
-    c.msgs.forEach(function (m) {
-      if (m.sys) { html += '<div class="sys">' + m.sys + '</div>'; return; }
-      var mine = m.from === 'me';
-      html += '<div class="msg ' + (mine ? 'me' : 'them') + (m.typing ? ' typing' : '') + '">' +
-        (!mine && c.type !== 'dm' ? '<div class="who" style="color:' + (COLORS[m.from] || 'var(--accent)') + '">' + m.from + '</div>' : '') +
-        (m.pic
-          ? '<div class="pic" style="background:' + m.bg + '">' + m.pic + '<span>⏳ ' + m.left + 'h left</span></div>'
-          : '<div class="bubble">' + esc(m.text) + '</div>') +
-        (m.t ? '<div class="t">' + m.t + '</div>' : '') +
-        '</div>';
+    msgs.forEach(function (m) {
+      if (!m.author_id) { html += '<div class="sys">' + esc(m.body) + '</div>'; return; }
+      var mine = m.author_id === me.id;
+      var content;
+      if (m.photo_path) {
+        content = photoAlive(m) && urls[m.photo_path]
+          ? '<div class="pic"><img src="' + urls[m.photo_path] + '" alt=""><span>⏳ ' + Math.max(1, Math.ceil((24 * 3600000 - (Date.now() - new Date(m.created_at))) / 3600000)) + 'h left</span></div>'
+          : '<div class="bubble pic-gone">📷 Photo expired</div>';
+        if (m.body) content += '<div class="bubble" style="margin-top:4px">' + esc(m.body) + '</div>';
+      } else {
+        content = '<div class="bubble">' + esc(m.body) + '</div>';
+      }
+      html += '<div class="msg ' + (mine ? 'me' : 'them') + '">' +
+        (!mine && c.kind !== 'dm' ? '<div class="who">' + esc(nameOf(m.author_id)) + '</div>' : '') +
+        content + '<div class="t">' + timeText(m.created_at) + '</div></div>';
     });
     $('cBody').innerHTML = html;
     $('cBody').scrollTop = $('cBody').scrollHeight;
   }
 
-  function openChat(id) {
-    current = chats.filter(function (c) { return c.id === id; })[0];
-    current.unread = 0;
-    $('cAvatar').textContent = current.icon;
-    $('cAvatar').className = 'avatar ' + (current.type !== 'dm' ? current.type : '');
-    $('cName').textContent = current.name;
-    $('cMembers').textContent = current.members;
-    renderMsgs();
-    $('convo').classList.add('open');
+  // New messages arrive live (and a slower check as a backup)
+  function listenLive(id) {
+    stopLive();
+    channel = db.channel('chat-' + id)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'chat_id=eq.' + id }, function (payload) {
+        addMessages([payload.new]);
+      })
+      .subscribe();
+    pollTimer = setInterval(async function () {
+      var lastId = msgs.length ? msgs[msgs.length - 1].id : 0;
+      var r = await db.from('messages').select('id, chat_id, author_id, body, photo_path, created_at').eq('chat_id', id).gt('id', lastId).order('id');
+      if (r.data && r.data.length) addMessages(r.data);
+    }, 8000);
   }
+  function stopLive() {
+    if (channel) { db.removeChannel(channel); channel = null; }
+    clearInterval(pollTimer);
+  }
+  async function addMessages(list) {
+    if (!current) return;
+    var fresh = list.filter(function (m) { return m.chat_id === current.id && !msgs.some(function (x) { return x.id === m.id; }); });
+    if (!fresh.length) return;
+    await signPhotos(fresh);
+    msgs = msgs.concat(fresh).sort(function (a, b) { return a.id - b.id; });
+    renderMsgs();
+    db.rpc('mark_read', { p_chat: current.id });
+  }
+
   function closeChat() {
+    stopLive();
     $('convo').classList.remove('open');
     current = null;
-    renderList();
+    loadChats();
   }
   $('back').addEventListener('click', closeChat);
 
-  $('cForm').addEventListener('submit', function (e) {
+  // Send text
+  $('cForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     var text = $('cInput').value.trim();
-    if (!text) return;
-    var c = current;
-    c.msgs.push({ from: 'me', text: text, t: now() });
-    c.time = now();
+    if (!text || !current) return;
     $('cInput').value = '';
-    renderMsgs();
-    // a friend answers (fake, just to feel alive)
-    var friend = c.type === 'dm' ? c.name : (c.msgs.filter(function (m) { return m.from && m.from !== 'me'; }).pop() || { from: 'Rio' }).from;
-    setTimeout(function () {
-      if (current !== c) return;
-      c.msgs.push({ from: friend, text: 'typing…', typing: true });
-      renderMsgs();
-      setTimeout(function () {
-        c.msgs.pop();
-        c.msgs.push({ from: friend, text: REPLIES[Math.floor(Math.random() * REPLIES.length)], t: now() });
-        if (current === c) renderMsgs();
-      }, 1200);
-    }, 600);
+    var r = await db.from('messages').insert({ chat_id: current.id, author_id: me.id, body: text })
+      .select('id, chat_id, author_id, body, photo_path, created_at').single();
+    if (r.error) { $('cInput').value = text; return toast(PadPal.friendlyError(r.error)); }
+    addMessages([r.data]);
   });
 
+  // Send a photo (gone after 24 hours)
+  $('camBtn').addEventListener('click', function () { $('photoInput').click(); });
+  $('photoInput').addEventListener('change', async function () {
+    var file = this.files[0];
+    this.value = '';
+    if (!file || !current) return;
+    toast('⏳ Sending photo…');
+    try {
+      var path = await PadPal.uploadPhoto(file, 'chat');
+      var r = await db.from('messages').insert({ chat_id: current.id, author_id: me.id, photo_path: path })
+        .select('id, chat_id, author_id, body, photo_path, created_at').single();
+      if (r.error) { db.storage.from('photos').remove([path]); throw r.error; }
+      addMessages([r.data]);
+    } catch (err) { toast(PadPal.friendlyError(err)); }
+  });
+
+  // My chat photos older than 24h: delete the files (keeps free storage)
+  async function cleanupMyOldPhotos() {
+    try {
+      var r = await db.from('messages').select('photo_path').eq('author_id', me.id).not('photo_path', 'is', null)
+        .lt('created_at', new Date(Date.now() - 24 * 3600000).toISOString()).limit(200);
+      var paths = (r.data || []).map(function (m) { return m.photo_path; });
+      if (paths.length) await db.storage.from('photos').remove(paths);
+    } catch (e) {}
+  }
+
+  // ===== New chat: direct or group =====
+  var groupPick = [];
+  function openNew(tab) {
+    var others = Object.keys(people).filter(function (id) { return id !== me.id; });
+    var html = '<h3>✏️ New chat</h3><div class="seg"><button class="' + (tab === 'dm' ? 'on' : '') + '" data-newtab="dm">👤 Message</button>' +
+      '<button class="' + (tab === 'group' ? 'on' : '') + '" data-newtab="group">👥 New group</button></div>';
+    if (tab === 'dm') {
+      html += others.length ? others.map(function (id) {
+        var t = PadPal.tierOf(people[id].points);
+        return '<button class="person-row" data-dm="' + id + '"><div class="avatar">' + avatarInner(id) + '</div><div><div class="name">' + esc(nameOf(id)) + '</div><div class="meta">@' + esc(people[id].username) + ' · ' + t.icon + ' ' + t.name + '</div></div></button>';
+      }).join('') : '<p class="meta">No other members yet. Invite friends from your profile!</p>';
+    } else {
+      html += '<div class="field"><label for="gName">Group name</label><input class="input" id="gName" maxlength="40" placeholder="Tuesday Crew 🔥"></div>' +
+        '<div class="label" style="font-size:13px;color:var(--text-2);font-weight:600;margin-bottom:8px">Members</div>' +
+        '<div class="pick">' + others.map(function (id) {
+          return '<button class="' + (groupPick.indexOf(id) > -1 ? 'on' : '') + '" data-gpick="' + id + '">' + esc(nameOf(id)) + '</button>';
+        }).join('') + '</div>' +
+        '<button class="btn btn-primary" style="width:100%;margin-top:14px" data-gcreate="1">Create group</button>';
+    }
+    var keepName = $('gName') ? $('gName').value : '';
+    openSheet(html);
+    if ($('gName')) $('gName').value = keepName;
+  }
+  $('newBtn').addEventListener('click', function () { groupPick = []; openNew('dm'); });
+
+  async function startDm(id) {
+    var r = await db.rpc('open_dm', { p_user: id });
+    if (r.error) return toast(PadPal.friendlyError(r.error));
+    closeSheet();
+    await loadChats();
+    openChat(r.data);
+  }
+
+  // ===== Chat info (members, add people, leave) =====
+  function openInfo() {
+    var c = current;
+    var html = '<h3>ℹ️ ' + esc(chatTitle(c)) + '</h3>' +
+      '<div class="label" style="font-size:13px;color:var(--text-2);font-weight:600">Members (' + c.members.length + ')</div>' +
+      c.members.map(function (id) {
+        return '<div class="person-row"><div class="avatar">' + avatarInner(id) + '</div><div><div class="name">' + esc(nameOf(id)) + (id === me.id ? ' (you)' : '') + '</div></div></div>';
+      }).join('');
+    if (c.kind === 'group') {
+      var outside = Object.keys(people).filter(function (id) { return c.members.indexOf(id) < 0; });
+      html += (outside.length ? '<div class="label" style="font-size:13px;color:var(--text-2);font-weight:600;margin-top:14px">Add people</div>' +
+        '<div class="pick">' + outside.map(function (id) { return '<button data-add="' + id + '">➕ ' + esc(nameOf(id)) + '</button>'; }).join('') + '</div>' : '') +
+        '<button class="btn btn-ghost" style="width:100%;margin-top:14px" data-leave="1">🚪 Leave group</button>';
+    } else if (c.kind === 'game') {
+      html += '<p class="note meta" style="margin-top:12px">Everyone who joins the game is in this chat. It closes 3 days after the game.</p>';
+    }
+    openSheet(html);
+  }
+  $('infoBtn').addEventListener('click', openInfo);
+
+  // "Are you sure?" without pop-ups
+  var armed = {};
+  function tapTwice(key, warning) {
+    if (armed[key]) { armed[key] = false; return true; }
+    armed[key] = true; toast(warning);
+    setTimeout(function () { armed[key] = false; }, 3000);
+    return false;
+  }
+
   // ===== Clicks =====
-  document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-filter],[data-chat],[data-soon]');
+  document.addEventListener('click', async function (e) {
+    var el = e.target.closest('[data-filter],[data-chat],[data-newtab],[data-dm],[data-gpick],[data-gcreate],[data-add],[data-leave]');
     if (!el) return;
-    if (el.dataset.filter) {
-      filter = el.dataset.filter;
+    var d = el.dataset;
+    if (d.filter) {
+      filter = d.filter;
       document.querySelectorAll('#filters button').forEach(function (b) { b.classList.toggle('on', b === el); });
       renderList();
-    } else if (el.dataset.chat) {
-      openChat(+el.dataset.chat);
-    } else if (el.dataset.soon) {
-      e.preventDefault();
-      toast('🚧 ' + el.dataset.soon + ': coming in a later step');
+    }
+    else if (d.chat) openChat(d.chat);
+    else if (d.newtab) openNew(d.newtab);
+    else if (d.dm) startDm(d.dm);
+    else if (d.gpick) {
+      var i = groupPick.indexOf(d.gpick);
+      if (i > -1) groupPick.splice(i, 1); else groupPick.push(d.gpick);
+      openNew('group');
+    }
+    else if (d.gcreate) {
+      el.disabled = true;
+      var r = await db.rpc('create_group', { p_name: $('gName').value, p_users: groupPick });
+      if (r.error) { el.disabled = false; return toast(PadPal.friendlyError(r.error)); }
+      closeSheet(); await loadChats(); openChat(r.data);
+    }
+    else if (d.add) {
+      var r2 = await db.rpc('add_to_group', { p_chat: current.id, p_users: [d.add] });
+      if (r2.error) return toast(PadPal.friendlyError(r2.error));
+      current.members.push(d.add);
+      toast('👋 Added ' + nameOf(d.add));
+      openInfo();
+    }
+    else if (d.leave) {
+      if (!tapTwice('leave', 'Tap again to leave this group')) return;
+      var r3 = await db.rpc('leave_group', { p_chat: current.id });
+      if (r3.error) return toast(PadPal.friendlyError(r3.error));
+      closeSheet(); closeChat(); toast('You left the group');
     }
   });
 
-  renderList();
+  // Refresh the list now and then while you're on it
+  setInterval(function () { if (!current && me && document.visibilityState === 'visible') loadChats(); }, 20000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && me && !current) loadChats(); });
 </script>
 </body>
 </html>
