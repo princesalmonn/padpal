@@ -141,15 +141,31 @@
 
   // ===== Score reports: undo the match (points go back) or dismiss =====
   async function loadReports() {
-    var r = await db.from('match_reports').select('id, match_id, user_id, reason, created_at').eq('status', 'open').order('created_at');
+    var r = await db.from('match_reports').select('*').eq('status', 'open').order('created_at');
     if (r.error) { $('reports').innerHTML = '<div class="card empty">Score reports appear after you run 05_lobby.sql.</div>'; return; }
     $('reportCount').textContent = r.data.length;
     if (!r.data.length) { $('reports').innerHTML = '<div class="card empty">No reports. Everyone is playing fair. 😇</div>'; return; }
-    var ids = r.data.map(function (x) { return x.match_id; });
-    var mr = await db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at').in('id', ids);
-    var byId = {};
+    var ids = r.data.filter(function (x) { return x.match_id; }).map(function (x) { return x.match_id; });
+    var gids = r.data.filter(function (x) { return x.game_id; }).map(function (x) { return x.game_id; });
+    var mr = ids.length ? await db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at').in('id', ids) : { data: [] };
+    var gr = gids.length ? await db.from('games').select('id, kind, session_state').in('id', gids) : { data: [] };
+    var byId = {}, games = {};
     (mr.data || []).forEach(function (m) { byId[m.id] = m; });
+    (gr.data || []).forEach(function (g) { games[g.id] = g; });
     $('reports').innerHTML = r.data.map(function (rep) {
+      if (rep.game_id) {
+        // a session report
+        var g = games[rep.game_id];
+        var s = g && g.session_state;
+        var top = s ? s.players.slice().sort(function (a, b) { return s.points[b] - s.points[a]; }).slice(0, 3)
+          .map(function (id, i) { return ['🥇', '🥈', '🥉'][i] + ' ' + esc(nameOf(id)) + ' (' + s.points[id] + ')'; }).join(' · ') : '';
+        return '<div class="card">' +
+          '<div class="name">' + (g && g.kind === 'mexicano' ? '🌮 Mexicano' : '🔄 Americano') + ' session</div>' +
+          '<div class="meta">' + top + ' · ' + ago(rep.created_at) + '</div>' +
+          '<p style="margin:10px 0 0;font-size:14px">💬 <b>' + esc(nameOf(rep.user_id)) + ':</b> ' + esc(rep.reason) + '</p>' +
+          '<div class="actions"><button class="btn btn-ghost" data-dismiss="' + rep.id + '">Score is OK</button>' +
+          '<button class="btn btn-primary" data-undo-session="' + rep.game_id + '">↩️ Undo session</button></div></div>';
+      }
       var m = byId[rep.match_id];
       var w = m ? (m.winner === 'a' ? [m.a1, m.a2] : [m.b1, m.b2]) : [];
       var l = m ? (m.winner === 'a' ? [m.b1, m.b2] : [m.a1, m.a2]) : [];
@@ -172,7 +188,7 @@
   }
 
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-approve],[data-reject],[data-undo],[data-dismiss]');
+    var el = e.target.closest('[data-approve],[data-reject],[data-undo],[data-undo-session],[data-dismiss]');
     if (!el) return;
     if (el.dataset.approve) setStatus(el.dataset.approve, 'approved', el);
     else if (el.dataset.reject) setStatus(el.dataset.reject, 'rejected', el);
@@ -182,6 +198,15 @@
       db.rpc('undo_match', { p_match: el.dataset.undo }).then(function (r) {
         if (r.error) { el.disabled = false; return showError(r.error); }
         toast('↩️ Match undone. Points are back.');
+        loadReports();
+      });
+    }
+    else if (el.dataset.undoSession) {
+      if (!tapTwice('undos' + el.dataset.undoSession, 'Tap again to undo: everyone\'s session points go back')) return;
+      el.disabled = true;
+      db.rpc('undo_session', { p_game: el.dataset.undoSession }).then(function (r) {
+        if (r.error) { el.disabled = false; return showError(r.error); }
+        toast('↩️ Session undone. Points are back.');
         loadReports();
       });
     }
