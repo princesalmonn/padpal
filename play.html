@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PadPal Play</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-title" content="PadPal">
+<meta name="theme-color" content="#16181C">
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
@@ -125,7 +129,7 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <div class="logo"><span>Pad</span><b>Pal</b></div>
+    <div class="logo"><img class="logo-img" src="logo.png" alt=""><span>Pad</span><b>Pal</b></div>
     <button class="icon-btn" data-open-guide="list" aria-label="Format guide">📖</button>
   </div>
 </header>
@@ -164,16 +168,12 @@
       <div class="big">🔒</div>
       <h3>Official PadPal Tournaments</h3>
       <p>Reach <b>500 points</b> (max Junior) to unlock. Only way to become 🥈 Pro and beyond!</p>
-      <div class="progress"><i style="width:72%"></i></div>
-      <div class="meta">You: 362 / 500 points</div>
+      <div class="progress"><i id="tBar" style="width:0%"></i></div>
+      <div class="meta" id="tPts">You: … / 500 points</div>
     </div>
     <h2>Upcoming</h2>
-    <div class="card">
-      <div class="user"><div class="avatar">🏆</div><div><div class="name">PadPal Cup #1 · Men's</div><div class="meta">Sat 14 Nov · Groups + Knockout · 1 of 8 qualified (Rio)</div></div></div>
-    </div>
-    <div class="card">
-      <div class="user"><div class="avatar">🎉</div><div><div class="name">Season 0 Friendly Cup</div><div class="meta">Open to everyone · no points · just for fun</div></div></div>
-      <button class="btn btn-accent" style="width:100%;margin-top:12px" data-soon="Friendly tournaments">I'm in!</button>
+    <div class="card" style="text-align:center">
+      <div class="meta" style="padding:6px 0">🏆 No tournaments yet. The admin will announce official PadPal Cups and friendly "Season 0" cups here. Coming soon!</div>
     </div>
   </section>
 </main>
@@ -274,6 +274,10 @@
       var who = await PadPal.me;
       if (!who) return;
       me = who.profile;
+      // your real points on the Tourneys tab
+      var pts = Number(me.points) || 0;
+      $('tBar').style.width = Math.max(2, Math.min(100, pts / 500 * 100)) + '%';
+      $('tPts').textContent = 'You: ' + PadPal.fmt(pts) + ' / 500 points';
       people = await PadPal.members();
       var r = await db.from('games')
         .select('id, host_id, kind, scheduled_at, place, size, is_open, status, join_code, game_players(user_id, status)')
