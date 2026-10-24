@@ -350,6 +350,7 @@
 
   var statsPeriod = 'month';
   var myChanges = [];     // every points change of yours (matches, sessions, ratings, inactivity)
+  var myExits = [];       // sessions you had to stop: { reason, when }
 
   // ===== Helpers =====
   function $(id) { return document.getElementById(id); }
@@ -441,6 +442,8 @@
     var streak = 0;
     for (var i = 0; i < myMatches.length && myMatches[i].won; i++) streak++;
     if (streak >= 3) list.push(['🔥', 'On fire', streak + ' wins in a row']);
+    var hurt = myExits.filter(function (x) { return x.reason === 'injured'; }).length;
+    if (hurt) list.push(['🩹', 'Battle scars', 'played until injured ' + hurt + '×']);
     if (myMatches.length >= 10) list.push(['🎾', 'Regular', myMatches.length + ' matches played']);
     if (Number(profile.mixed_points) >= 20) list.push(['🔀', 'Mixed master', PadPal.fmt(profile.mixed_points) + ' mixed pts']);
     var t = PadPal.tierOf(profile.points);
@@ -538,6 +541,14 @@
     var idle = ch.filter(function (c) { return c.reason === 'inactive' || c.reason === 'skill-shrink'; }).reduce(function (a, c) { return a + Number(c.change); }, 0);
     if (idle) facts.push('🧊 Not playing cost you <b>' + PadPal.fmt(Math.abs(idle)) + '</b> point' + (Math.abs(idle) === 1 ? '' : 's') + '. Keep playing!');
     if (nFriends >= 2) facts.push('👥 You played with <b>' + nFriends + '</b> different friends');
+    // sessions you had to stop (the host's reason)
+    var exits = myExits.filter(function (x) { return new Date(x.when).getTime() >= Date.now() - PERIOD_DAYS[key] * 86400000; });
+    var EXIT_TEXT = { injured: '🤕 Injured', sick: '🤒 Sick', tired: '😴 Too tired', left: '🏃 Had to leave', other: '🤷 Stopped' };
+    var byReason = {};
+    exits.forEach(function (x) { byReason[x.reason] = (byReason[x.reason] || 0) + 1; });
+    Object.keys(byReason).forEach(function (r) {
+      facts.push((EXIT_TEXT[r] || '🤷 Stopped') + ' during a session <b>' + byReason[r] + '×</b>' + (r === 'injured' ? '. Take care! 🩹' : r === 'tired' ? '. Hydrate! 💧' : ''));
+    });
     if (key === 'all' && myMatches.length) {
       var first = myMatches[myMatches.length - 1];
       facts.push('🎂 Your first PadPal match: <b>' + new Date(first.when).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) + '</b>');
@@ -570,6 +581,16 @@
       .order('played_at', { ascending: false }).limit(200);
     var cr = await db.from('point_changes').select('match_id, game_id, change, reason, created_at').eq('user_id', id);
     myChanges = cr.data || [];
+    // sessions where the host took you out (injured, sick, tired…)
+    myExits = [];
+    var sessionIds = myChanges.filter(function (c) { return c.reason === 'session' && c.game_id; }).map(function (c) { return c.game_id; });
+    if (sessionIds.length) {
+      var gs = await db.from('games').select('id, session_state, scheduled_at').in('id', sessionIds);
+      (gs.data || []).forEach(function (g) {
+        var o = g.session_state && g.session_state.out && g.session_state.out[id];
+        if (o) myExits.push({ reason: o.reason, when: g.scheduled_at });
+      });
+    }
     var changeOf = {};
     myChanges.forEach(function (c) { if (c.match_id) changeOf[c.match_id] = c.change; });
     myMatches = (r.data || []).map(function (m) {

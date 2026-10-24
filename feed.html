@@ -508,7 +508,9 @@
       order.map(function (id, i) {
         var c = g.changes[id];
         var medal = ['🥇', '🥈', '🥉'][i] || (i + 1) + '.';
-        return '<div class="team' + (i === 0 ? ' win' : '') + '"><div class="players">' + medal + ' ' + nm(id) + '</div>' +
+        var o = s.out && s.out[id];
+        var why = o ? ' ' + ({ injured: '🤕', sick: '🤒', tired: '😴', left: '🏃', other: '🤷' }[o.reason] || '') : '';
+        return '<div class="team' + (i === 0 ? ' win' : '') + '"><div class="players">' + medal + ' ' + nm(id) + why + '</div>' +
           '<div class="sets"><span>' + s.points[id] + '</span>' +
           (c ? '<span class="' + (c.change >= 0 ? 'plus' : 'minus') + '" style="min-width:42px;text-align:right">' + PadPal.fmtChange(c.change) + '</span>' : '') +
           '</div></div>';

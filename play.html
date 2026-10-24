@@ -478,7 +478,9 @@
         '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-gcancel="1">Cancel game</button>';
     } else {
       html += '<p class="note">' + (isSession
-          ? 'The host keeps the scores. This leaderboard updates by itself. Only the final place gives points. 🏆'
+          ? (g.session_state && g.session_state.players.indexOf(me.id) < 0 && myStatus(g) === 'joined'
+              ? '⏳ You joined after the start. The host will add you to the next round.'
+              : 'The host keeps the scores. This leaderboard updates by itself. Only the final place gives points. 🏆')
           : 'The host sets the teams and saves the score. Your points update automatically. 🎾') + '</p>' +
         (myStatus(g) === 'joined' && !g.session_state ? '<button class="btn btn-ghost" style="width:100%;margin-top:10px" data-gleave="' + g.id + '">Leave game</button>' : '');
     }
@@ -616,6 +618,11 @@
   // How many times two players have been partners
   function partnerKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
 
+  // Players still in the rotation (not taken out by the host)
+  function activeOf(s) {
+    return s.players.filter(function (id) { return !(s.out && s.out[id]); });
+  }
+
   // Make the next round: who plays, who rests, who partners whom
   function makeRound() {
     var f = session.format;
@@ -632,14 +639,15 @@
     function pick(list) {   // fewest games first (fair resting), then best ranked first
       return list.sort(function (a, b) { return (s.played[a] - s.played[b]) || (s.points[b] - s.points[a]) || (Math.random() - 0.5); });
     }
-    var men = pick(s.players.filter(function (id) { return gender(id) === 'm'; }));
-    var women = pick(s.players.filter(function (id) { return gender(id) === 'f'; }));
-    var n = s.courts * 2;
+    var men = pick(activeOf(s).filter(function (id) { return gender(id) === 'm'; }));
+    var women = pick(activeOf(s).filter(function (id) { return gender(id) === 'f'; }));
+    var courtsNow = Math.max(1, Math.min(s.courts, Math.floor(Math.min(men.length, women.length) / 2)));
+    var n = courtsNow * 2;
     var pm = men.slice(0, n), pw = women.slice(0, n);
     if (s.rounds.length === 0) { pm.sort(function () { return Math.random() - 0.5; }); pw.sort(function () { return Math.random() - 0.5; }); }
     else { pm.sort(function (a, b) { return s.points[b] - s.points[a]; }); pw.sort(function (a, b) { return s.points[b] - s.points[a]; }); }
     var matches = [];
-    for (var c = 0; c < s.courts; c++) {
+    for (var c = 0; c < courtsNow; c++) {
       var M = pm.slice(c * 2, c * 2 + 2), W = pw.slice(c * 2, c * 2 + 2);
       matches.push({ a: [M[0], W[1]], b: [M[1], W[0]], score: null });
     }
@@ -672,12 +680,25 @@
     var bottomLosers = bottom.slice(cut + 1);
     courts[k - 1] = bottom.slice(0, cut);
     var pool = prev.resting.concat(bottomLosers);
-    while (courts[k - 1].length < 4) courts[k - 1].push(pool.shift());
-    var matches = courts.map(function (q) {
+    while (courts[k - 1].length < 4 && pool.length) courts[k - 1].push(pool.shift());
+
+    // players taken out leave their court; newcomers wait at the bottom
+    var active = {};
+    activeOf(s).forEach(function (id) { active[id] = true; });
+    var seen = {};
+    prev.matches.forEach(function (m) { m.a.concat(m.b).forEach(function (id) { seen[id] = true; }); });
+    prev.resting.forEach(function (id) { seen[id] = true; });
+    var newcomers = activeOf(s).filter(function (id) { return !seen[id]; });
+    var ordered = [].concat.apply([], courts).filter(function (id) { return active[id]; })   // king court first
+      .concat(pool.filter(function (id) { return active[id]; }), newcomers);
+    var kNow = Math.max(1, Math.min(k, Math.floor(ordered.length / 4)));
+    var matches = [];
+    for (var c = 0; c < kNow; c++) {
+      var q = ordered.slice(c * 4, c * 4 + 4);
       // one player who came up with one who came down, so partners change every round
-      return { a: [q[0], q[3]], b: [q[1], q[2]], score: null };
-    });
-    return { matches: matches, resting: pool };
+      matches.push({ a: [q[0], q[3]], b: [q[1], q[2]], score: null });
+    }
+    return { matches: matches, resting: ordered.slice(kNow * 4) };
   }
 
   // 🤝 Team Americano / ⭕ Round Robin: fixed teams, everyone plays everyone (circle method)
@@ -723,29 +744,30 @@
   // ⚡ Americano (and Mexicano): Mexicano pairs by ranking from round 2
   function americanoRound() {
     var s = session;
-    var courtsNeeded = s.courts * 4;
+    var courtsNow = Math.max(1, Math.min(s.courts, Math.floor(activeOf(s).length / 4)));   // fewer courts if people left
+    var courtsNeeded = courtsNow * 4;
     var order;
     if (s.format === 'mexicano' && s.rounds.length > 0) {
       // ranking order (most points first), but people who rested least sit out first
-      order = s.players.slice().sort(function (a, b) {
+      order = activeOf(s).sort(function (a, b) {
         return (s.played[a] - s.played[b]) || (s.points[b] - s.points[a]);
       });
       var playing = order.slice(0, courtsNeeded).sort(function (a, b) { return s.points[b] - s.points[a]; });
       var resting = order.slice(courtsNeeded);
       var matches = [];
-      for (var c = 0; c < s.courts; c++) {
+      for (var c = 0; c < courtsNow; c++) {
         var g = playing.slice(c * 4, c * 4 + 4);
         matches.push({ a: [g[0], g[3]], b: [g[1], g[2]], score: null });
       }
       return { matches: matches, resting: resting };
     }
     // Americano (and Mexicano round 1): fewest games first, then avoid repeat partners
-    var shuffled = s.players.slice().sort(function () { return Math.random() - 0.5; });
+    var shuffled = activeOf(s).sort(function () { return Math.random() - 0.5; });
     order = shuffled.sort(function (a, b) { return s.played[a] - s.played[b]; });
     var playing2 = order.slice(0, courtsNeeded);
     var resting2 = order.slice(courtsNeeded);
     var ms = [];
-    for (var k = 0; k < s.courts; k++) {
+    for (var k = 0; k < courtsNow; k++) {
       var q = playing2.slice(k * 4, k * 4 + 4);
       var options = [[[q[0], q[1]], [q[2], q[3]]], [[q[0], q[2]], [q[1], q[3]]], [[q[0], q[3]], [q[1], q[2]]]];
       options.sort(function (x, y) {
@@ -799,6 +821,7 @@
         courts: courts,
         totalRounds: totalRounds,
         plan: plan,
+        out: {},              // players taken out: id → { reason, round, sub }
         rounds: [], view: 0,
         points: {}, played: {}, partners: {}
       };
@@ -811,6 +834,85 @@
     document.querySelector('[data-panel=organize]').click();
     renderSession();
     if (!g.session_state) { await persistSession(); loadGames(); }
+  }
+
+  // ===== Changing players during a session (host) =====
+  var REASONS = {
+    injured: ['🤕', 'Injured'], sick: ['🤒', 'Sick'], tired: ['😴', 'Tired'],
+    left: ['🏃', 'Had to leave'], other: ['🤷', 'Other']
+  };
+  var changeFor = null;    // the player the host is changing
+  function isTeamFormat(s) { return s.format === 'team_americano' || s.format === 'round_robin'; }
+
+  // Joined the game but not in the rounds yet (late arrivals)
+  function waitingPlayers() {
+    var g = gameById(sessionGame);
+    return g ? joinedOf(g).filter(function (id) { return session.players.indexOf(id) < 0; }) : [];
+  }
+
+  function openPlayers() {
+    var s = session;
+    s.out = s.out || {};
+    var html = '<h3>👥 Players</h3><p class="meta" style="margin:-6px 0 10px">Changes start from the <b>next round</b>. Everyone keeps the points they already have.</p>';
+    html += '<div class="card" style="padding:4px 12px">' + s.players.map(function (id) {
+      var o = s.out[id];
+      return '<div class="lb-row"><span>' + (o ? REASONS[o.reason][0] + ' ' : '') + nameOfId(id) + '</span>' +
+        '<small>' + (o ? REASONS[o.reason][1] + (o.sub ? ' · replaced by ' + nameOfId(o.sub) : '') : s.points[id] + ' pts') + '</small>' +
+        (o ? (o.sub ? '' : '<button class="btn btn-ghost" style="margin-left:auto;padding:4px 10px;font-size:12px" data-pback="' + id + '">↩️ Back in</button>')
+           : '<button class="btn btn-ghost" style="margin-left:auto;padding:4px 10px;font-size:12px" data-pout="' + id + '">' + (isTeamFormat(s) ? '🔄 Substitute' : '➖ Take out') + '</button>') +
+        '</div>';
+    }).join('') + '</div>';
+    if (!isTeamFormat(s)) {
+      var waiting = waitingPlayers();
+      html += '<div class="label">➕ Add to the rounds</div>' +
+        (waiting.length ? '<div class="pick">' + waiting.map(function (id) { return '<button data-padd="' + id + '">➕ ' + nameOfId(id) + '</button>'; }).join('') + '</div>'
+          : '<p class="note" style="margin-top:0">Nobody new yet. Send them the join link, then add them here.</p>');
+    } else {
+      html += '<p class="note">Fixed-partner format: someone who can\'t continue is replaced by a substitute, so their partner keeps playing.</p>';
+    }
+    html += '<button class="btn btn-ghost" style="width:100%;margin-top:12px" data-pshare="1">🔗 Share join link</button>';
+    openSheet(html);
+  }
+
+  function openReason(id) {
+    changeFor = id;
+    openSheet('<h3>Why is ' + nameOfId(id) + ' stopping?</h3><p class="meta" style="margin:-6px 0 12px">Their points so far still count in the ranking.</p>' +
+      '<div class="pick">' + Object.keys(REASONS).map(function (k) { return '<button data-preason="' + k + '">' + REASONS[k][0] + ' ' + REASONS[k][1] + '</button>'; }).join('') + '</div>' +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:14px" data-pplayers="1">Back</button>');
+  }
+
+  function openSubstitute(reason) {
+    var s = session;
+    var options = waitingPlayers().concat(s.players.filter(function (id) { return s.out[id] && !s.out[id].sub && id !== changeFor; }));
+    openSheet('<h3>🔄 Who replaces ' + nameOfId(changeFor) + '?</h3>' +
+      (options.length ? '<div class="pick">' + options.map(function (id) { return '<button data-psub="' + id + '|' + reason + '">' + nameOfId(id) + '</button>'; }).join('') + '</div>'
+        : '<p class="meta">Nobody available. Send the join link to a friend, and once they join they appear here.</p>') +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:14px" data-pplayers="1">Back</button>');
+  }
+
+  function takeOut(id, reason, sub) {
+    var s = session;
+    s.out = s.out || {};
+    s.out[id] ={ reason: reason, round: s.rounds.length + 1, sub: sub || null };
+    if (sub) {
+      if (s.players.indexOf(sub) < 0) { s.players.push(sub); s.points[sub] = 0; s.played[sub] = 0; }
+      if (s.out[sub]) delete s.out[sub];
+      // the substitute takes the leaver's place in every round that hasn't started yet
+      (s.plan || []).forEach(function (r, i) {
+        if (i < s.rounds.length) return;
+        r.matches.forEach(function (m) { m.a = m.a.map(swap); m.b = m.b.map(swap); });
+        r.resting = r.resting.map(swap);
+      });
+    }
+    function swap(x) { return x === id ? sub : x; }
+    afterChange((sub ? '🔄 ' + nameOfId(sub) + ' replaces ' : REASONS[reason][0] + ' ') + nameOfId(id) + (sub ? '' : ' is out'));
+  }
+
+  function afterChange(msg) {
+    renderSession();
+    persistSession();
+    openPlayers();
+    toast(msg);
   }
 
   // Finish: the database ranks everyone and gives the session points
@@ -862,7 +964,8 @@
     var finished = s.rounds.length === s.totalRounds && roundDone(s.rounds[s.rounds.length - 1]);
 
     var html = '<div class="session-top"><h3>' + f.icon + ' ' + f.name + '</h3>' +
-      '<button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-end="1">Cancel</button></div>' +
+      '<div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-pplayers="1">👥 Players</button>' +
+      '<button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-end="1">Cancel</button></div></div>' +
       '<p class="meta" style="margin:0 0 10px">' + s.players.length + ' players · ' + s.courts + ' court' + (s.courts > 1 ? 's' : '') + ' · ' + (s.scoring === 'games' ? 'first to ' + s.gamesTarget + ' games · ' + (s.golden ? '⚡ golden point' : '🔁 advantage') : s.target + ' pts per game') + '</p>' +
       '<div class="rounds">';
     for (var i = 0; i < s.totalRounds; i++) {
@@ -899,7 +1002,9 @@
     var order = s.players.slice().sort(function (a, b) { return s.points[b] - s.points[a]; });
     return '<div class="card">' + order.map(function (p, i) {
       var medal = ['🥇', '🥈', '🥉'][i] || (i + 1);
-      return '<div class="lb-row"><span class="pos">' + medal + '</span><span>' + nameOfId(p) + '</span><small>' + s.played[p] + ' games</small><span class="pts">' + s.points[p] + '</span></div>';
+      var o = s.out && s.out[p];
+      return '<div class="lb-row"><span class="pos">' + medal + '</span><span>' + nameOfId(p) + (o ? ' ' + REASONS[o.reason][0] : '') + '</span>' +
+        '<small>' + s.played[p] + ' games' + (o ? ' · ' + REASONS[o.reason][1].toLowerCase() : '') + '</small><span class="pts">' + s.points[p] + '</span></div>';
     }).join('') + '</div>';
   }
 
@@ -1133,7 +1238,7 @@
   // CLICKS
   // =====================================================
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-gsession],[data-close-sheet],[data-rate],[data-guide],[data-open-guide],[data-setup],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
+    var el = e.target.closest('[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-gsession],[data-pplayers],[data-pout],[data-pback],[data-padd],[data-preason],[data-psub],[data-pshare],[data-close-sheet],[data-rate],[data-guide],[data-open-guide],[data-setup],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
     if (!el) return;
     var d = el.dataset;
 
@@ -1175,6 +1280,14 @@
       openCreate(d.setup);
     }
     else if (d.gsession) startSessionFromLobby(gameById(lobbyId));
+    // changing players during a session
+    else if (d.pplayers) loadGames().then(openPlayers);   // refresh first: someone may have just joined
+    else if (d.pout) openReason(d.pout);
+    else if (d.preason) { if (isTeamFormat(session)) openSubstitute(d.preason); else takeOut(changeFor, d.preason, null); }
+    else if (d.psub) { var ps = d.psub.split('|'); takeOut(changeFor, ps[1], ps[0]); }
+    else if (d.pback) { delete session.out[d.pback]; afterChange('↩️ ' + nameOfId(d.pback) + ' is back in from the next round'); }
+    else if (d.padd) { session.players.push(d.padd); session.points[d.padd] = 0; session.played[d.padd] = 0; afterChange('➕ ' + nameOfId(d.padd) + ' plays from the next round'); }
+    else if (d.pshare) { lobbyId = sessionGame; shareJoinLink(); lobbyId = null; }
     else if (d.rate) { closeSheet(); PadPal.openRating(d.rate.split(',')); }
     else if (d.closeSheet) closeSheet();
     else if (d.view !== undefined) { session.view = +d.view; renderSession(); }
