@@ -1,43 +1,46 @@
 /* ===== PadPal shared style kit (used by every screen) ===== */
 
-/* Colours: dark "Iron Man" look is the default */
+/* Colours: from the PadPal logo (navy #0F1E3C + tennis-ball lime #C9E52C). Dark is the default. */
 :root {
-  --bg: #16181C;          /* gunmetal black */
-  --card: #24272D;        /* dark steel */
-  --card-2: #2E323A;
-  --line: #3A3F48;
-  --text: #E4E7EC;        /* bright silver */
-  --text-2: #9AA1AC;      /* dim silver */
-  --primary: #B3261E;     /* deep iron red */
-  --primary-text: #FFFFFF;
-  --accent: #D9822B;      /* burnt orange */
-  --gold: #C9A24A;        /* muted gold */
-  --win: #4CAF7A;
-  --loss: #E0554B;
-  --metal: linear-gradient(135deg, #3A3F48 0%, #24272D 50%, #3A3F48 100%);
-  --shadow: 0 6px 18px rgba(0,0,0,.35);
+  --bg: #0B1426;          /* deep navy night */
+  --card: #13203A;        /* navy card */
+  --card-2: #1A2A48;
+  --line: #27395E;
+  --text: #EEF2F8;
+  --text-2: #93A0B8;
+  --primary: #C9E52C;     /* tennis-ball lime: main buttons */
+  --primary-text: #0F1E3C;
+  --accent: #C9E52C;      /* highlights, pills, borders */
+  --accent-text: #0F1E3C; /* text on top of the accent colour */
+  --gold: #F2C14E;        /* trophies */
+  --win: #5FD68C;
+  --loss: #F0645A;
+  --metal: linear-gradient(135deg, #27395E 0%, #13203A 50%, #27395E 100%);
+  --shadow: 0 6px 18px rgba(0,0,0,.4);
   color-scheme: dark;
 }
-/* Light version: silver background, same red/orange */
+/* Light version: soft grey-blue background, navy buttons, darker lime so it stays readable */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
-    --bg: #ECEEF1; --card: #FFFFFF; --card-2: #F4F5F7; --line: #D5D9DF;
-    --text: #1C1F24; --text-2: #5F6670;
-    --primary: #A3211A; --accent: #C46F1E; --gold: #A88330;
-    --win: #2E8B57; --loss: #C8372D;
-    --metal: linear-gradient(135deg, #DDE1E6 0%, #FFFFFF 50%, #DDE1E6 100%);
-    --shadow: 0 6px 18px rgba(0,0,0,.12);
+    --bg: #EEF2F7; --card: #FFFFFF; --card-2: #F3F6FA; --line: #D6DEE9;
+    --text: #0F1E3C; --text-2: #5A6B86;
+    --primary: #0F1E3C; --primary-text: #FFFFFF;
+    --accent: #5E7A00; --accent-text: #FFFFFF; --gold: #B8860B;
+    --win: #1F8A4C; --loss: #C8372D;
+    --metal: linear-gradient(135deg, #D6DEE9 0%, #FFFFFF 50%, #D6DEE9 100%);
+    --shadow: 0 6px 18px rgba(15,30,60,.12);
   }
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #ECEEF1; --card: #FFFFFF; --card-2: #F4F5F7; --line: #D5D9DF;
-  --text: #1C1F24; --text-2: #5F6670;
-  --primary: #A3211A; --accent: #C46F1E; --gold: #A88330;
-  --win: #2E8B57; --loss: #C8372D;
-  --metal: linear-gradient(135deg, #DDE1E6 0%, #FFFFFF 50%, #DDE1E6 100%);
-  --shadow: 0 6px 18px rgba(0,0,0,.12);
+  --bg: #EEF2F7; --card: #FFFFFF; --card-2: #F3F6FA; --line: #D6DEE9;
+  --text: #0F1E3C; --text-2: #5A6B86;
+  --primary: #0F1E3C; --primary-text: #FFFFFF;
+  --accent: #5E7A00; --accent-text: #FFFFFF; --gold: #B8860B;
+  --win: #1F8A4C; --loss: #C8372D;
+  --metal: linear-gradient(135deg, #D6DEE9 0%, #FFFFFF 50%, #D6DEE9 100%);
+  --shadow: 0 6px 18px rgba(15,30,60,.12);
 }
 
 /* Basics */
@@ -60,8 +63,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .topbar-inner { max-width: 408px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
 .logo { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: center; }
-.logo-img { width: 36px; height: 36px; display: block; margin-right: 8px; }
-.logo span { color: var(--primary); }
+.logo-img { width: 36px; height: 36px; margin-right: 8px; }
+/* The logo has a dark-mode version (white letters) and a light-mode version (navy letters) */
+.logo-for-dark { display: block; }
+.logo-for-light { display: none !important; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .logo-for-dark { display: none !important; }
+  :root:not([data-theme="dark"]) .logo-for-light { display: block !important; }
+}
+:root[data-theme="light"] .logo-for-dark { display: none !important; }
+:root[data-theme="light"] .logo-for-light { display: block !important; }
+.logo span { color: var(--text); }
 .logo b { color: var(--accent); }
 .icon-btn { position: relative; border: 0; background: var(--card); width: 40px; height: 40px; border-radius: 50%; font-size: 18px; }
 .dot { position: absolute; top: 6px; right: 7px; width: 9px; height: 9px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card); }
@@ -83,7 +95,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Buttons */
 .btn { border: 0; border-radius: 12px; padding: 12px 18px; font-weight: 600; font-size: 15px; }
 .btn-primary { background: var(--primary); color: var(--primary-text); }
-.btn-accent { background: var(--accent); color: #1C1F24; }
+.btn-accent { background: var(--accent); color: var(--accent-text); }
 .btn-ghost { background: var(--card-2); color: var(--text); border: 1px solid var(--line); }
 
 /* "Sample data" label on screens that aren't real yet */
@@ -122,7 +134,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .rate-row span { font-size: 13px; font-weight: 600; }
 .rate-nums { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
 .rate-num { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--card-2); font-weight: 700; font-size: 14px; padding: 0; }
-.rate-num.on { background: var(--accent); border-color: var(--accent); color: #1C1F24; }
+.rate-num.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 
 /* Bottom tab bar + floating ➕ */
 nav.tabbar {
@@ -139,7 +151,7 @@ nav.tabbar a.on { color: var(--primary); font-weight: 700; }
 .fab {
   position: fixed; z-index: 21; right: max(16px, calc(50% - 204px)); bottom: calc(80px + env(safe-area-inset-bottom));
   width: 56px; height: 56px; border-radius: 50%; border: 0;
-  background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff;
+  background: var(--primary); color: var(--primary-text);
   font-size: 30px; line-height: 1; box-shadow: var(--shadow);
 }
 

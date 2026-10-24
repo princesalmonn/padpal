@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
-<meta name="theme-color" content="#16181C">
+<meta name="theme-color" content="#0B1426">
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
@@ -106,8 +106,8 @@
     transition: transform .08s;
   }
   .zone:active { transform: scale(.98); }
-  .zone.a { background: linear-gradient(160deg, #B3261E, #7A1712); }
-  .zone.b { background: linear-gradient(160deg, #3A3F48, #1C1F24); border: 2px solid #D9822B; }
+  .zone.a { background: linear-gradient(160deg, #D6F04A, #9DB816); color: #0F1E3C; }
+  .zone.b { background: linear-gradient(160deg, #1F3566, #0F1E3C); border: 2px solid #C9E52C; }
   .zone .nm { font-size: 16px; font-weight: 600; opacity: .9; }
   .zone .pt { font-size: 96px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; margin: 6px 0; }
   .zone .gm { font-size: 14px; opacity: .85; font-variant-numeric: tabular-nums; }
@@ -130,7 +130,7 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <div class="logo"><img class="logo-img" src="logo.png" alt=""><span>Pad</span><b>Pal</b></div>
+    <div class="logo"><img class="logo-img logo-for-dark" src="logo-dark.svg" alt=""><img class="logo-img logo-for-light" src="logo-light.svg" alt=""><span>Pad</span><b>Pal</b></div>
     <button class="icon-btn" data-open-guide="list" aria-label="Format guide">📖</button>
   </div>
 </header>
@@ -155,8 +155,8 @@
     <div id="organizeHome">
       <h2>Quick start</h2>
       <div class="quick-row">
-        <button style="background:linear-gradient(150deg,#B3261E,#7A1712)" data-match="1"><span>🎾</span><strong>Normal match</strong><small>Sets · 15-30-40</small></button>
-        <button style="background:linear-gradient(150deg,#D9822B,#9C4F12)" data-setup="americano"><span>🔄</span><strong>Americano</strong><small>Rotate partners</small></button>
+        <button style="background:linear-gradient(150deg,#1F3566,#0F1E3C);border:1px solid #27395E" data-match="1"><span>🎾</span><strong>Normal match</strong><small>Sets · 15-30-40</small></button>
+        <button style="background:linear-gradient(150deg,#D6F04A,#9DB816);color:#0F1E3C" data-setup="americano"><span>🔄</span><strong>Americano</strong><small>Rotate partners</small></button>
       </div>
       <h2>All formats <span style="text-transform:none;letter-spacing:0;font-weight:500">· tap for how it works</span></h2>
       <div class="formats" id="formats"></div>

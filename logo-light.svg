@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 40 420 420" width="1024" height="1024">
+  <title>PADPAL</title>
+  <defs>
+    <!-- Ball body between the two seam arcs (letters live here) -->
+    <clipPath id="panel">
+      <path d="M14.9 0 A406 406 0 0 1 14.9 500 H485.1 A406 406 0 0 1 485.1 0 Z"/>
+    </clipPath>
+    <!-- Side lunes outside the seams -->
+    <clipPath id="luneL"><circle cx="-305" cy="250" r="394"/></clipPath>
+    <clipPath id="luneR"><circle cx="805" cy="250" r="394"/></clipPath>
+    <!-- Inner contour: keeps a constant stroke along the ball edge -->
+    <clipPath id="inner"><circle cx="250" cy="250" r="172"/></clipPath>
+    <!-- Inner contour along the right seam (for the D bowl) -->
+    <clipPath id="seamInnerR">
+      <path d="M0 0 H450.2 A434 434 0 0 0 450.2 500 H0 Z"/>
+    </clipPath>
+
+    <mask id="letters" maskUnits="userSpaceOnUse" x="0" y="0" width="500" height="500">
+      <rect width="500" height="500" fill="#fff"/>
+      <g fill="#000">
+        <!-- row + column gaps -->
+        <rect x="0" y="244" width="500" height="12"/>
+        <rect x="193" y="0" width="12" height="500"/>
+        <rect x="295" y="0" width="12" height="500"/>
+
+        <!-- P (top) -->
+        <path clip-path="url(#inner)" d="M130 0 H165 V159 A16 16 0 0 1 149 175 H130 Z"/>
+        <path d="M130 203 H149 A44 44 0 0 0 193 159 H199 V250 H130 Z"/>
+        <!-- A (top) -->
+        <path clip-path="url(#inner)" d="M233 170 V99 A17 17 0 0 1 267 99 V170 Z"/>
+        <path d="M233 198 H267 V250 H233 Z"/>
+        <!-- D -->
+        <g clip-path="url(#seamInnerR)">
+          <rect clip-path="url(#inner)" x="335" y="0" width="165" height="216"/>
+        </g>
+
+        <!-- P (bottom) -->
+        <path d="M130 284 H165 V319 A16 16 0 0 1 149 335 H130 Z"/>
+        <path d="M130 363 H149 A44 44 0 0 0 193 319 H199 V500 H130 Z"/>
+        <!-- A (bottom) -->
+        <path d="M233 340 V301 A17 17 0 0 1 267 301 V340 Z"/>
+        <path d="M233 368 H267 V500 H233 Z"/>
+        <!-- L -->
+        <rect clip-path="url(#inner)" x="335" y="250" width="165" height="250"/>
+      </g>
+    </mask>
+  </defs>
+
+  <!-- Letters: PAD / PAL -->
+  <g clip-path="url(#panel)">
+    <circle cx="250" cy="250" r="200" fill="#0E1E3A" mask="url(#letters)"/>
+  </g>
+  <!-- Ball sides (seam lunes) -->
+  <g fill="#C9E52C">
+    <circle cx="250" cy="250" r="200" clip-path="url(#luneL)"/>
+    <circle cx="250" cy="250" r="200" clip-path="url(#luneR)"/>
+  </g>
+</svg>

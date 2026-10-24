@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
-<meta name="theme-color" content="#16181C">
+<meta name="theme-color" content="#0B1426">
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
@@ -35,7 +35,7 @@
   .chat-row .last { font-size: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
   .chat-row.unread .last { color: var(--text); font-weight: 600; }
   .chat-row .sub { font-size: 11px; color: var(--accent); margin-top: 2px; }
-  .badge-n { background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; padding: 0 6px; }
+  .badge-n { background: var(--primary); color: var(--primary-text); font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; padding: 0 6px; }
 
   /* Conversation (full screen) */
   .convo {
@@ -75,14 +75,14 @@
   .c-foot input:focus { border-color: var(--accent); }
   .c-foot .round { width: 42px; height: 42px; border-radius: 50%; border: 0; flex-shrink: 0; font-size: 18px; }
   .c-foot .cam { background: var(--card-2); }
-  .c-foot .send { background: var(--primary); color: #fff; }
+  .c-foot .send { background: var(--primary); color: var(--primary-text); }
 </style>
 </head>
 <body>
 
 <header class="topbar">
   <div class="topbar-inner">
-    <div class="logo"><img class="logo-img" src="logo.png" alt=""><span>Pad</span><b>Pal</b></div>
+    <div class="logo"><img class="logo-img logo-for-dark" src="logo-dark.svg" alt=""><img class="logo-img logo-for-light" src="logo-light.svg" alt=""><span>Pad</span><b>Pal</b></div>
     <button class="icon-btn" data-soon="New chats" aria-label="New chat">✏️</button>
   </div>
 </header>
