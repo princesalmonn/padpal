@@ -416,9 +416,25 @@
     renderBadges();
   }
 
+  // Tournament medals (place 1–3)
+  var trophies = [];
+  async function loadTrophies() {
+    var id = profile.id;
+    var r = await db.from('tournament_teams').select('place, tournaments(name, kind)')
+      .or('p1.eq.' + id + ',p2.eq.' + id).not('place', 'is', null).lte('place', 3);
+    trophies = (r.data || []).filter(function (t) { return t.tournaments; });
+    renderBadges();
+  }
+
   // Badges earned from real data
   function renderBadges() {
     var list = [];
+    trophies.forEach(function (t) {
+      var season0 = t.tournaments.kind === 'friendly';
+      list.push([['🏆', '🥈', '🥉'][t.place - 1],
+        t.place === 1 ? (season0 ? 'Season 0 Champion' : 'Champion') : (t.place === 2 ? '2nd place' : '3rd place'),
+        t.tournaments.name]);
+    });
     var best = Object.keys(shotStats).filter(function (k) { return shotStats[k].count >= 2; })
       .sort(function (a, b) { return shotStats[b].avg - shotStats[a].avg; })[0];
     if (best) list.push(['🏅', best + (profile.gender === 'f' ? ' Queen' : ' King'), shotStats[best].avg.toFixed(1) + ' avg · ' + shotStats[best].count + ' ratings']);
@@ -694,7 +710,7 @@
     profile = me.profile;
     renderHero();
     loadPins();
-    loadGame().then(loadShots);
+    loadGame().then(loadShots).then(loadTrophies);
   });
 
   // ===== Your header (name, picture, chips) =====

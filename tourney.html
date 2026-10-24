@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PadPal Tournament</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-title" content="PadPal">
+<meta name="theme-color" content="#0B1426">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="tracker.js"></script>
+<script>PadPal.me = PadPal.guard(); // members only</script>
+<style>
+  /* ===== Tournament-only styles ===== */
+  .back { text-decoration: none; color: var(--accent); font-weight: 600; font-size: 15px; }
+  .t-head { margin: 8px 0 14px; }
+  .t-head h1 { font-size: 24px; margin: 6px 0 4px; text-wrap: balance; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .tag { font-size: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+  .tag.official { border-color: var(--gold); color: var(--gold); font-weight: 700; }
+  .tag.friendly { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-2); margin: 20px 0 10px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .row:first-child { border-top: 0; }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .meta { font-size: 12px; }
+  .row .btn { padding: 6px 10px; font-size: 12px; }
+  .pick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pick button { border: 1px solid var(--line); background: var(--card-2); border-radius: 999px; padding: 7px 12px; font-size: 14px; }
+  .pick button.on { background: var(--primary); border-color: var(--primary); color: var(--primary-text); font-weight: 600; }
+  table.grp { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  table.grp th { text-align: left; color: var(--text-2); font-weight: 600; padding: 4px 4px 6px; font-size: 11px; text-transform: uppercase; }
+  table.grp td { padding: 7px 4px; border-top: 1px solid var(--line); }
+  table.grp td.n { text-align: center; width: 38px; }
+  table.grp tr.q td:first-child { color: var(--accent); font-weight: 700; }
+  .match { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--card-2); border-radius: 12px; padding: 10px 12px; margin-top: 8px; color: var(--text); }
+  .match .teams { flex: 1; min-width: 0; font-size: 13px; line-height: 1.45; }
+  .match .teams b { font-weight: 700; }
+  .match .score { font-weight: 800; font-variant-numeric: tabular-nums; font-size: 14px; text-align: right; }
+  .match .go { font-size: 12px; color: var(--accent); font-weight: 700; white-space: nowrap; }
+  .stage-label { font-size: 12px; color: var(--accent); font-weight: 700; margin-top: 12px; }
+  .podium { display: grid; gap: 8px; }
+  .podium .card { display: flex; align-items: center; gap: 12px; margin: 0; }
+  .podium .medal { font-size: 30px; }
+  .empty { text-align: center; color: var(--text-2); padding: 30px 0; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><img class="logo-img logo-for-dark" src="logo-dark.svg" alt=""><img class="logo-img logo-for-light" src="logo-light.svg" alt=""><span>Pad</span><b>Pal</b></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <a class="back" href="play.html#tourney">‹ Tournaments</a>
+  <div class="error-box" id="error" role="alert" hidden></div>
+  <div id="page"><div class="empty">Loading…</div></div>
+</main>
+
+<nav class="tabbar">
+  <div class="tabs">
+    <a href="feed.html"><span>🏠</span>Feed</a>
+    <a class="on" href="play.html"><span>🎾</span>Play</a>
+    <a href="chat.html"><span>💬</span>Chat</a>
+    <a href="ranks.html"><span>🏆</span>Ranks</a>
+    <a href="profile.html"><span>👤</span>Me</a>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  var db = PadPal.db;
+  var tid = new URLSearchParams(location.search).get('id');
+  var me = null, people = {}, T = null, signups = [], teams = [], matches = [], groups = {};
+  var draft = null;       // admin: pairs being made [[a,b], …]
+  var pickFirst = null;   // admin: first player tapped when pairing
+  var DIV = { men: '👨 Men', women: '👩 Women', mixed: '🔀 Mixed', open: '🌍 Open' };
+  var STAGE = { qf: 'Quarter-finals', sf: 'Semi-finals', final: '🏆 Final' };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var toastTimer;
+  function toast(msg) { var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600); }
+  function nm(id) { var p = people[id]; return p ? (p.display_name || p.username) : '?'; }
+  function teamById(id) { return teams.filter(function (t) { return t.id === id; })[0]; }
+  function teamName(id) { var t = teamById(id); return t ? nm(t.p1) + ' & ' + nm(t.p2) : '?'; }
+  function myTeam() { return teams.filter(function (t) { return t.p1 === me.id || t.p2 === me.id; })[0]; }
+
+  PadPal.me.then(async function (who) {
+    if (!who) return;
+    me = who.profile;
+    (await PadPal.members()).forEach(function (m) { people[m.id] = m; });
+    load();
+  });
+
+  async function load() {
+    var r = await db.from('tournaments').select('*').eq('id', tid).maybeSingle();
+    if (r.error || !r.data) {
+      $('page').innerHTML = '';
+      $('error').textContent = r.error ? PadPal.friendlyError(r.error) : 'Tournament not found.';
+      $('error').hidden = false;
+      return;
+    }
+    T = r.data;
+    signups = (await db.from('tournament_signups').select('*').eq('tournament_id', tid).order('created_at')).data || [];
+    teams = (await db.from('tournament_teams').select('*').eq('tournament_id', tid)).data || [];
+    matches = (await db.from('tournament_matches').select('*').eq('tournament_id', tid).order('slot')).data || [];
+    groups = {};
+    teams.forEach(function (t) { if (t.group_no) (groups[t.group_no] = groups[t.group_no] || []).push(t.id); });
+    if (T.status === 'registration' && me.is_admin && !draft) draft = teams.map(function (t) { return [t.p1, t.p2]; });
+    render();
+  }
+
+  // ===== Draw the page =====
+  function render() {
+    var d = new Date(T.scheduled_at);
+    var html = '<div class="t-head"><h1>' + esc(T.name) + '</h1>' +
+      '<div class="meta">' + d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }) + ' · ' +
+        d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + (T.place ? ' · 📍 ' + esc(T.place) : '') + '</div>' +
+      '<div class="tags">' + (T.kind === 'official' ? '<span class="tag official">🏆 Official · 500+ pts</span>' : '<span class="tag friendly">🎉 Season 0 · no points</span>') +
+        '<span class="tag">' + DIV[T.division] + '</span><span class="tag">Max ' + T.max_teams + ' teams</span>' +
+        '<span class="tag">' + (T.sets_to_win === 1 ? '1 set' : 'Best of 3') + '</span>' +
+        '<span class="tag">' + { registration: '📝 Sign-ups open', playing: '🔴 Playing now', done: '✅ Finished', cancelled: '❌ Cancelled' }[T.status] + '</span></div></div>';
+
+    if (T.status === 'registration') html += registrationHtml();
+    if (T.status === 'done') html += podiumHtml();
+    if (T.status === 'playing' || T.status === 'done') html += knockoutHtml() + groupsHtml();
+    if (T.kind === 'official') html += '<p class="meta" style="margin-top:18px">🏆 Points: +1 for playing · +2 per match won · 🥇 +15 · 🥈 +10 · 🥉 +6</p>';
+    if (me.is_admin && T.status !== 'done' && T.status !== 'cancelled') {
+      html += '<button class="btn btn-ghost" style="width:100%;margin-top:16px" data-cancel>Cancel tournament</button>';
+    }
+    $('page').innerHTML = html;
+  }
+
+  function registrationHtml() {
+    var mine = signups.filter(function (s) { return s.user_id === me.id; })[0];
+    var others = Object.keys(people).filter(function (id) { return id !== me.id; });
+    var html = '<div class="card">';
+    if (mine) {
+      html += '<div class="name">✅ You\'re signed up!</div>' +
+        '<p class="meta" style="margin:6px 0 10px">Partner wish: <b>' + (mine.partner_wish ? esc(nm(mine.partner_wish)) : 'anyone') + '</b>. The admin makes the final teams.</p>' +
+        '<button class="btn btn-ghost" style="width:100%" data-withdraw>Withdraw</button>';
+    } else {
+      html += '<div class="name">Sign up</div><p class="meta" style="margin:6px 0 10px">Want to play with someone? Pick them (optional).</p>' +
+        '<select class="input" id="partnerWish"><option value="">No preference</option>' +
+        others.map(function (id) { return '<option value="' + id + '">' + esc(nm(id)) + '</option>'; }).join('') + '</select>' +
+        '<button class="btn btn-primary" style="width:100%;margin-top:10px" data-signup>✍️ Sign me up</button>';
+    }
+    html += '</div>';
+
+    html += '<h2>Signed up (' + signups.length + ')</h2><div class="card" style="padding:4px 14px">' +
+      (signups.length ? signups.map(function (s) {
+        return '<div class="row"><div class="grow"><b>' + esc(nm(s.user_id)) + '</b>' + (s.partner_wish ? '<div class="meta">wants to play with ' + esc(nm(s.partner_wish)) + '</div>' : '') + '</div>' +
+          '<span class="pill">' + PadPal.tierOf(people[s.user_id] ? people[s.user_id].points : 0).icon + ' ' + PadPal.fmt(people[s.user_id] ? people[s.user_id].points : 0) + '</span></div>';
+      }).join('') : '<p class="meta">Nobody yet. Be the first!</p>') + '</div>';
+
+    if (me.is_admin) html += adminTeamsHtml();
+    else if (teams.length) html += '<h2>Teams so far</h2><div class="card" style="padding:4px 14px">' + teams.map(function (t) { return '<div class="row">🎾 ' + esc(teamName(t.id)) + '</div>'; }).join('') + '</div>';
+    return html;
+  }
+
+  // Admin: pair players into teams, then start
+  function adminTeamsHtml() {
+    var paired = [].concat.apply([], draft);
+    var free = signups.map(function (s) { return s.user_id; }).filter(function (id) { return paired.indexOf(id) < 0; });
+    return '<h2>👑 Make teams (' + draft.length + ')</h2><div class="card">' +
+      '<p class="meta" style="margin:0 0 10px">Tap two players to pair them, or let PadPal do it (partner wishes first, then strong + weaker players together).</p>' +
+      '<div class="pick">' + (free.length ? free.map(function (id) {
+        return '<button class="' + (pickFirst === id ? 'on' : '') + '" data-pair="' + id + '">' + esc(nm(id)) + '</button>';
+      }).join('') : '<span class="meta">Everyone is in a team.</span>') + '</div>' +
+      (draft.length ? draft.map(function (p, i) {
+        return '<div class="row"><div class="grow">🎾 <b>' + esc(nm(p[0])) + ' & ' + esc(nm(p[1])) + '</b></div><button class="btn btn-ghost" data-unpair="' + i + '">Split</button></div>';
+      }).join('') : '') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">' +
+        '<button class="btn btn-ghost" data-auto>🪄 Auto-pair</button><button class="btn btn-ghost" data-save-teams>💾 Save teams</button></div>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:8px" data-start' + (teams.length >= 4 ? '' : ' disabled') + '>🚀 Start tournament (' + teams.length + ' teams saved)</button>' +
+      '<p class="meta" style="margin:8px 0 0">Needs at least 4 saved teams. After starting, the groups and matches are made automatically.</p></div>';
+  }
+
+  function autoPair() {
+    var ids = signups.map(function (s) { return s.user_id; });
+    var wish = {};
+    signups.forEach(function (s) { wish[s.user_id] = s.partner_wish; });
+    var pairs = [], used = {};
+    ids.forEach(function (a) {   // mutual wishes first
+      var b = wish[a];
+      if (!used[a] && b && !used[b] && wish[b] === a) { pairs.push([a, b]); used[a] = used[b] = true; }
+    });
+    var rest = ids.filter(function (id) { return !used[id]; })
+      .sort(function (a, b) { return Number(people[b].points) - Number(people[a].points); });
+    if (T.division === 'mixed') {
+      var men = rest.filter(function (id) { return people[id].gender === 'm'; });
+      var women = rest.filter(function (id) { return people[id].gender === 'f'; }).reverse();
+      for (var i = 0; i < Math.min(men.length, women.length); i++) pairs.push([men[i], women[i]]);
+    } else {
+      while (rest.length >= 2) pairs.push([rest.shift(), rest.pop()]);   // strongest with weakest
+    }
+    draft = pairs.slice(0, T.max_teams);
+  }
+
+  // ===== Groups and knockout =====
+  function canScore(m) {
+    if (T.status !== 'playing') return false;
+    if (me.is_admin) return true;
+    var a = teamById(m.team_a), b = teamById(m.team_b);
+    return [a.p1, a.p2, b.p1, b.p2].indexOf(me.id) > -1;
+  }
+  function matchHtml(m) {
+    var score = m.sets ? m.sets.map(function (s) { return s[0] + '-' + s[1]; }).join(' ') : '';
+    var a = esc(teamName(m.team_a)), b = esc(teamName(m.team_b));
+    if (m.winner === 'a') a = '<b>🏆 ' + a + '</b>';
+    if (m.winner === 'b') b = '<b>🏆 ' + b + '</b>';
+    var can = canScore(m);
+    return '<button class="match" ' + (can ? 'data-score="' + m.id + '"' : 'disabled') + '>' +
+      '<div class="teams">' + a + '<br>' + b + '</div>' +
+      (score ? '<div class="score">' + score + '</div>' : '') +
+      (can ? '<div class="go">' + (m.winner ? 'Fix' : '▶️ Score') + '</div>' : '') + '</button>';
+  }
+  function groupsHtml() {
+    var html = '';
+    Object.keys(groups).sort().forEach(function (g) {
+      var stats = {};
+      groups[g].forEach(function (id) { stats[id] = { w: 0, l: 0, sd: 0, gd: 0 }; });
+      var gm = matches.filter(function (m) { return m.stage === 'group' && String(m.group_no) === g; });
+      gm.forEach(function (m) {
+        if (!m.winner) return;
+        var A = stats[m.team_a], B = stats[m.team_b];
+        (m.winner === 'a' ? A : B).w++; (m.winner === 'a' ? B : A).l++;
+        m.sets.forEach(function (s) {
+          A.sd += s[0] > s[1] ? 1 : -1; B.sd += s[1] > s[0] ? 1 : -1;
+          A.gd += s[0] - s[1]; B.gd += s[1] - s[0];
+        });
+      });
+      var order = groups[g].slice().sort(function (a, b) {
+        return stats[b].w - stats[a].w || stats[b].sd - stats[a].sd || stats[b].gd - stats[a].gd;
+      });
+      var label = Object.keys(groups).length === 1 ? 'Group' : 'Group ' + String.fromCharCode(64 + Number(g));
+      html += '<h2>' + label + '</h2><div class="card"><table class="grp"><tr><th>Team</th><th class="n">W</th><th class="n">L</th><th class="n">Sets</th></tr>' +
+        order.map(function (id, i) {
+          return '<tr class="' + (i < 2 ? 'q' : '') + '"><td>' + (i + 1) + '. ' + esc(teamName(id)) + '</td><td class="n">' + stats[id].w + '</td><td class="n">' + stats[id].l + '</td><td class="n">' + (stats[id].sd > 0 ? '+' : '') + stats[id].sd + '</td></tr>';
+        }).join('') + '</table>' +
+        '<p class="meta" style="margin:8px 0 0">Top 2 go through.</p>' + gm.map(matchHtml).join('') + '</div>';
+    });
+    return html;
+  }
+  function knockoutHtml() {
+    var ko = matches.filter(function (m) { return m.stage !== 'group'; });
+    if (!ko.length) return T.status === 'playing' ? '<p class="meta">🔜 The knockout appears when all group matches are played.</p>' : '';
+    var html = '<h2>Knockout</h2><div class="card">';
+    ['qf', 'sf', 'final'].forEach(function (st) {
+      var list = ko.filter(function (m) { return m.stage === st; });
+      if (list.length) html += '<div class="stage-label">' + STAGE[st] + '</div>' + list.map(matchHtml).join('');
+    });
+    return html + '</div>';
+  }
+  function podiumHtml() {
+    var by = function (p) { return teams.filter(function (t) { return t.place === p; }); };
+    var rows = [[1, '🥇'], [2, '🥈'], [3, '🥉']];
+    return '<h2>Results</h2><div class="podium">' + rows.map(function (r) {
+      return by(r[0]).map(function (t) {
+        return '<div class="card"><span class="medal">' + r[1] + '</span><div><div class="name">' + esc(teamName(t.id)) + '</div>' +
+          '<div class="meta">' + (T.kind === 'official' ? { 1: '+15 bonus', 2: '+10 bonus', 3: '+6 bonus' }[r[0]] + ' · +2 per win · +1 for playing' : 'Season 0 · 🏅 glory') + '</div></div></div>';
+      }).join('');
+    }).join('') + '</div>';
+  }
+
+  // ===== Actions =====
+  async function rpc(fn, args, ok) {
+    var r = await db.rpc(fn, args);
+    if (r.error) { toast(PadPal.friendlyError(r.error)); return null; }
+    if (ok) toast(ok);
+    await load();
+    return r;
+  }
+  var armed = {};
+  function tapTwice(k, msg) { if (armed[k]) { armed[k] = false; return true; } armed[k] = true; toast(msg); setTimeout(function () { armed[k] = false; }, 3000); return false; }
+
+  document.addEventListener('click', async function (e) {
+    var el = e.target.closest('[data-signup],[data-withdraw],[data-pair],[data-unpair],[data-auto],[data-save-teams],[data-start],[data-score],[data-cancel]');
+    if (!el) return;
+    var d = el.dataset;
+    if (el.hasAttribute('data-signup')) rpc('tournament_signup', { p_t: tid, p_partner: $('partnerWish').value || null }, '✍️ You\'re signed up!');
+    else if (el.hasAttribute('data-withdraw')) { if (tapTwice('w', 'Tap again to withdraw')) rpc('tournament_withdraw', { p_t: tid }, 'You withdrew'); }
+    else if (d.pair) {
+      if (!pickFirst) pickFirst = d.pair;
+      else if (pickFirst === d.pair) pickFirst = null;
+      else { draft.push([pickFirst, d.pair]); pickFirst = null; }
+      render();
+    }
+    else if (d.unpair !== undefined) { draft.splice(+d.unpair, 1); render(); }
+    else if (el.hasAttribute('data-auto')) { autoPair(); render(); toast('🪄 Teams suggested. Check them, then Save teams'); }
+    else if (el.hasAttribute('data-save-teams')) rpc('set_tournament_teams', { p_t: tid, p_pairs: draft }, '💾 Teams saved');
+    else if (el.hasAttribute('data-start')) { if (tapTwice('s', 'Tap again to start: sign-ups close and groups are made')) rpc('start_tournament', { p_t: tid }, '🚀 Tournament started!'); }
+    else if (el.hasAttribute('data-cancel')) { if (tapTwice('c', 'Tap again to cancel the tournament')) rpc('cancel_tournament', { p_t: tid }, 'Tournament cancelled'); }
+    else if (d.score) {
+      var m = matches.filter(function (x) { return x.id === d.score; })[0];
+      var res = await PadPal.scoreMatch({ names: [teamName(m.team_a), teamName(m.team_b)], setsToWin: T.sets_to_win,
+        title: m.stage === 'group' ? 'Group match' : STAGE[m.stage] });
+      if (!res) return;
+      var r = await rpc('save_tournament_match', { p_match: m.id, p_sets: res.sets, p_winner: res.winner }, '✅ Result saved');
+      if (r && r.data && r.data.finished) toast('🏆 Tournament finished! Results are in the Feed');
+    }
+  });
+
+  // live-ish: refresh every 20 seconds while playing
+  setInterval(function () { if (T && T.status === 'playing' && document.visibilityState === 'visible' && !document.querySelector('.pp-tracker')) load(); }, 20000);
+</script>
+</body>
+</html>

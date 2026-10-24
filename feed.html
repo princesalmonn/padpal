@@ -226,6 +226,7 @@
   var viewing = null;
   var matches = {};     // match id → match (with points changes)
   var sessions = {};    // game id → finished Americano/Mexicano (with points changes)
+  var tourneys = {};    // tournament id → tournament (with teams)
   var people = {};      // member id → profile
 
   // ===== Helpers =====
@@ -289,7 +290,7 @@
 
   async function load() {
     var r = await db.from('posts')
-      .select('id, kind, body, photo_path, match_id, game_id, expires_at, created_at, author_id, author:profiles!posts_author_id_fkey(id, username, display_name, avatar_url), likes(user_id), comments(count)')
+      .select('id, kind, body, photo_path, match_id, game_id, tournament_id, expires_at, created_at, author_id, author:profiles!posts_author_id_fkey(id, username, display_name, avatar_url), likes(user_id), comments(count)')
       .order('created_at', { ascending: false })
       .limit(50);
     if (r.error) {
@@ -316,7 +317,12 @@
       (gr.data || []).forEach(function (g) { sessions[g.id] = g; g.changes = {}; });
       (gc.data || []).forEach(function (c) { var g = sessions[c.game_id]; if (g) { g.changes[c.user_id] = c; g.finished = c.created_at; } });
     }
-    if (matchIds.length || gameIds.length) {
+    var tIds = posts.filter(function (p) { return p.kind === 'tournament'; }).map(function (p) { return p.tournament_id; });
+    if (tIds.length) {
+      var tr = await db.from('tournaments').select('id, name, kind, division, tournament_teams(id, p1, p2, place)').in('id', tIds);
+      (tr.data || []).forEach(function (t) { tourneys[t.id] = t; });
+    }
+    if (matchIds.length || gameIds.length || tIds.length) {
       try { (await PadPal.members()).forEach(function (m) { people[m.id] = m; }); } catch (err) {}
     }
 
@@ -407,6 +413,7 @@
     if (p.body) html += '<p class="post-text">' + esc(p.body) + '</p>';
     if (p.kind === 'match') html += matchHtml(matches[p.match_id]);
     if (p.kind === 'session') html += sessionHtml(sessions[p.game_id]);
+    if (p.kind === 'tournament') html += tourneyHtml(tourneys[p.tournament_id], p.body);
     if (p.kind === 'photo') {
       var pinned = mine && myPins[p.photo_path];
       html += '<button class="photo" data-story="' + p.id + '" style="border:0;padding:0;width:100%;display:block">' +
@@ -467,6 +474,26 @@
     }
     return '<div class="match">' + row(win, true) + row(lose, false) + '</div>' +
       '<div class="result"><span>' + changes(win) + '</span><span>' + changes(lose) + '</span></div>';
+  }
+
+  // Tournament started / finished
+  function tourneyHtml(t, what) {
+    if (!t) return '<p class="meta">Tournament unavailable.</p>';
+    function nm(id) { var p = people[id]; return esc(p ? (p.display_name || p.username) : '?'); }
+    var title = (t.kind === 'official' ? '🏆 ' : '🎉 ') + esc(t.name);
+    var html = '<a href="tourney.html?id=' + t.id + '" style="display:block;text-decoration:none;color:var(--text)"><div class="match">';
+    if (what === 'finished') {
+      [[1, '🥇'], [2, '🥈'], [3, '🥉']].forEach(function (r) {
+        t.tournament_teams.filter(function (tm) { return tm.place === r[0]; }).forEach(function (tm) {
+          html += '<div class="team' + (r[0] === 1 ? ' win' : '') + '"><div class="players">' + r[1] + ' ' + nm(tm.p1) + ' & ' + nm(tm.p2) + '</div></div>';
+        });
+      });
+      html = '<p class="post-text" style="font-weight:600">' + title + ' · final results</p>' + html;
+    } else {
+      html = '<p class="post-text" style="font-weight:600">' + title + ' has started! 🚀</p>' + html +
+        '<div class="team"><div class="players">' + t.tournament_teams.length + ' teams · tap to follow the groups and bracket</div></div>';
+    }
+    return html + '</div></a>';
   }
 
   // Americano / Mexicano result: final ranking with everyone's points

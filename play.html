@@ -172,10 +172,8 @@
       <div class="progress"><i id="tBar" style="width:0%"></i></div>
       <div class="meta" id="tPts">You: … / 500 points</div>
     </div>
-    <h2>Upcoming</h2>
-    <div class="card" style="text-align:center">
-      <div class="meta" style="padding:6px 0">🏆 No tournaments yet. The admin will announce official PadPal Cups and friendly "Season 0" cups here. Coming soon!</div>
-    </div>
+    <button class="btn btn-primary big-btn" id="newTourney" hidden>👑 Create tournament</button>
+    <div id="tourneys"><p class="meta">Loading tournaments…</p></div>
   </section>
 </main>
 
@@ -1056,7 +1054,66 @@
     }
   });
 
-  loadGames().then(joinFromLink);
+  loadGames().then(joinFromLink).then(loadTourneys);
+
+  // =====================================================
+  // 5. TOURNAMENTS list (details live on tourney.html)
+  // =====================================================
+  var DIVISIONS = { men: '👨 Men', women: '👩 Women', mixed: '🔀 Mixed', open: '🌍 Open' };
+
+  async function loadTourneys() {
+    if (!me) return;
+    $('newTourney').hidden = !me.is_admin;
+    var r = await db.from('tournaments').select('id, name, kind, division, scheduled_at, place, max_teams, status, tournament_signups(user_id), tournament_teams(id)')
+      .neq('status', 'cancelled').order('scheduled_at', { ascending: false }).limit(20);
+    if (r.error) {
+      $('tourneys').innerHTML = '<p class="meta">' + (/tournament/.test(r.error.message) ? 'Tournaments appear after you run 12_tournaments.sql.' : escH(PadPal.friendlyError(r.error))) + '</p>';
+      return;
+    }
+    var label = { registration: '📝 Sign-ups open', playing: '🔴 Playing now', done: '✅ Finished' };
+    $('tourneys').innerHTML = r.data.length ? '<h2>Tournaments</h2>' + r.data.map(function (t) {
+      var signed = t.tournament_signups.some(function (s) { return s.user_id === me.id; });
+      return '<a class="card game" href="tourney.html?id=' + t.id + '" style="display:block;text-decoration:none;color:var(--text)">' +
+        '<div class="when">' + escH(t.name) + '</div>' +
+        '<div class="where">' + whenText(t.scheduled_at) + (t.place ? ' · 📍 ' + escH(t.place) : '') + '</div>' +
+        '<div class="tags"><span class="tag">' + (t.kind === 'official' ? '🏆 Official' : '🎉 Season 0') + '</span><span class="tag">' + DIVISIONS[t.division] + '</span>' +
+        '<span class="tag">' + label[t.status] + '</span>' +
+        (t.status === 'registration' ? '<span class="tag">' + t.tournament_signups.length + ' signed up</span>' : '<span class="tag">' + t.tournament_teams.length + ' teams</span>') +
+        (signed ? '<span class="tag" style="color:var(--accent)">✅ You\'re in</span>' : '') + '</div></a>';
+    }).join('') : '<div class="card" style="text-align:center"><p class="meta" style="margin:6px 0">🏆 No tournaments yet. ' +
+      (me.is_admin ? 'Create the first one!' : 'The admin will announce PadPal Cups and friendly Season 0 cups here.') + '</p></div>';
+  }
+
+  // Admin: create a tournament
+  $('newTourney').addEventListener('click', function () {
+    var d = new Date(Date.now() + 7 * 86400000); d.setHours(8, 0, 0, 0);
+    var local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    var radio = function (name, v, label, on) { return '<label><input type="radio" name="' + name + '" value="' + v + '"' + (on ? ' checked' : '') + '><span>' + label + '</span></label>'; };
+    openSheet('<h3>👑 New tournament</h3><form id="tForm">' +
+      '<div class="field"><label for="tName">Name</label><input class="input" id="tName" required maxlength="60" placeholder="PadPal Season 0 Cup"></div>' +
+      '<div class="field"><span class="label">Type</span><div class="choices">' + radio('tKind', 'friendly', '🎉 Season 0 (no points)', true) + radio('tKind', 'official', '🏆 Official (500+)') + '</div></div>' +
+      '<div class="field"><span class="label">Division</span><div class="choices">' + radio('tDiv', 'open', '🌍 Open', true) + radio('tDiv', 'men', '👨 Men') + radio('tDiv', 'women', '👩 Women') + radio('tDiv', 'mixed', '🔀 Mixed') + '</div></div>' +
+      '<div class="field"><span class="label">Max teams</span><div class="choices">' + [4, 6, 8, 12, 16].map(function (n) { return radio('tMax', n, n, n === 8); }).join('') + '</div></div>' +
+      '<div class="field"><span class="label">Match length</span><div class="choices">' + radio('tSets', 1, '1 set', true) + radio('tSets', 2, 'Best of 3') + '</div></div>' +
+      '<div class="field"><label for="tWhen">When</label><input class="input" id="tWhen" type="datetime-local" value="' + local + '" required></div>' +
+      '<div class="field"><label for="tPlace">Where (optional)</label><input class="input" id="tPlace" maxlength="80"></div>' +
+      '<p class="note">Everyone who can join gets a 🔔 notification.</p>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:10px" id="tBtn">Create tournament</button></form>');
+    $('tForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      $('tBtn').disabled = true;
+      var val = function (n) { return document.querySelector('input[name=' + n + ']:checked').value; };
+      var r = await db.rpc('create_tournament', {
+        p_name: $('tName').value, p_kind: val('tKind'), p_division: val('tDiv'), p_when: new Date($('tWhen').value).toISOString(),
+        p_place: $('tPlace').value, p_max_teams: +val('tMax'), p_sets_to_win: +val('tSets')
+      });
+      if (r.error) { $('tBtn').disabled = false; return toast(PadPal.friendlyError(r.error)); }
+      location.href = 'tourney.html?id=' + r.data;
+    });
+  });
+
+  // play.html#tourney opens the Tourneys tab
+  if (location.hash === '#tourney') document.querySelector('[data-panel=tourney]').click();
   renderFormats();
 
   // refresh the lists when you come back to the app
