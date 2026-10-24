@@ -530,6 +530,16 @@
     else {
       var days = Math.floor((Date.now() - new Date(profile.last_played + 'T00:00:00')) / 86400000);
       $('rWarn').textContent = days <= 0 ? '🔥 You played today!' : '⏳ Last game ' + days + ' day' + (days > 1 ? 's' : '') + ' ago. Play at least once a week!';
+      // tell exactly when points start dropping (First Timers are safe)
+      PadPal.inactivity(profile).then(function (inact) {
+        if (!inact) {
+          if (days > 0 && Number(profile.points) < 100) $('rWarn').textContent += ' (First Timers never lose points 🐣)';
+          return;
+        }
+        if (inact.idle <= 0) return;
+        $('rWarn').textContent = '⏳ Last game ' + inact.idle + ' day' + (inact.idle > 1 ? 's' : '') + ' ago. Play by ' +
+          inact.deadline + ' or lose ' + PadPal.fmt(inact.amount) + ' point' + (inact.amount === 1 ? '' : 's') + ' 🧊';
+      });
     }
     var wins = myMatches.filter(function (m) { return m.won; }).length;
     var streak = 0;

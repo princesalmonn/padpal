@@ -167,6 +167,24 @@
     return r.data;
   }
 
+  // ===== Inactivity: when will you lose points if you don't play? =====
+  // Returns null for First Timers or people who never played.
+  async function inactivity(profile) {
+    if (!profile.last_played || Number(profile.points) < 100) return null;
+    var s = { decay_points: 1, decay_points_long: 2 };
+    try { var r = await db.from('settings').select('decay_points, decay_points_long').eq('id', 1).maybeSingle(); if (r.data) s = r.data; } catch (e) {}
+    var todayJkt = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }) + 'T00:00:00');
+    var idle = Math.round((todayJkt - new Date(profile.last_played + 'T00:00:00')) / 86400000);
+    var next = idle < 7 ? 7 : (Math.floor(idle / 7) + 1) * 7;   // the next idle day that costs points
+    var lossDay = new Date(todayJkt.getTime() + (next - idle) * 86400000);
+    return {
+      idle: idle,
+      daysLeft: next - idle,
+      amount: Number(next >= 28 ? s.decay_points_long : s.decay_points),
+      deadline: lossDay.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })
+    };
+  }
+
   // Turn technical errors into plain words
   function friendlyError(err) {
     var m = (err && (err.message || err.msg || err.code)) || String(err);
@@ -206,6 +224,7 @@
     createInvite: createInvite, shareInvite: shareInvite, friendlyError: friendlyError,
     uploadPhoto: uploadPhoto, photoUrls: photoUrls,
     remembered: remembered, setRemember: setRemember,
-    TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, fmt: fmt, fmtChange: fmtChange
+    TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, fmt: fmt, fmtChange: fmtChange,
+    inactivity: inactivity
   };
 })();

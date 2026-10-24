@@ -44,6 +44,12 @@
   .actions .heart { display: inline-block; transition: transform .15s; }
   .actions .liked .heart { transform: scale(1.25); }
 
+  /* "Play soon or lose points" banner */
+  .idle-warn {
+    display: block; text-decoration: none; margin: 4px 0 10px; padding: 10px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;
+    background: color-mix(in srgb, var(--loss) 14%, var(--card)); color: var(--text); border: 1px solid color-mix(in srgb, var(--loss) 40%, transparent);
+  }
+
   /* Rank up / down announcement */
   .announce { text-align: center; padding: 18px 14px; }
   .announce.up { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, var(--card)), var(--card)); }
@@ -122,6 +128,7 @@
 </header>
 
 <main class="wrap">
+  <a class="idle-warn" id="idleWarn" href="play.html" hidden></a>
   <div class="stories" id="stories"></div>
   <div class="error-box" id="feedError" role="alert" hidden></div>
   <div id="feed"><div class="empty-feed">Loading…</div></div>
@@ -266,6 +273,13 @@
   PadPal.me.then(async function (me) {
     if (!me) return;
     profile = me.profile;
+    // warn from 4 days without playing: "play by Sunday or lose 1 point"
+    PadPal.inactivity(profile).then(function (inact) {
+      if (!inact || inact.idle < 4) return;
+      $('idleWarn').textContent = '🧊 No game for ' + inact.idle + ' days. Play by ' + inact.deadline + ' or lose ' +
+        PadPal.fmt(inact.amount) + ' point' + (inact.amount === 1 ? '' : 's') + '. Tap to find a game 🎾';
+      $('idleWarn').hidden = false;
+    });
     await cleanupMyExpired();
     load();
   });
