@@ -39,6 +39,9 @@
   <h2>Waiting for approval <span class="count" id="pendingCount">0</span></h2>
   <div id="pending"><div class="empty">Loading…</div></div>
 
+  <h2>⚠️ Score reports <span class="count" id="reportCount">0</span></h2>
+  <div id="reports"></div>
+
   <h2>Invite someone</h2>
   <div class="card">
     <p class="meta" style="margin:0 0 12px">Each link works for one person. They still need your approval after signing up.</p>
@@ -97,6 +100,17 @@
     if (r.error) return showError(r.error);
     people = r.data;
     render();
+    loadReports();
+  }
+
+  // "Are you sure?" without pop-ups: tap once to warn, again within 3s to do it
+  var armed = {};
+  function tapTwice(key, warning) {
+    if (armed[key]) { armed[key] = false; return true; }
+    armed[key] = true;
+    toast(warning);
+    setTimeout(function () { armed[key] = false; }, 3000);
+    return false;
   }
 
   function render() {
@@ -121,6 +135,30 @@
     }).join('');
   }
 
+  // ===== Score reports: undo the match (points go back) or dismiss =====
+  async function loadReports() {
+    var r = await db.from('match_reports').select('id, match_id, user_id, reason, created_at').eq('status', 'open').order('created_at');
+    if (r.error) { $('reports').innerHTML = '<div class="card empty">Score reports appear after you run 05_lobby.sql.</div>'; return; }
+    $('reportCount').textContent = r.data.length;
+    if (!r.data.length) { $('reports').innerHTML = '<div class="card empty">No reports. Everyone is playing fair. 😇</div>'; return; }
+    var ids = r.data.map(function (x) { return x.match_id; });
+    var mr = await db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at').in('id', ids);
+    var byId = {};
+    (mr.data || []).forEach(function (m) { byId[m.id] = m; });
+    $('reports').innerHTML = r.data.map(function (rep) {
+      var m = byId[rep.match_id];
+      var w = m ? (m.winner === 'a' ? [m.a1, m.a2] : [m.b1, m.b2]) : [];
+      var l = m ? (m.winner === 'a' ? [m.b1, m.b2] : [m.a1, m.a2]) : [];
+      var sets = m ? m.sets.map(function (s) { return m.winner === 'a' ? s[0] + '-' + s[1] : s[1] + '-' + s[0]; }).join(' ') : '';
+      return '<div class="card">' +
+        (m ? '<div class="name">🏆 ' + esc(nameOf(w[0])) + ' & ' + esc(nameOf(w[1])) + ' beat ' + esc(nameOf(l[0])) + ' & ' + esc(nameOf(l[1])) + '</div>' +
+             '<div class="meta">' + sets + ' · ' + ago(m.played_at) + '</div>' : '<div class="meta">Match not found</div>') +
+        '<p style="margin:10px 0 0;font-size:14px">💬 <b>' + esc(nameOf(rep.user_id)) + ':</b> ' + esc(rep.reason) + '</p>' +
+        '<div class="actions"><button class="btn btn-ghost" data-dismiss="' + rep.id + '">Score is OK</button>' +
+        '<button class="btn btn-primary" data-undo="' + rep.match_id + '">↩️ Undo match</button></div></div>';
+    }).join('');
+  }
+
   async function setStatus(id, status, btn) {
     btn.disabled = true;
     var r = await db.rpc('set_member_status', { member: id, new_status: status });
@@ -130,10 +168,26 @@
   }
 
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-approve],[data-reject]');
+    var el = e.target.closest('[data-approve],[data-reject],[data-undo],[data-dismiss]');
     if (!el) return;
     if (el.dataset.approve) setStatus(el.dataset.approve, 'approved', el);
-    else setStatus(el.dataset.reject, 'rejected', el);
+    else if (el.dataset.reject) setStatus(el.dataset.reject, 'rejected', el);
+    else if (el.dataset.undo) {
+      if (!tapTwice('undo' + el.dataset.undo, 'Tap again to undo: points go back and the match is deleted')) return;
+      el.disabled = true;
+      db.rpc('undo_match', { p_match: el.dataset.undo }).then(function (r) {
+        if (r.error) { el.disabled = false; return showError(r.error); }
+        toast('↩️ Match undone. Points are back.');
+        loadReports();
+      });
+    }
+    else if (el.dataset.dismiss) {
+      db.rpc('dismiss_report', { p_report: +el.dataset.dismiss }).then(function (r) {
+        if (r.error) return showError(r.error);
+        toast('👍 Report closed');
+        loadReports();
+      });
+    }
   });
 
   $('makeInvite').addEventListener('click', async function () {

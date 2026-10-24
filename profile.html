@@ -155,23 +155,24 @@
     <div class="chips" id="heroChips"></div>
   </section>
 
-  <div class="sample-note" style="margin-top:14px">🧪 Your profile and pinned photos are real. Points, stats and history are sample data for now.</div>
+  <div class="sample-note" style="margin-top:14px">🧪 Points, rank and match history are real. Shot chart, badges and the Stats tab are still samples.</div>
 
   <div class="card">
     <div class="rank">
-      <div class="badge">⚡</div>
-      <div><div class="tier">Amateur</div><div class="meta">#3 in Men's ladder</div></div>
-      <div class="pts">362<small>points</small></div>
+      <div class="badge" id="rBadge"></div>
+      <div><div class="tier" id="rTier"></div><div class="meta" id="rPos"></div></div>
+      <div class="pts"><span id="rPts">0</span><small>points</small></div>
     </div>
-    <div class="progress"><i style="width:62%"></i></div>
-    <div class="prog-label"><span>⚡ Amateur · 300</span><span>38 pts to 🥉 Junior</span></div>
-    <div class="warn">⏳ Last game 4 days ago. Play by <b>Wednesday</b> or lose 5 points!</div>
+    <div class="progress"><i id="rBar" style="width:0%"></i></div>
+    <div class="prog-label"><span id="rFrom"></span><span id="rTo"></span></div>
+    <div class="meta" id="rMixed" style="margin-top:8px"></div>
+    <div class="warn" id="rWarn"></div>
   </div>
 
   <div class="quick">
-    <div><strong>48</strong><small>Matches</small></div>
-    <div><strong>63%</strong><small>Win rate</small></div>
-    <div><strong>🔥 4</strong><small>Win streak</small></div>
+    <div><strong id="qMatches">0</strong><small>Matches</small></div>
+    <div><strong id="qRate">–</strong><small>Win rate</small></div>
+    <div><strong id="qStreak">0</strong><small>Win streak</small></div>
   </div>
 
   <div class="row-btns">
@@ -364,22 +365,6 @@
              facts: ['First PadPal match: 12 Feb 2026 🎂', 'You have played with 9 different friends 👥', 'Most common score: 6-4 🎾'] }
   };
 
-  var friends = {
-    Andi: { initial: 'A', you: 5, them: 11, note: 'Andi is your nemesis 😈 Last time you lost 4-6 6-7' },
-    Rio:  { initial: 'R', you: 9, them: 7,  note: 'Close rivalry! You won the last 2 🔥' },
-    Budi: { initial: 'B', you: 6, them: 1,  note: 'Budi has beaten you only once 😎' },
-    Maya: { initial: 'M', you: 3, them: 3,  note: 'Dead even. Next match decides it! ⚖️' }
-  };
-
-  var matches = [
-    { win: true,  partner: 'Sari', vs: 'Andi & Budi', score: '6-4 7-5', pts: '+10', when: 'Today · Court 3' },
-    { win: true,  partner: 'Rio',  vs: 'Maya & Sari', score: '28-20',   pts: '+8',  when: 'Sat · Americano' },
-    { win: true,  partner: 'Maya', vs: 'Rio & Budi',  score: '6-3 6-2', pts: '+5',  when: 'Thu · Court 1' },
-    { win: true,  partner: 'Sari', vs: 'Rio & Andi',  score: '7-6 6-4', pts: '+18', when: 'Tue · Court 2' },
-    { win: false, partner: 'Budi', vs: 'Andi & Rio',  score: '4-6 6-7', pts: '−5',  when: 'Last week' },
-    { win: false, partner: 'Maya', vs: 'Andi & Sari', score: '3-6 2-6', pts: '−2',  when: 'Last week' }
-  ];
-
   // ===== Helpers =====
   function $(id) { return document.getElementById(id); }
   var toastTimer;
@@ -447,27 +432,107 @@
       '<div class="stat">' + stat + '<small>' + sub + '</small></div></div>';
   }
 
-  // ===== History =====
-  function renderH2H(name) {
-    var f = friends[name];
-    $('h2hPick').innerHTML = Object.keys(friends).map(function (n) {
-      return '<button class="' + (n === name ? 'on' : '') + '" data-h2h="' + n + '">vs ' + n + '</button>';
+  // ===== History (real) =====
+  var myMatches = [];   // newest first, each with .won, .partner, .opp[], .change
+  var people = {};      // member id → profile
+
+  function pname(id) { var p = people[id]; return esc(p ? (p.display_name || p.username) : '?'); }
+
+  async function loadGame() {
+    var list = [];
+    try { list = await PadPal.members(); } catch (err) {}
+    list.forEach(function (m) { people[m.id] = m; });
+    var id = profile.id;
+    var r = await db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at')
+      .or('a1.eq.' + id + ',a2.eq.' + id + ',b1.eq.' + id + ',b2.eq.' + id)
+      .order('played_at', { ascending: false }).limit(200);
+    var cr = await db.from('point_changes').select('match_id, change').eq('user_id', id);
+    var changeOf = {};
+    (cr.data || []).forEach(function (c) { if (c.match_id) changeOf[c.match_id] = c.change; });
+    myMatches = (r.data || []).map(function (m) {
+      var team = (m.a1 === id || m.a2 === id) ? 'a' : 'b';
+      var mine = team === 'a' ? [m.a1, m.a2] : [m.b1, m.b2];
+      return {
+        won: m.winner === team,
+        partner: mine[0] === id ? mine[1] : mine[0],
+        opp: team === 'a' ? [m.b1, m.b2] : [m.a1, m.a2],
+        score: m.sets.map(function (s) { return team === 'a' ? s[0] + '-' + s[1] : s[1] + '-' + s[0]; }).join(' '),
+        change: changeOf[m.id],
+        when: m.played_at
+      };
+    });
+    renderRank(list);
+    renderMatches();
+    var foes = {};
+    myMatches.forEach(function (m) { m.opp.forEach(function (o) { foes[o] = true; }); });
+    var first = Object.keys(foes)[0];
+    if (first) renderH2H(first);
+    else { $('h2hPick').innerHTML = ''; $('h2hCard').innerHTML = '<p class="meta" style="margin:0">Play a match to see your records against friends.</p>'; }
+  }
+
+  // Rank card + quick numbers
+  function renderRank(list) {
+    var pts = profile.points || 0;
+    var t = PadPal.tierOf(pts);
+    var next = PadPal.nextTier(pts);
+    $('rBadge').textContent = t.icon;
+    $('rBadge').style.background = t.color;
+    $('rTier').textContent = t.name;
+    $('rPts').textContent = PadPal.fmt(pts);
+    $('rMixed').textContent = '🔀 Mixed: ' + PadPal.fmt(profile.mixed_points) + ' pts (from games with men and women)';
+    var ladder = list.filter(function (m) { return m.gender === profile.gender; });
+    var pos = ladder.map(function (m) { return m.id; }).indexOf(profile.id) + 1;
+    $('rPos').textContent = pos ? '#' + pos + ' in ' + (profile.gender === 'f' ? "Women's" : "Men's") + ' ladder' : '';
+    var span = next ? next.min - t.min : 1;
+    var pct = next ? Math.round((pts - t.min) / span * 100) : 100;
+    if (pts >= 500 && t.name === 'Junior') pct = 100;
+    $('rBar').style.width = Math.max(2, Math.min(100, pct)) + '%';
+    $('rFrom').textContent = t.icon + ' ' + t.name + ' · ' + t.min;
+    $('rTo').textContent = !next ? 'Top tier! 👑'
+      : pts >= 500 ? '🏆 Tournaments unlock ' + next.icon + ' ' + next.name
+      : PadPal.fmt(next.min - pts) + ' pts to ' + next.icon + ' ' + next.name;
+    if (!profile.last_played) $('rWarn').textContent = '🎾 No matches yet. Play your first match from the Play tab!';
+    else {
+      var days = Math.floor((Date.now() - new Date(profile.last_played + 'T00:00:00')) / 86400000);
+      $('rWarn').textContent = days <= 0 ? '🔥 You played today!' : '⏳ Last game ' + days + ' day' + (days > 1 ? 's' : '') + ' ago. Play at least once a week!';
+    }
+    var wins = myMatches.filter(function (m) { return m.won; }).length;
+    var streak = 0;
+    for (var i = 0; i < myMatches.length && myMatches[i].won; i++) streak++;
+    $('qMatches').textContent = myMatches.length;
+    $('qRate').textContent = myMatches.length ? Math.round(wins / myMatches.length * 100) + '%' : '–';
+    $('qStreak').textContent = streak ? '🔥 ' + streak : '0';
+  }
+
+  function renderH2H(id) {
+    var games = myMatches.filter(function (m) { return m.opp.indexOf(id) > -1; });
+    var you = games.filter(function (m) { return m.won; }).length;
+    var them = games.length - you;
+    var foes = [];
+    myMatches.forEach(function (m) { m.opp.forEach(function (o) { if (foes.indexOf(o) < 0) foes.push(o); }); });
+    $('h2hPick').innerHTML = foes.map(function (f) {
+      return '<button class="' + (f === id ? 'on' : '') + '" data-h2h="' + f + '">vs ' + pname(f) + '</button>';
     }).join('');
+    var note = you > them ? 'You lead! Keep it up 🔥' : them > you ? 'They lead. Time for revenge 😤' : 'Dead even. Next match decides it! ⚖️';
     $('h2hCard').innerHTML =
       '<div class="h2h">' +
-        '<div><div class="avatar">Y</div><div class="name">You</div></div>' +
-        '<div class="big"><span class="' + (f.you >= f.them ? 'plus' : '') + '">' + f.you + '</span> – <span class="' + (f.them > f.you ? 'minus' : '') + '">' + f.them + '</span></div>' +
-        '<div><div class="avatar">' + f.initial + '</div><div class="name">' + name + '</div></div>' +
-      '</div><div class="h2h-note">' + f.note + '</div>';
+        '<div><div class="avatar">' + esc((profile.display_name || profile.username)[0].toUpperCase()) + '</div><div class="name">You</div></div>' +
+        '<div class="big"><span class="' + (you >= them ? 'plus' : '') + '">' + you + '</span> – <span class="' + (them > you ? 'minus' : '') + '">' + them + '</span></div>' +
+        '<div><div class="avatar">' + pname(id)[0] + '</div><div class="name">' + pname(id) + '</div></div>' +
+      '</div><div class="h2h-note">' + note + '</div>';
   }
+
   function renderMatches() {
-    $('matches').innerHTML = matches.map(function (m) {
+    $('matches').innerHTML = myMatches.length ? myMatches.map(function (m) {
+      var c = m.change;
       return '<div class="match-row">' +
-        '<div class="wlb ' + (m.win ? 'w' : 'l') + '">' + (m.win ? 'W' : 'L') + '</div>' +
-        '<div class="who">with <b>' + m.partner + '</b> vs ' + m.vs + '<small>' + m.when + '</small></div>' +
-        '<div class="score">' + m.score + '<small class="' + (m.win ? 'plus' : 'minus') + '">' + m.pts + '</small></div>' +
-        '</div>';
-    }).join('');
+        '<div class="wlb ' + (m.won ? 'w' : 'l') + '">' + (m.won ? 'W' : 'L') + '</div>' +
+        '<div class="who">with <b>' + pname(m.partner) + '</b> vs ' + pname(m.opp[0]) + ' & ' + pname(m.opp[1]) +
+        '<small>' + new Date(m.when).toLocaleDateString() + '</small></div>' +
+        '<div class="score">' + m.score +
+        (c === undefined ? '' : '<small class="' + (c >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(c) + '</small>') +
+        '</div></div>';
+    }).join('') : '<p class="meta">No matches yet. Start one from the 🎾 Play tab!</p>';
   }
 
   // ===== Clicks =====
@@ -493,8 +558,6 @@
 
   renderRadar();
   renderStats('month');
-  renderH2H('Andi');
-  renderMatches();
 
   // ===== Real data from your account (the rest above is still sample data) =====
   var SIDES = { right: '➡️ Right (drive)', left: '⬅️ Left (revés)', both: '↔️ Both' };
@@ -512,6 +575,7 @@
     profile = me.profile;
     renderHero();
     loadPins();
+    loadGame();
   });
 
   // ===== Your header (name, picture, chips) =====

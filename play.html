@@ -131,7 +131,7 @@
 </header>
 
 <main class="wrap">
-  <div class="sample-note">🧪 Sample games for now. The score tracker and Americano work, but nothing is saved yet.</div>
+  <div class="sample-note">🎾 Matches, invites, join links and open games are real now! Americano saving and tournaments are still samples.</div>
   <div class="seg" id="seg">
     <button class="on" data-panel="open">📣 Open games</button>
     <button data-panel="organize">🎯 Organize</button>
@@ -140,8 +140,8 @@
 
   <!-- ===== Open games ===== -->
   <section class="panel on" id="open">
-    <button class="btn btn-primary big-btn" data-soon="Creating open games">📣 Create open game</button>
-    <div id="games"></div>
+    <button class="btn btn-primary big-btn" data-gcreate="1">🎾 Create a match</button>
+    <div id="games"><p class="meta">Loading games…</p></div>
   </section>
 
   <!-- ===== Organize ===== -->
@@ -248,34 +248,204 @@
   ];
 
   // =====================================================
-  // 1. OPEN GAMES
+  // 1. GAMES: invites, your games, open games, lobby (all real)
   // =====================================================
-  var games = [
-    { when: 'Today · 19:00 – 20:30', where: 'Court 3 · Padel Arena Senayan', level: '⚡ Amateur ± 1 tier', type: 'Friendly match', players: ['Rio', 'Sari', 'Andi'], price: 'Rp 100k / person' },
-    { when: 'Sat 26 Oct · 08:00 – 10:00', where: 'Courts 1–2 · Smash Club', level: 'All levels', type: '🔄 Americano · 8 players', players: ['Maya', 'Dewi', 'Kevin', 'Lia', 'Dimas'], price: 'Rp 120k / person', size: 8 },
-    { when: 'Sun 27 Oct · 07:00 – 08:30', where: 'Court 2 · Padel Arena Senayan', level: '🌱 Newbie – 🎾 Beginner', type: 'Mixed match', players: ['Budi', 'Dewi'], price: 'Rp 90k / person' }
-  ];
+  var db = PadPal.db;
+  var games = [];        // open games I can see, with their players
+  var lobbyId = null;    // the lobby that's open right now
+  var lobbyTimer = null;
+  var lobbyView = 'lobby'; // which lobby screen is showing: lobby, invite or teams
+
+  function escH(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function nameOfId(id) { var p = personById(id); return p ? escH(shortName(p)) : 'Someone'; }
+  function whenText(iso) {
+    var d = new Date(iso), now = new Date();
+    var day = d.toDateString() === now.toDateString() ? 'Today'
+      : d.toDateString() === new Date(now.getTime() + 86400000).toDateString() ? 'Tomorrow'
+      : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    return day + ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+  function joinedOf(g) { return g.game_players.filter(function (p) { return p.status === 'joined'; }).map(function (p) { return p.user_id; }); }
+  function myStatus(g) { var p = g.game_players.filter(function (x) { return x.user_id === me.id; })[0]; return p ? p.status : null; }
+  function gameById(id) { return games.filter(function (g) { return g.id === id; })[0]; }
+
+  async function loadGames() {
+    try {
+      var who = await PadPal.me;
+      if (!who) return;
+      me = who.profile;
+      people = await PadPal.members();
+      var r = await db.from('games')
+        .select('id, host_id, kind, scheduled_at, place, size, is_open, status, join_code, game_players(user_id, status)')
+        .eq('status', 'open').order('scheduled_at').limit(50);
+      if (r.error) throw r.error;
+      games = r.data;
+    } catch (err) {
+      $('games').innerHTML = '<div class="error-box">' + escH(PadPal.friendlyError(err)) + '</div>';
+      return;
+    }
+    renderGames();
+    if (lobbyId && lobbyView === 'lobby') renderLobby();
+  }
+
+  function gameCard(g, buttons) {
+    var joined = joinedOf(g);
+    var free = g.size - joined.length;
+    var faces = joined.slice(0, 4).map(function (id) { return '<div class="avatar">' + nameOfId(id)[0] + '</div>'; }).join('');
+    var empties = '';
+    for (var k = 0; k < Math.min(free, 2); k++) empties += '<div class="free">+</div>';
+    return '<article class="card game">' +
+      '<div class="when">' + whenText(g.scheduled_at) + '</div>' +
+      '<div class="where">' + (g.place ? '📍 ' + escH(g.place) + ' · ' : '') + 'host: ' + nameOfId(g.host_id) + '</div>' +
+      '<div class="tags"><span class="tag">🎾 Match · 2 vs 2</span>' + (g.is_open ? '<span class="tag">📣 Open</span>' : '<span class="tag">🔒 Invite only</span>') + '</div>' +
+      '<div class="slots">' + faces + empties +
+        (free > 0 ? '<span class="need">Need ' + free + '</span>' : '<span class="need" style="color:var(--win)">Full ✓</span>') +
+        buttons + '</div></article>';
+  }
 
   function renderGames() {
-    $('games').innerHTML = games.map(function (g, i) {
-      var size = g.size || 4;
-      var free = size - g.players.length;
-      // show max 3 faces + a "+N" bubble so big games still fit on a phone
-      var shown = g.players.slice(0, 3).map(function (n) { return '<div class="avatar">' + n[0] + '</div>'; }).join('');
-      if (g.players.length > 3) shown += '<div class="free" style="border-style:solid">+' + (g.players.length - 3) + '</div>';
-      var empties = '';
-      for (var k = 0; k < Math.min(free, size > 4 ? 1 : 2); k++) empties += '<div class="free">+</div>';
-      return '<article class="card game">' +
-        '<div class="when">' + g.when + '</div>' +
-        '<div class="where">📍 ' + g.where + '</div>' +
-        '<div class="tags"><span class="tag">' + g.type + '</span><span class="tag">' + g.level + '</span><span class="tag">💸 ' + g.price + '</span></div>' +
-        '<div class="slots">' + shown + empties +
-          (free > 0 ? '<span class="need">Need ' + free + '</span>' : '<span class="need" style="color:var(--win)">Full ✓</span>') +
-          (g.joined
-            ? '<button class="btn joined" data-leave="' + i + '">✓ Joined</button>'
-            : (free > 0 ? '<button class="btn btn-primary" data-join="' + i + '">Join</button>' : '')) +
-        '</div></article>';
-    }).join('');
+    var invites = games.filter(function (g) { return myStatus(g) === 'invited'; });
+    var mine = games.filter(function (g) { return myStatus(g) === 'joined'; });
+    var open = games.filter(function (g) {
+      return g.is_open && myStatus(g) !== 'joined' && myStatus(g) !== 'invited' && joinedOf(g).length < g.size;
+    });
+    var html = '';
+    if (invites.length) {
+      html += '<h2>🎟️ Invites for you</h2>' + invites.map(function (g) {
+        return gameCard(g, '<button class="btn btn-ghost" data-gleave="' + g.id + '">No</button><button class="btn btn-primary" data-gjoin="' + g.id + '">Join</button>');
+      }).join('');
+    }
+    html += '<h2>🎾 Your games</h2>' + (mine.length ? mine.map(function (g) {
+      return gameCard(g, '<button class="btn btn-primary" data-gopen="' + g.id + '">' + (g.host_id === me.id ? 'Open lobby' : 'View') + '</button>');
+    }).join('') : '<p class="meta">No games yet. Create one, or join an open game below!</p>');
+    html += '<h2>📣 Open games</h2>' + (open.length ? open.map(function (g) {
+      return gameCard(g, '<button class="btn btn-primary" data-gjoin="' + g.id + '">Join</button>');
+    }).join('') : '<p class="meta">No open games right now.</p>');
+    $('games').innerHTML = html;
+  }
+
+  // ----- Create a game -----
+  function openCreate() {
+    var d = new Date(Date.now() + 3600000);
+    d.setMinutes(0, 0, 0);
+    var local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    openSheet(
+      '<h3>🎾 New match</h3>' +
+      '<form id="createForm">' +
+        '<div class="field"><label for="cWhen">When</label><input class="input" id="cWhen" type="datetime-local" value="' + local + '" required></div>' +
+        '<div class="field"><label for="cPlace">Where (optional)</label><input class="input" id="cPlace" maxlength="80" placeholder="Court 3 · Padel Arena"></div>' +
+        '<div class="field"><span class="label">Who can join?</span><div class="choices">' +
+          '<label><input type="radio" name="cOpen" value="no" checked><span>🔒 Invite / link only</span></label>' +
+          '<label><input type="radio" name="cOpen" value="yes"><span>📣 Any member</span></label>' +
+        '</div></div>' +
+        '<p class="note">You are the <b>host</b>: you invite players, set the teams and save the final score.</p>' +
+        '<button class="btn btn-primary" style="width:100%;margin-top:12px" id="cBtn">Create lobby</button>' +
+      '</form>' +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-mfree="1">Just keep score now (not saved)</button>'
+    );
+    $('createForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      $('cBtn').disabled = true;
+      var r = await db.rpc('create_game', {
+        p_when: new Date($('cWhen').value).toISOString(),
+        p_place: $('cPlace').value,
+        p_open: document.querySelector('input[name=cOpen]:checked').value === 'yes'
+      });
+      if (r.error) { $('cBtn').disabled = false; return toast(PadPal.friendlyError(r.error)); }
+      await loadGames();
+      openLobby(r.data.id);
+    });
+  }
+
+  // ----- The lobby -----
+  function openLobby(id) {
+    lobbyId = id;
+    renderLobby();
+    clearInterval(lobbyTimer);
+    lobbyTimer = setInterval(function () { if (lobbyId && $('sheet').classList.contains('open')) loadGames(); else stopLobby(); }, 6000);
+  }
+  function stopLobby() { lobbyId = null; clearInterval(lobbyTimer); }
+
+  function renderLobby() {
+    lobbyView = 'lobby';
+    var g = gameById(lobbyId);
+    if (!g) { closeSheet(); stopLobby(); toast('This game is finished or cancelled'); return; }
+    var host = g.host_id === me.id;
+    var joined = joinedOf(g);
+    var row = function (p) {
+      var icon = p.status === 'joined' ? '✅' : p.status === 'invited' ? '⏳' : '❌';
+      var label = p.status === 'joined' ? 'joined' : p.status === 'invited' ? 'invited' : 'said no';
+      return '<div class="lb-row"><span>' + icon + ' ' + nameOfId(p.user_id) + (p.user_id === g.host_id ? ' 👑' : '') + '</span><small>' + label + '</small>' +
+        (host && p.user_id !== me.id && p.status !== 'declined' ? '<button class="btn btn-ghost" style="margin-left:auto;padding:4px 10px;font-size:12px" data-gremove="' + p.user_id + '">Remove</button>' : '') +
+        '</div>';
+    };
+    var order = { joined: 0, invited: 1, declined: 2 };
+    var list = g.game_players.slice().sort(function (a, b) { return order[a.status] - order[b.status]; });
+    var html = '<h3>🎾 Match lobby</h3>' +
+      '<p class="meta" style="margin:-6px 0 12px">' + whenText(g.scheduled_at) + (g.place ? ' · 📍 ' + escH(g.place) : '') + '</p>' +
+      '<div class="label">Players (' + joined.length + ' / ' + g.size + ' joined)</div>' +
+      '<div class="card" style="padding:4px 12px">' + list.map(row).join('') + '</div>';
+    if (host) {
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">' +
+        '<button class="btn btn-ghost" data-ginvite="1">👥 Invite friends</button>' +
+        '<button class="btn btn-ghost" data-gshare="1">🔗 Share join link</button></div>' +
+        (joined.length === 4
+          ? '<button class="btn btn-primary" style="width:100%;margin-top:10px" data-gteams="1">⚔️ Set teams & start</button>'
+          : '<p class="note">Waiting for ' + (4 - joined.length) + ' more player' + (4 - joined.length > 1 ? 's' : '') + ' to join… (updates by itself)</p>') +
+        '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-gcancel="1">Cancel game</button>';
+    } else {
+      html += '<p class="note">The host sets the teams and saves the score. Your points update automatically. 🎾</p>' +
+        (myStatus(g) === 'joined' ? '<button class="btn btn-ghost" style="width:100%;margin-top:10px" data-gleave="' + g.id + '">Leave game</button>' : '');
+    }
+    openSheet(html);
+  }
+
+  // Invite picker
+  var invitePick = [];
+  function renderInvite() {
+    lobbyView = 'invite';
+    var g = gameById(lobbyId);
+    var inGame = g.game_players.filter(function (p) { return p.status !== 'declined'; }).map(function (p) { return p.user_id; });
+    var others = people.filter(function (p) { return inGame.indexOf(p.id) < 0; });
+    openSheet('<h3>👥 Invite friends</h3>' +
+      (others.length ? '<div class="pick">' + others.map(function (p) {
+        return '<button class="' + (invitePick.indexOf(p.id) > -1 ? 'on' : '') + '" data-ginvpick="' + p.id + '">' + (p.gender === 'f' ? '👩 ' : '👨 ') + escH(shortName(p)) + ' <small>' + PadPal.tierOf(p.points).icon + '</small></button>';
+      }).join('') + '</div>' : '<p class="meta">Everyone is already invited. Share the join link, or invite new friends to PadPal from your profile.</p>') +
+      '<button class="btn btn-primary" style="width:100%;margin-top:14px" data-ginvsend="1"' + (invitePick.length ? '' : ' disabled') + '>Send ' + (invitePick.length || '') + ' invite' + (invitePick.length === 1 ? '' : 's') + '</button>' +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-gopen="' + lobbyId + '">Back to lobby</button>');
+  }
+
+  async function shareJoinLink() {
+    var g = gameById(lobbyId);
+    var link = new URL('play.html?join=' + g.join_code, location.href).href;
+    var text = 'Join my padel match on PadPal 🎾 ' + whenText(g.scheduled_at) + (g.place ? ' · ' + g.place : '');
+    if (navigator.share) {
+      try { await navigator.share({ title: 'PadPal match', text: text, url: link }); return; }
+      catch (e) { if (e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(link); toast('📋 Join link copied!'); }
+    catch (e) { toast('Join link: ' + link); }
+  }
+
+  async function gameAction(fn, args, okMsg) {
+    var r = await db.rpc(fn, args);
+    if (r.error) { toast(PadPal.friendlyError(r.error)); return null; }
+    if (okMsg) toast(okMsg);
+    await loadGames();
+    return r;
+  }
+
+  // Opened from a join link: play.html?join=CODE
+  async function joinFromLink() {
+    var code = new URLSearchParams(location.search).get('join');
+    if (!code) return;
+    history.replaceState(null, '', 'play.html');
+    await PadPal.me;
+    var r = await db.rpc('join_game', { p_game: null, p_code: code });
+    if (r.error) return toast(PadPal.friendlyError(r.error));
+    await loadGames();
+    toast('🎾 You joined the game!');
+    openLobby(r.data);
   }
 
   // =====================================================
@@ -523,11 +693,70 @@
   }
   function closeTracker() { $('tracker').classList.remove('open'); T = null; }
 
-  function newMatch() {
+  // ===== Normal match from a lobby: the host picks a partner from the 4 who joined =====
+  var people = [];       // real members
+  var me = null;         // my profile
+  var pickPartner = null;
+
+  function shortName(p) { return p.display_name || p.username; }
+  function personById(id) { return people.filter(function (p) { return p.id === id; })[0]; }
+
+  function newMatch() { openCreate(); }
+
+  function renderTeams() {
+    lobbyView = 'teams';
+    var g = gameById(lobbyId);
+    var others = joinedOf(g).filter(function (id) { return id !== me.id; });
+    var opp = others.filter(function (id) { return id !== pickPartner; });
+    var chip = function (id) {
+      var p = personById(id);
+      return '<button class="' + (pickPartner === id ? 'on' : '') + '" data-mpart="' + id + '">' +
+        (p && p.gender === 'f' ? '👩 ' : '👨 ') + nameOfId(id) + ' <small>' + PadPal.tierOf(p ? p.points : 0).icon + '</small></button>';
+    };
+    openSheet(
+      '<h3>⚔️ Set teams</h3>' +
+      '<div class="label">Your partner</div>' +
+      '<div class="pick">' + others.map(chip).join('') + '</div>' +
+      (pickPartner
+        ? '<div class="card" style="margin-top:14px;text-align:center"><b>' + nameOfId(me.id) + ' & ' + nameOfId(pickPartner) + '</b><div class="meta" style="margin:6px 0">vs</div><b>' + nameOfId(opp[0]) + ' & ' + nameOfId(opp[1]) + '</b></div>'
+        : '<p class="note">Tap the friend who plays on your side.</p>') +
+      '<button class="btn btn-primary" style="width:100%;margin-top:14px" data-mstart="1"' + (pickPartner ? '' : ' disabled') + '>🎾 Start match</button>' +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-gopen="' + lobbyId + '">Back to lobby</button>'
+    );
+  }
+
+  function startMatch(players) {
+    var names = players
+      ? [shortName(me) + ' & ' + shortName(personById(players.a[1])), shortName(personById(players.b[0])) + ' & ' + shortName(personById(players.b[1]))]
+      : ['Team A', 'Team B'];
+    var game = players ? lobbyId : null;
+    closeSheet();
+    stopLobby();
     openTracker({
-      mode: 'sets', title: 'Normal match', names: ['You & Sari', 'Andi & Rio'],
+      mode: 'sets', title: players ? 'Match · you host' : 'Practice (not saved)', names: names, players: players, game: game,
       golden: true, pts: [0, 0], games: [0, 0], sets: [], setsWon: [0, 0], tiebreak: false, over: false
     });
+  }
+
+  async function saveMatch(btn) {
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    var winner = T.setsWon[0] > T.setsWon[1] ? 'a' : 'b';
+    var r = await PadPal.db.rpc('save_game_match', {
+      p_game: T.game,
+      p_a1: T.players.a[0], p_a2: T.players.a[1], p_b1: T.players.b[0], p_b2: T.players.b[1],
+      p_sets: T.sets, p_winner: winner
+    });
+    if (r.error) {
+      btn.disabled = false;
+      btn.textContent = '💾 Save match';
+      toast(PadPal.friendlyError(r.error));
+      return;
+    }
+    T.saved = r.data;
+    showDone();
+    toast('✅ Match saved and posted to the feed!');
+    loadGames();
   }
 
   var LABELS = ['0', '15', '30', '40'];
@@ -618,15 +847,32 @@
     var final = T.mode === 'points'
       ? T.pts[0] + ' – ' + T.pts[1]
       : T.sets.map(function (s) { return s[0] + '-' + s[1]; }).join('  ');
+    var buttons;
+    if (T.onSave) {
+      buttons = '<button class="btn btn-primary" data-save-score="1">✅ Save score</button>' +
+        '<button class="btn btn-ghost" data-undo-last="1">↩️ Undo last point</button>';
+    } else if (T.saved) {
+      // show everyone's new points
+      buttons = '<div class="card" style="width:100%;max-width:320px;text-align:left;margin:0">' +
+        T.saved.changes.map(function (c) {
+          var p = personById(c.user_id);
+          var tier = PadPal.tierOf(c.points);
+          return '<div class="lb-row"><span>' + (c.won ? '🏆 ' : '') + (p ? shortName(p).replace(/</g, '&lt;') : '?') + '</span>' +
+            '<small>' + tier.icon + ' ' + PadPal.fmt(c.points) + '</small>' +
+            '<span class="pts ' + (c.change >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(c.change) + '</span></div>';
+        }).join('') + '</div>' +
+        '<button class="btn btn-primary" data-close-tracker="1">Done</button>';
+    } else if (T.players) {
+      buttons = '<button class="btn btn-primary" data-save-match="1">💾 Save match</button>' +
+        '<button class="btn btn-ghost" data-undo-last="1">↩️ Undo last point</button>';
+    } else {
+      buttons = '<p class="meta">Practice match: not saved.</p>' +
+        '<button class="btn btn-primary" data-close-tracker="1">Done</button>' +
+        '<button class="btn btn-ghost" data-undo-last="1">↩️ Undo last point</button>';
+    }
     $('doneScreen').innerHTML =
       '<div class="big">🏆</div><h3>' + T.names[win] + ' win!</h3>' +
-      '<div class="final">' + final + '</div>' +
-      (T.mode === 'sets' ? '<p class="meta">Winners <span class="plus">+10</span> · Losers <span class="minus">−5</span> (example)</p>' : '') +
-      (T.onSave
-        ? '<button class="btn btn-primary" data-save-score="1">✅ Save score</button>'
-        : '<button class="btn btn-primary" data-soon="Posting results">📣 Post to feed</button>' +
-          '<button class="btn btn-accent" data-soon="Shot ratings">🎾 Rate shots</button>') +
-      '<button class="btn btn-ghost" data-undo-last="1">↩️ Undo last point</button>';
+      '<div class="final">' + final + '</div>' + buttons;
     $('doneScreen').classList.add('open');
   }
 
@@ -657,7 +903,7 @@
   // CLICKS
   // =====================================================
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-panel],[data-join],[data-leave],[data-guide],[data-open-guide],[data-setup],[data-pick],[data-target],[data-courts],[data-start],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-soon]');
+    var el = e.target.closest('[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-guide],[data-open-guide],[data-setup],[data-pick],[data-target],[data-courts],[data-start],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
     if (!el) return;
     var d = el.dataset;
 
@@ -665,18 +911,33 @@
       document.querySelectorAll('#seg button').forEach(function (b) { b.classList.toggle('on', b === el); });
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.toggle('on', p.id === d.panel); });
     }
-    else if (d.join !== undefined) {
-      var g = games[d.join];
-      g.players.push('Yoga'); g.joined = true;
-      renderGames();
-      toast('🎾 You joined! Game chat created 💬');
+    // ----- games & lobby -----
+    else if (d.gcreate) openCreate();
+    else if (d.gjoin) {
+      gameAction('join_game', { p_game: d.gjoin, p_code: null }, '🎾 You joined!').then(function (r) { if (r) openLobby(d.gjoin); });
     }
-    else if (d.leave !== undefined) {
-      var g2 = games[d.leave];
-      g2.players.pop(); g2.joined = false;
-      renderGames();
-      toast('You left the game');
+    else if (d.gleave) { closeSheet(); stopLobby(); gameAction('leave_game', { p_game: d.gleave }, 'OK, you\'re out of that game'); }
+    else if (d.gopen) openLobby(d.gopen);
+    else if (d.ginvite) { invitePick = []; renderInvite(); }
+    else if (d.ginvpick) {
+      var ii = invitePick.indexOf(d.ginvpick);
+      if (ii > -1) invitePick.splice(ii, 1); else invitePick.push(d.ginvpick);
+      renderInvite();
     }
+    else if (d.ginvsend) {
+      el.disabled = true;
+      gameAction('invite_players', { p_game: lobbyId, p_users: invitePick }, '📨 Invites sent!').then(function () { renderLobby(); });
+    }
+    else if (d.gshare) shareJoinLink();
+    else if (d.gremove) gameAction('remove_player', { p_game: lobbyId, p_user: d.gremove }, 'Removed');
+    else if (d.gcancel) {
+      if (tapTwice('cancelgame', 'Tap again to cancel this game')) {
+        var gid = lobbyId;
+        closeSheet(); stopLobby();
+        gameAction('cancel_game', { p_game: gid }, 'Game cancelled');
+      }
+    }
+    else if (d.gteams) { pickPartner = null; renderTeams(); }
     else if (d.openGuide) openSheet(guideListHtml());
     else if (d.guide) openSheet(guideHtml(d.guide));
     else if (d.setup) {
@@ -720,6 +981,14 @@
       if (tapTwice('end', 'Tap End again to stop. Scores will be lost.')) { session = null; renderSession(); }
     }
     else if (d.match) newMatch();
+    else if (d.mpart) { pickPartner = pickPartner === d.mpart ? null : d.mpart; renderTeams(); }
+    else if (d.mstart) {
+      var others = joinedOf(gameById(lobbyId)).filter(function (id) { return id !== me.id && id !== pickPartner; });
+      startMatch({ a: [me.id, pickPartner], b: others });
+    }
+    else if (d.mfree) startMatch(null);
+    else if (d.saveMatch) saveMatch(el);
+    else if (d.closeTracker) closeTracker();
     else if (d.point !== undefined) addPoint(+d.point);
     else if (d.soon) {
       e.preventDefault();
@@ -728,8 +997,13 @@
     }
   });
 
-  renderGames();
+  loadGames().then(joinFromLink);
   renderFormats();
+
+  // refresh the lists when you come back to the app
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') loadGames();
+  });
 </script>
 </body>
 </html>

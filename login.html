@@ -256,7 +256,10 @@
     if (p.status === 'rejected') return show('stepRejected');
     if (!p.username) return fillSetup(p);
     if (p.status === 'pending') return show('stepWaiting');
-    location.replace('feed.html');
+    // go back to where you wanted to be (e.g. a game join link), otherwise the Feed
+    var next = null;
+    try { next = localStorage.getItem('padpal_next'); localStorage.removeItem('padpal_next'); } catch (e) {}
+    location.replace(next && /^[a-z]+\.html(\?[\w=&-]*)?$/.test(next) ? next : 'feed.html');
   }
 
   // Switch between screens with links

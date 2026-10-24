@@ -45,6 +45,10 @@
       var p = me && me.profile;
       var ok = p && p.status === 'approved' && p.username && (!opts.admin || p.is_admin);
       if (!ok) {
+        // remember where you wanted to go (e.g. a game join link), so login can bring you back
+        if (!(p && opts.admin)) {
+          try { localStorage.setItem('padpal_next', location.pathname.split('/').pop() + location.search); } catch (e) {}
+        }
         location.replace(p && opts.admin ? 'profile.html' : 'login.html');
         return null;
       }
@@ -121,6 +125,48 @@
     return map;
   }
 
+  // ===== Tiers and members =====
+
+  var TIERS = [
+    { min: 0,   name: 'First Timer', icon: '🐣', color: '#6B7280' },
+    { min: 100, name: 'Newbie',      icon: '🌱', color: '#6E8B5B' },
+    { min: 200, name: 'Beginner',    icon: '🎾', color: '#4F7CAC' },
+    { min: 300, name: 'Amateur',     icon: '⚡', color: '#7E6AA8' },
+    { min: 400, name: 'Junior',      icon: '🥉', color: '#B87333' },
+    { min: 501, name: 'Pro',         icon: '🥈', color: '#A8B0BA' },
+    { min: 626, name: 'Pro-Star',    icon: '💎', color: '#D9822B' },
+    { min: 751, name: 'Star',        icon: '⭐', color: '#C9A24A' },
+    { min: 876, name: 'Legend',      icon: '👑', color: '#B3261E' }
+  ];
+  function tierOf(points) {
+    var t = TIERS[0];
+    TIERS.forEach(function (x) { if ((points || 0) >= x.min) t = x; });
+    return t;
+  }
+  // Points can have one decimal (+0.5 for showing up): 12 → "12", 12.5 → "12.5"
+  function fmt(n) {
+    var v = Math.round((Number(n) || 0) * 10) / 10;
+    return String(v);
+  }
+  // A change with its sign: +2.5 / −2 / ±0
+  function fmtChange(n) {
+    var v = Math.round((Number(n) || 0) * 10) / 10;
+    return v > 0 ? '+' + v : v < 0 ? '−' + Math.abs(v) : '±0';
+  }
+  function nextTier(points) {
+    return TIERS.filter(function (x) { return x.min > (points || 0); })[0] || null;
+  }
+
+  // All approved members (small friends group, so we load them all at once)
+  async function members() {
+    var r = await db.from('profiles')
+      .select('id, username, display_name, gender, avatar_url, points, last_played')
+      .eq('status', 'approved').not('username', 'is', null)
+      .order('points', { ascending: false });
+    if (r.error) throw r.error;
+    return r.data;
+  }
+
   // Turn technical errors into plain words
   function friendlyError(err) {
     var m = (err && (err.message || err.msg || err.code)) || String(err);
@@ -148,6 +194,8 @@
       return 'You already have 6 pinned photos. Remove one first.';
     if (/bucket not found|row-level security.*objects|new row violates/i.test(m))
       return "Photos aren't set up yet. Run 02_photos.sql in Supabase first.";
+    if (/could not find the function|save_game_match|create_game|join_game/i.test(m))
+      return "Games aren't set up yet. Run 04_matches.sql and then 05_lobby.sql in Supabase.";
     if (/fetch|network/i.test(m))
       return "Can't reach PadPal. Check your internet and try again.";
     return m;
@@ -157,6 +205,7 @@
     db: db, myProfile: myProfile, guard: guard, signOut: signOut,
     createInvite: createInvite, shareInvite: shareInvite, friendlyError: friendlyError,
     uploadPhoto: uploadPhoto, photoUrls: photoUrls,
-    remembered: remembered, setRemember: setRemember
+    remembered: remembered, setRemember: setRemember,
+    TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, fmt: fmt, fmtChange: fmtChange
   };
 })();

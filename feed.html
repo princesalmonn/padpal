@@ -39,6 +39,16 @@
   .actions .heart { display: inline-block; transition: transform .15s; }
   .actions .liked .heart { transform: scale(1.25); }
 
+  /* Match result */
+  .match { background: var(--card-2); border-radius: 12px; padding: 10px 12px; }
+  .team { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; gap: 8px; }
+  .team + .team { border-top: 1px solid var(--line); }
+  .team .players { font-size: 14px; min-width: 0; }
+  .team.win .players { font-weight: 700; }
+  .sets { display: flex; gap: 12px; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .team:not(.win) .sets { color: var(--text-2); font-weight: 500; }
+  .result { display: flex; justify-content: space-between; margin-top: 10px; font-size: 13px; gap: 8px; flex-wrap: wrap; }
+
   /* Photo post */
   .photo { position: relative; border-radius: 12px; overflow: hidden; background: var(--card-2); margin-top: 8px; }
   .photo img { width: 100%; display: block; max-height: 70vh; object-fit: cover; }
@@ -91,7 +101,7 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="logo"><span>Pad</span><b>Pal</b></div>
-    <button class="icon-btn" data-soon="Notifications" aria-label="Notifications">🔔</button>
+    <a class="icon-btn" id="bell" href="play.html" aria-label="Game invites" style="display:grid;place-items:center;text-decoration:none">🔔<i class="dot" id="bellDot" hidden></i></a>
   </div>
 </header>
 
@@ -144,6 +154,19 @@
   </form>
 </div>
 
+<div class="sheet" id="reportSheet">
+  <div class="grab"></div>
+  <h3>⚠️ Report wrong score</h3>
+  <p class="meta" style="margin:-4px 0 12px">The admin will check it. If the score was wrong, the admin can undo the match and everyone's points go back.</p>
+  <form id="reportForm">
+    <div class="field">
+      <label for="reportText">What was wrong?</label>
+      <textarea class="input" id="reportText" rows="3" maxlength="200" required placeholder="We won 6-4 7-5, not them 😅"></textarea>
+    </div>
+    <button class="btn btn-primary" style="width:100%">Send report</button>
+  </form>
+</div>
+
 <div class="sheet" id="commentsSheet">
   <div class="grab"></div>
   <h3>Comments</h3>
@@ -180,6 +203,8 @@
   var commentsFor = null;
   var compose = null;   // { kind, file }
   var viewing = null;
+  var matches = {};     // match id → match (with points changes)
+  var people = {};      // member id → profile
 
   // ===== Helpers =====
   function $(id) { return document.getElementById(id); }
@@ -235,7 +260,7 @@
 
   async function load() {
     var r = await db.from('posts')
-      .select('id, kind, body, photo_path, expires_at, created_at, author_id, author:profiles!posts_author_id_fkey(id, username, display_name, avatar_url), likes(user_id), comments(count)')
+      .select('id, kind, body, photo_path, match_id, expires_at, created_at, author_id, author:profiles!posts_author_id_fkey(id, username, display_name, avatar_url), likes(user_id), comments(count)')
       .order('created_at', { ascending: false })
       .limit(50);
     if (r.error) {
@@ -246,6 +271,21 @@
     }
     $('feedError').hidden = true;
     posts = r.data.filter(function (p) { return !p.expires_at || new Date(p.expires_at) > Date.now(); });
+
+    // Match results: load the matches, the points and the players' names
+    var matchIds = posts.filter(function (p) { return p.match_id; }).map(function (p) { return p.match_id; });
+    if (matchIds.length) {
+      var mr = await db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at').in('id', matchIds);
+      var cr = await db.from('point_changes').select('match_id, user_id, change, points_after').in('match_id', matchIds);
+      (mr.data || []).forEach(function (m) { matches[m.id] = m; m.changes = {}; });
+      (cr.data || []).forEach(function (c) { if (matches[c.match_id]) matches[c.match_id].changes[c.user_id] = c; });
+      try { (await PadPal.members()).forEach(function (m) { people[m.id] = m; }); } catch (err) {}
+    }
+
+    // red dot on the bell when someone invited you to a game
+    var inv = await db.from('game_players').select('game_id, games!inner(status)', { count: 'exact', head: true })
+      .eq('user_id', profile.id).eq('status', 'invited').eq('games.status', 'open');
+    $('bellDot').hidden = !(inv.count > 0);
 
     var pr = await db.from('pinned_photos').select('path').eq('user_id', profile.id);
     myPins = {};
@@ -305,6 +345,7 @@
       (mine || profile.is_admin ? '<button class="more" data-delete="' + p.id + '" aria-label="Delete post">🗑️</button>' : '') +
       '</div>';
     if (p.body) html += '<p class="post-text">' + esc(p.body) + '</p>';
+    if (p.kind === 'match') html += matchHtml(matches[p.match_id]);
     if (p.kind === 'photo') {
       var pinned = mine && myPins[p.photo_path];
       html += '<button class="photo" data-story="' + p.id + '" style="border:0;padding:0;width:100%;display:block">' +
@@ -316,8 +357,46 @@
       '<button class="' + (liked ? 'liked' : '') + '" data-like="' + p.id + '"><span class="heart">' + (liked ? '❤️' : '🤍') + '</span>' + p.likes.length + '</button>' +
       '<button data-comments="' + p.id + '">💬 ' + nComments + '</button>' +
       (mine && p.kind === 'photo' && !myPins[p.photo_path] ? '<button data-pin="' + p.id + '">📌 Pin to profile</button>' : '') +
+      (canReport(matches[p.match_id]) ? '<button data-report="' + p.match_id + '">⚠️ Wrong score?</button>' : '') +
       '</div></article>';
     return html;
+  }
+
+  // Players of a match can report a wrong score within 24 hours
+  function canReport(m) {
+    if (!m) return false;
+    var played = [m.a1, m.a2, m.b1, m.b2].indexOf(profile.id) > -1;
+    return played && Date.now() - new Date(m.played_at) < 24 * 3600000;
+  }
+  var reportFor = null;
+  function openReport(matchId) {
+    reportFor = matchId;
+    $('reportText').value = '';
+    closeSheets();
+    openSheet($('reportSheet'));
+  }
+
+  // Match result card: winners on top, sets, everyone's points change
+  function matchHtml(m) {
+    if (!m) return '<p class="meta">Match result unavailable.</p>';
+    function nm(id) { var p = people[id]; return esc(p ? (p.display_name || p.username) : '?'); }
+    var teams = { a: [m.a1, m.a2], b: [m.b1, m.b2] };
+    var win = m.winner, lose = win === 'a' ? 'b' : 'a';
+    var idx = win === 'a' ? [0, 1] : [1, 0];
+    function row(team, won) {
+      return '<div class="team' + (won ? ' win' : '') + '"><div class="players">' + (won ? '🏆 ' : '') +
+        nm(teams[team][0]) + ' & ' + nm(teams[team][1]) + '</div><div class="sets">' +
+        m.sets.map(function (s) { return '<span>' + s[won ? idx[0] : idx[1]] + '</span>'; }).join('') + '</div></div>';
+    }
+    function changes(team) {
+      return teams[team].map(function (id) {
+        var c = m.changes[id];
+        if (!c) return nm(id);
+        return nm(id) + ' <span class="' + (c.change >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(c.change) + '</span>';
+      }).join(' · ');
+    }
+    return '<div class="match">' + row(win, true) + row(lose, false) + '</div>' +
+      '<div class="result"><span>' + changes(win) + '</span><span>' + changes(lose) + '</span></div>';
   }
 
   function renderFeed() {
@@ -471,13 +550,21 @@
   }
   $('backdrop').addEventListener('click', closeSheets);
   $('fab').addEventListener('click', function () { openSheet($('newSheet')); });
+  $('reportForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var r = await db.rpc('report_match', { p_match: reportFor, p_reason: $('reportText').value });
+    if (r.error) return toast(PadPal.friendlyError(r.error));
+    closeSheets();
+    toast('📨 Report sent to the admin');
+  });
 
   // ===== One click handler for the feed =====
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-soon]');
+    var el = e.target.closest('[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-report],[data-soon]');
     if (!el) return;
     var d = el.dataset;
-    if (d.like) toggleLike(d.like);
+    if (d.report) openReport(d.report);
+    else if (d.like) toggleLike(d.like);
     else if (d.comments) openComments(d.comments);
     else if (d.story) openStory(d.story);
     else if (d.pin) pinPost(d.pin);
