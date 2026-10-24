@@ -82,7 +82,7 @@
   var draft = null;       // admin: pairs being made [[a,b], …]
   var pickFirst = null;   // admin: first player tapped when pairing
   var DIV = { men: '👨 Men', women: '👩 Women', mixed: '🔀 Mixed', open: '🌍 Open' };
-  var STAGE = { qf: 'Quarter-finals', sf: 'Semi-finals', final: '🏆 Final' };
+  var STAGE = { r16: 'Round of 16', qf: 'Quarter-finals', sf: 'Semi-finals', final: '🏆 Final' };
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -254,7 +254,7 @@
     var ko = matches.filter(function (m) { return m.stage !== 'group'; });
     if (!ko.length) return T.status === 'playing' ? '<p class="meta">🔜 The knockout appears when all group matches are played.</p>' : '';
     var html = '<h2>Knockout</h2><div class="card">';
-    ['qf', 'sf', 'final'].forEach(function (st) {
+    ['r16', 'qf', 'sf', 'final'].forEach(function (st) {
       var list = ko.filter(function (m) { return m.stage === st; });
       if (list.length) html += '<div class="stage-label">' + STAGE[st] + '</div>' + list.map(matchHtml).join('');
     });

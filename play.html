@@ -327,6 +327,17 @@
   }
 
   // ----- Create a game -----
+  function range(a, b) { var r = []; for (var i = a; i <= b; i++) r.push(i); return r; }
+
+  // "8 rounds on 3 courts · everyone plays about 6 games"
+  function sessionEstimate(g, n) {
+    var st = g.settings || {};
+    var courts = Math.max(1, Math.min(st.courts || 2, Math.floor(n / 4)));
+    var rounds = st.rounds || (g.kind === 'king' ? 6 : Math.min(7, Math.max(3, n - 1)));
+    var each = Math.round(rounds * courts * 4 / n);
+    return '🎾 ' + rounds + ' rounds on ' + courts + ' court' + (courts > 1 ? 's' : '') + ' · everyone plays about <b>' + each + '</b> game' + (each === 1 ? '' : 's') + '.';
+  }
+
   function openCreate(kind) {
     kind = kind || 'match';
     var d = new Date(Date.now() + 3600000);
@@ -340,17 +351,31 @@
           radio('match', '🎾 Match (4)') + radio('americano', '🔄 Americano') + radio('mexicano', '🌮 Mexicano') + radio('mixicano', '🔀 Mixicano') + radio('team_americano', '🤝 Team Americano') + radio('round_robin', '⭕ Round Robin') + radio('king', '👑 King of the Court') +
         '</div></div>' +
         '<div id="cSession"' + (kind === 'match' ? ' hidden' : '') + '>' +
-          '<div class="field"><label for="cSize">Max players</label><select class="input" id="cSize">' +
-            [5, 6, 7, 8, 9, 10, 11, 12, 16].map(function (n) { return '<option' + (n === 8 ? ' selected' : '') + '>' + n + '</option>'; }).join('') +
-          '</select></div>' +
-          '<div class="field"><span class="label">Points per game</span><div class="choices">' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">' +
+            '<div class="field"><label for="cSize">Max players</label><select class="input" id="cSize">' +
+              range(5, 64).map(function (n) { return '<option' + (n === 8 ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></div>' +
+            '<div class="field"><label for="cCourts">Courts</label><select class="input" id="cCourts">' +
+              range(1, 12).map(function (n) { return '<option' + (n === 2 ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></div>' +
+            '<div class="field"><label for="cRounds">Rounds</label><select class="input" id="cRounds"><option value="0">Auto</option>' +
+              range(3, 15).map(function (n) { return '<option>' + n + '</option>'; }).join('') + '</select></div>' +
+          '</div>' +
+          '<div class="field"><span class="label">Scoring</span><div class="choices">' +
+            '<label><input type="radio" name="cScoring" value="points" checked><span>🔢 Points</span></label>' +
+            '<label><input type="radio" name="cScoring" value="games"><span>🎾 Tennis (15-30-40)</span></label>' +
+          '</div></div>' +
+          '<div class="field" id="cPointsBox"><span class="label">Points per game</span><div class="choices">' +
             [16, 21, 24, 32].map(function (t) { return '<label><input type="radio" name="cTarget" value="' + t + '"' + (t === 21 ? ' checked' : '') + '><span>' + t + '</span></label>'; }).join('') +
           '</div></div>' +
-          '<div class="field"><span class="label">Courts</span><div class="choices">' +
-            [1, 2, 3, 4].map(function (c) { return '<label><input type="radio" name="cCourts" value="' + c + '"' + (c === 2 ? ' checked' : '') + '><span>' + c + '</span></label>'; }).join('') +
-          '</div></div>' +
+          '<div class="field" id="cGamesBox" hidden><span class="label">Each round is a mini-set: first to…</span><div class="choices">' +
+            '<label><input type="radio" name="cGames" value="4" checked><span>4 games</span></label>' +
+            '<label><input type="radio" name="cGames" value="6"><span>6 games</span></label>' +
+          '</div><small>Tiebreak when it\'s 4-4 / 6-6. Your total = games won.</small></div>' +
           '<p class="note">Only the <b>final ranking</b> of the session gives points (🥇 +6 · 🥈 +4 · 🥉 +3 …).</p>' +
         '</div>' +
+        '<div class="field" id="cDeuceBox"' + (kind === 'match' ? '' : ' hidden') + '><span class="label">At 40-40</span><div class="choices">' +
+          '<label><input type="radio" name="cDeuce" value="golden" checked><span>⚡ Golden point</span></label>' +
+          '<label><input type="radio" name="cDeuce" value="advantage"><span>🔁 Advantage</span></label>' +
+        '</div></div>' +
         '<div class="field"><label for="cWhen">When</label><input class="input" id="cWhen" type="datetime-local" value="' + local + '" required></div>' +
         '<div class="field"><label for="cPlace">Where (optional)</label><input class="input" id="cPlace" maxlength="80" placeholder="Court 3 · Padel Arena"></div>' +
         '<div class="field"><span class="label">Who can join?</span><div class="choices">' +
@@ -362,9 +387,16 @@
       '</form>' +
       '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-mfree="1">Just keep score now (not saved)</button>'
     );
-    document.querySelectorAll('input[name=cKind]').forEach(function (r) {
-      r.addEventListener('change', function () { $('cSession').hidden = this.value === 'match'; });
-    });
+    // show only the options that matter for what you picked
+    function refresh() {
+      var k = document.querySelector('input[name=cKind]:checked').value;
+      var games = document.querySelector('input[name=cScoring]:checked').value === 'games';
+      $('cSession').hidden = k === 'match';
+      $('cPointsBox').hidden = games;
+      $('cGamesBox').hidden = !games;
+      $('cDeuceBox').hidden = k !== 'match' && !games;
+    }
+    document.querySelectorAll('input[name=cKind], input[name=cScoring]').forEach(function (r) { r.addEventListener('change', refresh); });
     $('createForm').addEventListener('submit', async function (e) {
       e.preventDefault();
       $('cBtn').disabled = true;
@@ -375,10 +407,16 @@
         p_place: $('cPlace').value,
         p_open: document.querySelector('input[name=cOpen]:checked').value === 'yes',
         p_size: k === 'match' ? 4 : +$('cSize').value,
-        p_settings: k === 'match' ? null : {
-          target: +document.querySelector('input[name=cTarget]:checked').value,
-          courts: +document.querySelector('input[name=cCourts]:checked').value
-        }
+        p_settings: k === 'match'
+          ? { golden: document.querySelector('input[name=cDeuce]:checked').value === 'golden' }
+          : {
+              scoring: document.querySelector('input[name=cScoring]:checked').value,
+              target: +document.querySelector('input[name=cTarget]:checked').value,
+              games: +document.querySelector('input[name=cGames]:checked').value,
+              golden: document.querySelector('input[name=cDeuce]:checked').value === 'golden',
+              courts: +$('cCourts').value,
+              rounds: +$('cRounds').value
+            }
       });
       if (r.error) { $('cBtn').disabled = false; return toast(PadPal.friendlyError(r.error)); }
       await loadGames();
@@ -430,7 +468,7 @@
       } else {
         startBtn = joined.length >= 5
           ? '<button class="btn btn-primary" style="width:100%;margin-top:10px" data-gsession="1">🚀 Start session with ' + joined.length + ' players</button>' +
-            '<p class="note">After you start, nobody else can join.</p>'
+            '<p class="note">' + sessionEstimate(g, joined.length) + ' After you start, nobody else can join.</p>'
           : '<p class="note">A session needs at least 5 players. Waiting for ' + (5 - joined.length) + ' more… (updates by itself)</p>';
       }
       html += (g.session_state ? '' : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">' +
@@ -728,7 +766,8 @@
       var st = g.settings || {};
       var courts = Math.max(1, Math.min(st.courts || 2, Math.floor(players.length / 4)));
       var problem = null;
-      var totalRounds = Math.min(7, Math.max(3, players.length - 1));
+      var chosen = st.rounds || 0;   // 0 = automatic
+      var totalRounds = chosen || Math.min(7, Math.max(3, players.length - 1));
       var plan = null;
       if (g.kind === 'mixicano') {
         var nf = players.filter(function (id) { return (personById(id) || {}).gender === 'f'; }).length;
@@ -741,19 +780,22 @@
         else {
           var teams = makeTeams(players);
           courts = Math.max(1, Math.min(courts, Math.floor(teams.length / 2)));
-          plan = teamPlan(teams, courts, g.kind === 'round_robin' ? 99 : 7);
+          plan = teamPlan(teams, courts, chosen || (g.kind === 'round_robin' ? 99 : 7));
           totalRounds = plan.length;
         }
       }
       if (g.kind === 'king') {
         courts = Math.max(1, Math.min(courts, Math.floor(players.length / 4)));
-        totalRounds = 6;
+        totalRounds = chosen || 6;
       }
       if (problem) { toast('⚠️ ' + problem); return; }
       session = {
         format: g.kind,
         players: players,
         target: st.target || 21,
+        scoring: st.scoring || 'points',   // 'points' (16/21/24/32) or 'games' (tennis mini-set)
+        gamesTarget: st.games || 4,
+        golden: st.golden !== false,
         courts: courts,
         totalRounds: totalRounds,
         plan: plan,
@@ -821,7 +863,7 @@
 
     var html = '<div class="session-top"><h3>' + f.icon + ' ' + f.name + '</h3>' +
       '<button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-end="1">Cancel</button></div>' +
-      '<p class="meta" style="margin:0 0 10px">' + s.players.length + ' players · ' + s.courts + ' court' + (s.courts > 1 ? 's' : '') + ' · ' + s.target + ' pts per game</p>' +
+      '<p class="meta" style="margin:0 0 10px">' + s.players.length + ' players · ' + s.courts + ' court' + (s.courts > 1 ? 's' : '') + ' · ' + (s.scoring === 'games' ? 'first to ' + s.gamesTarget + ' games · ' + (s.golden ? '⚡ golden point' : '🔁 advantage') : s.target + ' pts per game') + '</p>' +
       '<div class="rounds">';
     for (var i = 0; i < s.totalRounds; i++) {
       var exists = i < s.rounds.length;
@@ -914,11 +956,13 @@
       ? [shortName(me) + ' & ' + shortName(personById(players.a[1])), shortName(personById(players.b[0])) + ' & ' + shortName(personById(players.b[1]))]
       : ['Team A', 'Team B'];
     var game = players ? lobbyId : null;
+    var g = game && gameById(game);
+    var matchGolden = !(g && g.settings && g.settings.golden === false);   // golden point unless the host chose advantage
     closeSheet();
     stopLobby();
     openTracker({
       mode: 'sets', title: players ? 'Match · you host' : 'Practice (not saved)', names: names, players: players, game: game,
-      golden: true, pts: [0, 0], games: [0, 0], sets: [], setsWon: [0, 0], tiebreak: false, over: false
+      golden: matchGolden, pts: [0, 0], games: [0, 0], sets: [], setsWon: [0, 0], tiebreak: false, over: false
     });
   }
 
@@ -958,13 +1002,14 @@
     var o = 1 - t;
     T.games[t]++;
     T.pts = [0, 0];
-    if (T.tiebreak || (T.games[t] >= 6 && T.games[t] - T.games[o] >= 2)) {
+    var SG = T.setGames || 6;   // games to win a set (6, or 4 for a short mini-set)
+    if (T.tiebreak || (T.games[t] >= SG && T.games[t] - T.games[o] >= 2)) {
       T.sets.push(T.games.slice());
       T.setsWon[t]++;
       T.games = [0, 0];
       T.tiebreak = false;
-      if (T.setsWon[t] === 2) T.over = true;
-    } else if (T.games[0] === 6 && T.games[1] === 6) {
+      if (T.setsWon[t] === (T.setsToWin || 2)) T.over = true;
+    } else if (T.games[0] === SG && T.games[1] === SG) {
       T.tiebreak = true;
     }
   }
@@ -1010,7 +1055,7 @@
         var flag = '';
         if (T.tiebreak) flag = 'TIEBREAK';
         else if (T.golden && p[0] === 3 && p[1] === 3) flag = 'GOLDEN POINT';
-        else if ((p[t] >= 3 && p[t] > p[o]) || (p[t] === 3 && p[o] < 3)) flag = T.games[t] >= 5 && T.games[t] > T.games[o] ? 'SET POINT' : 'GAME POINT';
+        else if ((p[t] >= 3 && p[t] > p[o]) || (p[t] === 3 && p[o] < 3)) flag = T.games[t] >= (T.setGames || 6) - 1 && T.games[t] > T.games[o] ? 'SET POINT' : 'GAME POINT';
         $('flag' + t).textContent = flag;
       }
     }
@@ -1136,15 +1181,26 @@
     else if (d.score !== undefined) {
       var ri = session.view, mi = +d.score;
       var m = session.rounds[ri].matches[mi];
-      openTracker({
-        mode: 'points', title: 'Round ' + (ri + 1) + ' · Court ' + (mi + 1),
-        names: [teamName(m.a).replace(/&amp;/g, '&'), teamName(m.b).replace(/&amp;/g, '&')], target: session.target, pts: [0, 0], over: false,
-        onSave: function () {
-          saveScore(ri, mi, T.pts[0], T.pts[1]);
-          closeTracker(); renderSession(); persistSession();
-          toast('✅ Score saved');
-        }
-      });
+      var title = 'Round ' + (ri + 1) + ' · Court ' + (mi + 1);
+      var names = [teamName(m.a).replace(/&amp;/g, '&'), teamName(m.b).replace(/&amp;/g, '&')];
+      var done = function (a, b) {
+        saveScore(ri, mi, a, b);
+        closeTracker(); renderSession(); persistSession();
+        toast('✅ Score saved');
+      };
+      if (session.scoring === 'games') {
+        // tennis scoring: one mini-set to 4 or 6 games, total = games won
+        openTracker({
+          mode: 'sets', title: title, names: names, setGames: session.gamesTarget, setsToWin: 1, golden: session.golden,
+          pts: [0, 0], games: [0, 0], sets: [], setsWon: [0, 0], tiebreak: false, over: false,
+          onSave: function () { done(T.sets[0][0], T.sets[0][1]); }
+        });
+      } else {
+        openTracker({
+          mode: 'points', title: title, names: names, target: session.target, pts: [0, 0], over: false,
+          onSave: function () { done(T.pts[0], T.pts[1]); }
+        });
+      }
     }
     else if (d.saveScore) T.onSave();
     else if (d.undoLast) undo();
@@ -1220,7 +1276,7 @@
       '<div class="field"><label for="tName">Name</label><input class="input" id="tName" required maxlength="60" placeholder="PadPal Season 0 Cup"></div>' +
       '<div class="field"><span class="label">Type</span><div class="choices">' + radio('tKind', 'friendly', '🎉 Season 0 (no points)', true) + radio('tKind', 'official', '🏆 Official (500+)') + '</div></div>' +
       '<div class="field"><span class="label">Division</span><div class="choices">' + radio('tDiv', 'open', '🌍 Open', true) + radio('tDiv', 'men', '👨 Men') + radio('tDiv', 'women', '👩 Women') + radio('tDiv', 'mixed', '🔀 Mixed') + '</div></div>' +
-      '<div class="field"><span class="label">Max teams</span><div class="choices">' + [4, 6, 8, 12, 16].map(function (n) { return radio('tMax', n, n, n === 8); }).join('') + '</div></div>' +
+      '<div class="field"><span class="label">Max teams</span><div class="choices">' + [4, 6, 8, 12, 16, 24, 32].map(function (n) { return radio('tMax', n, n, n === 8); }).join('') + '</div></div>' +
       '<div class="field"><span class="label">Match length</span><div class="choices">' + radio('tSets', 1, '1 set', true) + radio('tSets', 2, 'Best of 3') + '</div></div>' +
       '<div class="field"><label for="tWhen">When</label><input class="input" id="tWhen" type="datetime-local" value="' + local + '" required></div>' +
       '<div class="field"><label for="tPlace">Where (optional)</label><input class="input" id="tPlace" maxlength="80"></div>' +
