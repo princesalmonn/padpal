@@ -52,6 +52,50 @@
     catch (e) { return link; }
   }
 
+  // ===== Photos =====
+
+  // Shrink a phone photo (often 3–5 MB) to a small JPEG (~100–300 KB)
+  function shrinkPhoto(file, maxSide) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        var scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(function (blob) {
+          blob ? resolve(blob) : reject(new Error("Couldn't read that photo. Try another one."));
+        }, 'image/jpeg', 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("Couldn't read that photo. Try another one.")); };
+      img.src = url;
+    });
+  }
+
+  // Shrink + upload into your own folder. Returns where it was saved.
+  async function uploadPhoto(file, kind, maxSide) {
+    var me = await myProfile();
+    var blob = await shrinkPhoto(file, maxSide || 1080);
+    var path = me.session.user.id + '/' + kind + '-' + Date.now() + '.jpg';
+    var r = await db.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg' });
+    if (r.error) throw r.error;
+    return path;
+  }
+
+  // Photos are private, so we ask for short-lived links to show them
+  async function photoUrls(paths) {
+    paths = paths.filter(Boolean);
+    if (!paths.length) return {};
+    var r = await db.storage.from('photos').createSignedUrls(paths, 60 * 60);
+    if (r.error) throw r.error;
+    var map = {};
+    r.data.forEach(function (x) { if (x.signedUrl) map[x.path] = x.signedUrl; });
+    return map;
+  }
+
   // Turn technical errors into plain words
   function friendlyError(err) {
     var m = (err && (err.message || err.msg || err.code)) || String(err);
@@ -65,6 +109,10 @@
       return 'That username is already taken. Try another one.';
     if (/check constraint|23514/i.test(m))
       return 'Username: 3–20 characters, only lowercase letters, numbers, dots and underscores.';
+    if (/6 pinned photos/i.test(m))
+      return 'You already have 6 pinned photos. Remove one first.';
+    if (/bucket not found|row-level security.*objects|new row violates/i.test(m))
+      return "Photos aren't set up yet. Run 02_photos.sql in Supabase first.";
     if (/fetch|network/i.test(m))
       return "Can't reach PadPal. Check your internet and try again.";
     return m;
@@ -72,6 +120,7 @@
 
   window.PadPal = {
     db: db, myProfile: myProfile, guard: guard, signOut: signOut,
-    createInvite: createInvite, shareInvite: shareInvite, friendlyError: friendlyError
+    createInvite: createInvite, shareInvite: shareInvite, friendlyError: friendlyError,
+    uploadPhoto: uploadPhoto, photoUrls: photoUrls
   };
 })();

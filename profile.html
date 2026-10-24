@@ -59,6 +59,27 @@
   .pins { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .pins > * { aspect-ratio: 1; border-radius: 12px; display: grid; place-items: center; font-size: 34px; border: 0; }
   .pins .empty { background: var(--card); border: 2px dashed var(--line); color: var(--text-2); font-size: 26px; }
+  .pins .photo-btn { padding: 0; overflow: hidden; background: var(--card-2); }
+  .pins img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pins .loading { background: var(--card); color: var(--text-2); font-size: 13px; }
+
+  /* Tappable profile picture */
+  .avatar-btn { position: relative; border: 0; background: none; padding: 0; display: block; margin: 0 auto 10px; }
+  .avatar-btn .avatar { margin: 0; overflow: hidden; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+  .avatar-btn .cam {
+    position: absolute; right: 0; bottom: 2px; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--primary); border: 3px solid var(--bg); display: grid; place-items: center; font-size: 13px;
+  }
+  .avatar-btn.busy .avatar { opacity: .5; }
+
+  /* Photo viewer */
+  .viewer { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.92); display: none; flex-direction: column; align-items: center; justify-content: center; padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)); }
+  .viewer.open { display: flex; }
+  .viewer img { max-width: 100%; max-height: 72vh; border-radius: 14px; }
+  .v-close { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 14px; border: 0; background: none; color: #fff; font-size: 34px; }
+  .v-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; max-width: 440px; margin-top: 14px; }
+  textarea.input { resize: none; font-family: inherit; }
 
   /* Shot chart */
   .radar { display: block; width: 100%; max-width: 320px; margin: 0 auto; }
@@ -123,14 +144,18 @@
 <main class="wrap">
 
   <section class="hero">
-    <div class="avatar" id="heroAvatar"></div>
+    <button class="avatar-btn" id="avatarBtn" aria-label="Change profile picture">
+      <div class="avatar" id="heroAvatar"></div>
+      <span class="cam">📷</span>
+    </button>
+    <input type="file" id="avatarInput" accept="image/*" hidden>
     <h1 id="heroName"></h1>
     <div class="handle" id="heroHandle"></div>
     <p class="bio" id="heroBio"></p>
     <div class="chips" id="heroChips"></div>
   </section>
 
-  <div class="sample-note" style="margin-top:14px">🧪 Your name and details above are real. Points, stats and photos below are sample data for now.</div>
+  <div class="sample-note" style="margin-top:14px">🧪 Your profile and pinned photos are real. Points, stats and history are sample data for now.</div>
 
   <div class="card">
     <div class="rank">
@@ -150,7 +175,7 @@
   </div>
 
   <div class="row-btns">
-    <button class="btn btn-ghost" data-soon="Edit profile">✏️ Edit profile</button>
+    <button class="btn btn-ghost" data-edit>✏️ Edit profile</button>
     <button class="btn btn-primary" id="inviteBtn">➕ Invite friend</button>
   </div>
 
@@ -165,6 +190,7 @@
   <section class="panel on" id="overview">
     <h2>Pinned photos <small id="pinCount"></small></h2>
     <div class="pins" id="pins"></div>
+    <input type="file" id="pinInput" accept="image/*" hidden>
 
     <h2>Shot chart <small>from friends' ratings</small></h2>
     <div class="card">
@@ -227,21 +253,74 @@
   <h3>Settings</h3>
   <div style="display:grid;gap:10px">
     <a class="btn btn-accent" id="adminLink" href="admin.html" style="text-align:center;text-decoration:none" hidden>👑 Admin panel</a>
-    <button class="btn btn-ghost" data-soon="Edit profile">✏️ Edit profile</button>
+    <button class="btn btn-ghost" data-edit>✏️ Edit profile</button>
     <button class="btn btn-ghost" id="logoutBtn">🚪 Log out</button>
+  </div>
+</div>
+
+<!-- Edit profile -->
+<div class="sheet" id="editSheet">
+  <div class="grab"></div>
+  <h3>Edit profile</h3>
+  <form id="editForm">
+    <div class="field">
+      <label for="eName">Your name</label>
+      <input class="input" id="eName" required maxlength="40" autocomplete="name">
+    </div>
+    <div class="field">
+      <label for="eUsername">Username</label>
+      <input class="input" id="eUsername" required maxlength="20" autocapitalize="none" autocomplete="username">
+      <small>3–20 characters: lowercase letters, numbers, dots and underscores</small>
+    </div>
+    <div class="field">
+      <label for="eBio">Bio</label>
+      <textarea class="input" id="eBio" rows="2" maxlength="160" placeholder="Left side warrior 🦾"></textarea>
+      <small><span id="bioCount">0</span> / 160</small>
+    </div>
+    <div class="field">
+      <span class="label">Side</span>
+      <div class="choices">
+        <label><input type="radio" name="eSide" value="right"><span>➡️ Right (drive)</span></label>
+        <label><input type="radio" name="eSide" value="left"><span>⬅️ Left (revés)</span></label>
+        <label><input type="radio" name="eSide" value="both"><span>↔️ Both</span></label>
+      </div>
+    </div>
+    <div class="field">
+      <span class="label">Hand</span>
+      <div class="choices">
+        <label><input type="radio" name="eHand" value="right"><span>✋ Right</span></label>
+        <label><input type="radio" name="eHand" value="left"><span>🤚 Left</span></label>
+      </div>
+    </div>
+    <div class="field">
+      <label for="eShot">Favourite shot</label>
+      <select class="input" id="eShot">
+        <option value="">Choose…</option>
+        <option>Bandeja</option><option>Víbora</option><option>Smash</option><option>Por 3 / Por 4</option>
+        <option>Chiquita</option><option>Lob</option><option>Bajada</option><option>Rulo</option>
+        <option>Volley</option><option>Wall exit</option>
+      </select>
+    </div>
+    <p class="meta" style="margin:0 0 12px">Want to change your ladder (men / women)? Ask the admin.</p>
+    <div class="error-box" id="editError" role="alert" hidden></div>
+    <button class="btn btn-primary" id="editSave" style="width:100%;margin-top:10px">Save</button>
+  </form>
+</div>
+
+<!-- Photo viewer -->
+<div class="viewer" id="viewer">
+  <button class="v-close" id="vClose" aria-label="Close">×</button>
+  <img id="vImg" alt="Pinned photo">
+  <div class="v-foot">
+    <span class="meta" id="vDate"></span>
+    <button class="btn btn-ghost" id="vRemove">🗑️ Remove from profile</button>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-  // ===== Fake data (later this comes from the real database) =====
-  var pinned = [
-    { art: '🥉', bg: 'linear-gradient(160deg,#C9A24A,#24272D)' },
-    { art: '🌅', bg: 'linear-gradient(160deg,#D9822B,#B3261E 60%,#16181C)' },
-    { art: '🎾', bg: 'linear-gradient(160deg,#B3261E,#D9822B)' },
-    { art: '🍻', bg: 'linear-gradient(160deg,#4F7CAC,#24272D)' }
-  ];
+  // ===== Sample data (stats, history: becomes real in Stage 2) =====
 
   // Shot ratings (average of friends' 1–10 ratings)
   var shots = [
@@ -289,19 +368,6 @@
     t.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
-  }
-
-  // ===== Pinned photos (max 6) =====
-  function renderPins() {
-    var html = '';
-    for (var i = 0; i < 6; i++) {
-      var p = pinned[i];
-      html += p
-        ? '<div style="background:' + p.bg + '">' + p.art + '</div>'
-        : '<button class="empty" data-soon="Pinning photos">+</button>';
-    }
-    $('pins').innerHTML = html;
-    $('pinCount').textContent = pinned.length + ' / 6 used';
   }
 
   // ===== Shot chart (spider graph, drawn with SVG) =====
@@ -404,7 +470,6 @@
     }
   });
 
-  renderPins();
   renderRadar();
   renderStats('month');
   renderH2H('Andi');
@@ -416,10 +481,29 @@
   var LADDERS = { m: '👨 Men', f: '👩 Women' };
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
+  var db = PadPal.db;
+  var profile = null;
+  var pins = [];
+  var viewing = null;
+
   PadPal.me.then(function (me) {
     if (!me) return;
-    var p = me.profile;
-    $('heroAvatar').textContent = (p.display_name || p.username)[0].toUpperCase();
+    profile = me.profile;
+    renderHero();
+    loadPins();
+  });
+
+  // ===== Your header (name, picture, chips) =====
+  async function renderHero() {
+    var p = profile;
+    var initial = esc((p.display_name || p.username)[0].toUpperCase());
+    $('heroAvatar').innerHTML = initial;
+    if (p.avatar_url) {
+      try {
+        var urls = await PadPal.photoUrls([p.avatar_url]);
+        if (urls[p.avatar_url]) $('heroAvatar').innerHTML = '<img src="' + urls[p.avatar_url] + '" alt="">';
+      } catch (err) { /* keep the letter if the photo can't load */ }
+    }
     $('heroName').textContent = p.display_name || p.username;
     $('heroHandle').textContent = '@' + p.username;
     $('heroBio').textContent = p.bio || '';
@@ -431,12 +515,160 @@
     if (p.gender) chips.push(['Ladder', LADDERS[p.gender]]);
     $('heroChips').innerHTML = chips.map(function (c) { return '<span class="chip"><b>' + c[0] + '</b>' + esc(c[1]) + '</span>'; }).join('');
     $('adminLink').hidden = !p.is_admin;
+  }
+
+  // ===== Profile picture: kept forever, until you change it =====
+  $('avatarBtn').addEventListener('click', function () { $('avatarInput').click(); });
+  $('avatarInput').addEventListener('change', async function () {
+    var file = this.files[0];
+    this.value = '';
+    if (!file) return;
+    $('avatarBtn').classList.add('busy');
+    try {
+      var old = profile.avatar_url;
+      var path = await PadPal.uploadPhoto(file, 'avatar', 512);
+      var r = await db.from('profiles').update({ avatar_url: path }).eq('id', profile.id);
+      if (r.error) throw r.error;
+      profile.avatar_url = path;
+      if (old) db.storage.from('photos').remove([old]); // tidy up the old picture
+      await renderHero();
+      toast('📷 New profile picture saved');
+    } catch (err) {
+      toast(PadPal.friendlyError(err));
+    }
+    $('avatarBtn').classList.remove('busy');
+  });
+
+  // ===== Edit profile =====
+  function openSheet(el) { el.classList.add('open'); $('backdrop').classList.add('open'); }
+  function closeSheets() {
+    document.querySelectorAll('.sheet.open').forEach(function (s) { s.classList.remove('open'); });
+    $('backdrop').classList.remove('open');
+  }
+  function setRadio(name, value) {
+    document.querySelectorAll('input[name=' + name + ']').forEach(function (r) { r.checked = r.value === value; });
+  }
+  function getRadio(name) {
+    var el = document.querySelector('input[name=' + name + ']:checked');
+    return el ? el.value : null;
+  }
+  document.querySelectorAll('[data-edit]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      closeSheets();
+      $('eName').value = profile.display_name || '';
+      $('eUsername').value = profile.username || '';
+      $('eBio').value = profile.bio || '';
+      $('bioCount').textContent = $('eBio').value.length;
+      setRadio('eSide', profile.side);
+      setRadio('eHand', profile.hand);
+      $('eShot').value = profile.fav_shot || '';
+      $('editError').hidden = true;
+      openSheet($('editSheet'));
+    });
+  });
+  $('eUsername').addEventListener('input', function () { this.value = this.value.toLowerCase().replace(/[^a-z0-9._]/g, ''); });
+  $('eBio').addEventListener('input', function () { $('bioCount').textContent = this.value.length; });
+  $('editForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    $('editSave').disabled = true;
+    var changes = {
+      display_name: $('eName').value.trim(),
+      username: $('eUsername').value.trim(),
+      bio: $('eBio').value.trim() || null,
+      side: getRadio('eSide'),
+      hand: getRadio('eHand'),
+      fav_shot: $('eShot').value || null
+    };
+    var r = await db.from('profiles').update(changes).eq('id', profile.id);
+    $('editSave').disabled = false;
+    if (r.error) {
+      $('editError').textContent = PadPal.friendlyError(r.error);
+      $('editError').hidden = false;
+      return;
+    }
+    Object.assign(profile, changes);
+    renderHero();
+    closeSheets();
+    toast('✅ Profile saved');
+  });
+
+  // ===== Pinned photos: max 6, kept until you remove them =====
+  async function loadPins() {
+    $('pins').innerHTML = '<div class="loading">Loading…</div>';
+    var r = await db.from('pinned_photos').select('id, path, created_at')
+      .eq('user_id', profile.id).order('created_at', { ascending: false });
+    if (r.error) { $('pins').innerHTML = ''; $('pinCount').textContent = ''; return toast(PadPal.friendlyError(r.error)); }
+    pins = r.data;
+    var urls = {};
+    try { urls = await PadPal.photoUrls(pins.map(function (p) { return p.path; })); } catch (err) {}
+    pins.forEach(function (p) { p.url = urls[p.path]; });
+    renderPins();
+  }
+  function renderPins() {
+    var html = '';
+    for (var i = 0; i < 6; i++) {
+      var p = pins[i];
+      html += p
+        ? '<button class="photo-btn" data-pin="' + i + '" aria-label="Open photo">' + (p.url ? '<img src="' + p.url + '" alt="" loading="lazy">' : '📷') + '</button>'
+        : '<button class="empty" data-add-pin aria-label="Add a photo">+</button>';
+    }
+    $('pins').innerHTML = html;
+    $('pinCount').textContent = pins.length + ' / 6 used';
+  }
+  $('pinInput').addEventListener('change', async function () {
+    var file = this.files[0];
+    this.value = '';
+    if (!file) return;
+    toast('⏳ Uploading…');
+    try {
+      var path = await PadPal.uploadPhoto(file, 'pin');
+      var r = await db.from('pinned_photos').insert({ path: path });
+      if (r.error) { db.storage.from('photos').remove([path]); throw r.error; }
+      await loadPins();
+      toast('📌 Pinned to your profile');
+    } catch (err) {
+      toast(PadPal.friendlyError(err));
+    }
+  });
+
+  // Photo viewer
+  function openViewer(i) {
+    viewing = pins[i];
+    $('vImg').src = viewing.url || '';
+    $('vDate').textContent = 'Pinned ' + new Date(viewing.created_at).toLocaleDateString();
+    $('viewer').classList.add('open');
+  }
+  $('vClose').addEventListener('click', function () { $('viewer').classList.remove('open'); });
+  $('vRemove').addEventListener('click', async function () {
+    if (!tapTwice('remove', 'Tap again to remove this photo')) return;
+    var r = await db.from('pinned_photos').delete().eq('id', viewing.id);
+    if (r.error) return toast(PadPal.friendlyError(r.error));
+    db.storage.from('photos').remove([viewing.path]);
+    $('viewer').classList.remove('open');
+    await loadPins();
+    toast('🗑️ Photo removed');
+  });
+
+  // "Are you sure?" without pop-ups: tap once to warn, again within 3s to do it
+  var armed = {};
+  function tapTwice(key, warning) {
+    if (armed[key]) { armed[key] = false; return true; }
+    armed[key] = true;
+    toast(warning);
+    setTimeout(function () { armed[key] = false; }, 3000);
+    return false;
+  }
+
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-pin],[data-add-pin]');
+    if (!el) return;
+    if (el.dataset.pin !== undefined) openViewer(+el.dataset.pin);
+    else $('pinInput').click();
   });
 
   // Settings sheet
-  function closeSettings() { $('settingsSheet').classList.remove('open'); $('backdrop').classList.remove('open'); }
-  $('settingsBtn').addEventListener('click', function () { $('settingsSheet').classList.add('open'); $('backdrop').classList.add('open'); });
-  $('backdrop').addEventListener('click', closeSettings);
+  $('settingsBtn').addEventListener('click', function () { openSheet($('settingsSheet')); });
+  $('backdrop').addEventListener('click', closeSheets);
   $('logoutBtn').addEventListener('click', async function () {
     await PadPal.signOut();
     location.replace('login.html');
