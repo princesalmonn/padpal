@@ -159,7 +159,7 @@
     <div class="chips" id="heroChips"></div>
   </section>
 
-  <div class="sample-note" style="margin-top:14px">🧪 Everything here is real except the Stats tab, which is still a sample.</div>
+  <div style="height:14px"></div>
 
   <div class="card">
     <div class="rank">
@@ -348,20 +348,8 @@
   var shotMax = 7;        // 1–7 below Pro, 1–10 for Pro and up
   var shotStats = {};     // shot → { avg, count }
 
-  var periods = {
-    week:  { matches: 3,  wins: 2,  pts: '+18', hours: 4,  streak: 2,
-             partner: ['Sari', '2-0'], nemesis: ['Andi', '0-1'], most: ['Rio', 3],
-             facts: ['You played 3 games in 7 days. Your points are safe 🛡️', 'Your only loss this week was a golden point 😩'] },
-    month: { matches: 11, wins: 7,  pts: '+46', hours: 15, streak: 4,
-             partner: ['Sari', '5-1'], nemesis: ['Andi', '1-3'], most: ['Rio', 8],
-             facts: ['You played 15 hours of padel this month ⏱️', 'You win 80% of golden points 🧊', 'Your best day is Saturday (6-1) 📅', 'You and Sari are 5-1 together 🤝'] },
-    year:  { matches: 41, wins: 26, pts: '+212', hours: 58, streak: 6,
-             partner: ['Sari', '14-4'], nemesis: ['Andi', '4-9'], most: ['Rio', 27],
-             facts: ['Longest match: 2h 05m vs Andi & Budi 🥵', 'You came back from 0-4 down 3 times 💪', 'You ranked up twice this year 📈'] },
-    all:   { matches: 48, wins: 30, pts: '+362', hours: 67, streak: 6,
-             partner: ['Sari', '16-4'], nemesis: ['Andi', '5-11'], most: ['Rio', 31],
-             facts: ['First PadPal match: 12 Feb 2026 🎂', 'You have played with 9 different friends 👥', 'Most common score: 6-4 🎾'] }
-  };
+  var statsPeriod = 'month';
+  var myChanges = [];     // every points change of yours (matches, sessions, ratings, inactivity)
 
   // ===== Helpers =====
   function $(id) { return document.getElementById(id); }
@@ -446,26 +434,109 @@
       : '<p class="meta" style="margin:0">No badges yet. Play, win and get rated to earn them! 🏅</p>';
   }
 
-  // ===== Stats for the chosen time period =====
+  // ===== Stats for the chosen time period (all real) =====
+  var PERIOD_DAYS = { week: 7, month: 30, year: 365, all: 100000 };
+  var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
   function renderStats(key) {
-    var s = periods[key];
-    var rate = Math.round(s.wins / s.matches * 100);
+    statsPeriod = key;
+    var since = Date.now() - PERIOD_DAYS[key] * 86400000;
+    var ms = myMatches.filter(function (m) { return new Date(m.when).getTime() >= since; });   // newest first
+    var ch = myChanges.filter(function (c) { return new Date(c.created_at).getTime() >= since; });
+    var wins = ms.filter(function (m) { return m.won; }).length;
+    var losses = ms.length - wins;
+    var rate = ms.length ? Math.round(wins / ms.length * 100) : 0;
+    var gained = ch.reduce(function (a, c) { return a + Number(c.change); }, 0);
+    // longest run of wins, oldest → newest
+    var best = 0, run = 0;
+    ms.slice().reverse().forEach(function (m) { run = m.won ? run + 1 : 0; best = Math.max(best, run); });
+    var sessions = {};
+    ch.forEach(function (c) { if (c.reason === 'session' && c.game_id) sessions[c.game_id] = true; });
+    var nSessions = Object.keys(sessions).length;
+
     $('tiles').innerHTML =
-      '<div class="tile"><small>Matches</small><strong>' + s.matches + '</strong><div class="meta">' + s.wins + 'W · ' + (s.matches - s.wins) + 'L</div></div>' +
-      '<div class="tile"><small>Win rate</small><strong>' + rate + '%</strong><div class="wl"><i style="width:' + rate + '%"></i></div></div>' +
-      '<div class="tile"><small>Points</small><strong class="plus">' + s.pts + '</strong><div class="meta">gained</div></div>' +
-      '<div class="tile"><small>Best streak</small><strong>🔥 ' + s.streak + '</strong><div class="meta">' + s.hours + 'h on court</div></div>';
-    $('people').innerHTML =
-      person('🤝', 'Best partner', s.partner[0], s.partner[1], 'together') +
-      person('😈', 'Nemesis', s.nemesis[0], s.nemesis[1], 'vs them') +
-      person('👥', 'Most played with', s.most[0], s.most[1], 'games');
-    $('facts').innerHTML = s.facts.map(function (f) { return '<div class="fact">' + f + '</div>'; }).join('');
+      '<div class="tile"><small>Matches</small><strong>' + ms.length + '</strong><div class="meta">' + wins + 'W · ' + losses + 'L' + (nSessions ? ' · ' + nSessions + ' session' + (nSessions > 1 ? 's' : '') : '') + '</div></div>' +
+      '<div class="tile"><small>Win rate</small><strong>' + (ms.length ? rate + '%' : '–') + '</strong><div class="wl"' + (ms.length ? '' : ' style="background:var(--card-2)"') + '><i style="width:' + rate + '%"></i></div></div>' +
+      '<div class="tile"><small>Points</small><strong class="' + (gained >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(gained) + '</strong><div class="meta">all games, ratings & more</div></div>' +
+      '<div class="tile"><small>Best streak</small><strong>🔥 ' + best + '</strong><div class="meta">wins in a row</div></div>';
+
+    // partners and opponents
+    var stat = {};
+    function s(id) { return stat[id] = stat[id] || { with: 0, withWins: 0, vs: 0, vsWins: 0 }; }
+    ms.forEach(function (m) {
+      var p = s(m.partner); p.with++; if (m.won) p.withWins++;
+      m.opp.forEach(function (o) { var x = s(o); x.vs++; if (m.won) x.vsWins++; });
+    });
+    var ids = Object.keys(stat);
+    var partner = ids.filter(function (id) { return stat[id].with > 0; }).sort(function (a, b) {
+      var A = stat[a], B = stat[b];
+      var ra = A.withWins / A.with - (A.with < 2 ? 1 : 0), rb = B.withWins / B.with - (B.with < 2 ? 1 : 0);
+      return rb - ra || B.with - A.with;
+    })[0];
+    var nemesis = ids.filter(function (id) { return stat[id].vs > 0 && stat[id].vs - stat[id].vsWins > 0; }).sort(function (a, b) {
+      var A = stat[a], B = stat[b];
+      return ((B.vs - B.vsWins) - B.vsWins) - ((A.vs - A.vsWins) - A.vsWins) || B.vs - A.vs;
+    })[0];
+    var most = ids.sort(function (a, b) { return (stat[b].with + stat[b].vs) - (stat[a].with + stat[a].vs); })[0];
+    $('people').innerHTML = ms.length
+      ? (partner ? person('🤝', 'Best partner', partner, stat[partner].withWins + '-' + (stat[partner].with - stat[partner].withWins), 'together') : '') +
+        (nemesis ? person('😈', 'Nemesis', nemesis, stat[nemesis].vsWins + '-' + (stat[nemesis].vs - stat[nemesis].vsWins), 'vs them') : '') +
+        (most ? person('👥', 'Most played with', most, stat[most].with + stat[most].vs, 'games') : '')
+      : '<p class="meta" style="margin:0">No matches in this period yet. 🎾</p>';
+
+    $('facts').innerHTML = funFacts(ms, ch, nSessions, ids.length, key).map(function (f) { return '<div class="fact">' + f + '</div>'; }).join('') ||
+      '<p class="meta" style="margin:0">Play some matches to unlock fun facts! 🤓</p>';
   }
-  function person(icon, label, name, stat, sub) {
-    return '<div class="person"><div class="avatar">' + name[0] + '</div>' +
-      '<div><div class="label">' + icon + ' ' + label + '</div><div class="name">' + name + '</div></div>' +
+
+  function funFacts(ms, ch, nSessions, nFriends, key) {
+    var facts = [];
+    if (nSessions) facts.push('🔄 You played <b>' + nSessions + '</b> Americano/Mexicano session' + (nSessions > 1 ? 's' : ''));
+    // best day of the week
+    var days = {};
+    ms.forEach(function (m) { var d = new Date(m.when).getDay(); days[d] = days[d] || [0, 0]; days[d][m.won ? 0 : 1]++; });
+    var bestDay = Object.keys(days).filter(function (d) { return days[d][0] + days[d][1] >= 2; })
+      .sort(function (a, b) { return (days[b][0] - days[b][1]) - (days[a][0] - days[a][1]); })[0];
+    if (bestDay !== undefined) facts.push('📅 Your best day is <b>' + DAY_NAMES[bestDay] + '</b> (' + days[bestDay][0] + '-' + days[bestDay][1] + ')');
+    // biggest win
+    var big = null;
+    ms.forEach(function (m) {
+      if (!m.won) return;
+      var diff = m.sets.reduce(function (a, st) { return a + st[0] - st[1]; }, 0);
+      if (!big || diff > big.diff) big = { diff: diff, m: m };
+    });
+    if (big && big.diff >= 6) facts.push('💥 Biggest win: <b>' + big.m.score + '</b> with ' + pname(big.m.partner));
+    // comebacks and tiebreaks
+    var comebacks = ms.filter(function (m) { return m.won && m.sets.length > 1 && m.sets[0][0] < m.sets[0][1]; }).length;
+    if (comebacks) facts.push('💪 You came back after losing the first set <b>' + comebacks + '×</b>');
+    var tbWon = 0, tbAll = 0;
+    ms.forEach(function (m) { m.sets.forEach(function (st) { if (Math.max(st[0], st[1]) === 7 && Math.min(st[0], st[1]) === 6) { tbAll++; if (st[0] > st[1]) tbWon++; } }); });
+    if (tbAll) facts.push('🧊 Tiebreak sets: you won <b>' + tbWon + ' of ' + tbAll + '</b>');
+    // most common set score you won
+    var scores = {};
+    ms.forEach(function (m) { m.sets.forEach(function (st) { if (st[0] > st[1]) { var k = st[0] + '-' + st[1]; scores[k] = (scores[k] || 0) + 1; } }); });
+    var top = Object.keys(scores).sort(function (a, b) { return scores[b] - scores[a]; })[0];
+    if (top && scores[top] >= 2) facts.push('🎾 Your favourite winning set score: <b>' + top + '</b> (' + scores[top] + '×)');
+    // points from ratings and from not playing
+    var skill = ch.filter(function (c) { return c.reason === 'skill'; }).reduce(function (a, c) { return a + Number(c.change); }, 0);
+    if (skill) facts.push('🎯 Friends\' shot ratings gave you <b>' + PadPal.fmtChange(skill) + '</b> points');
+    var idle = ch.filter(function (c) { return c.reason === 'inactive' || c.reason === 'skill-shrink'; }).reduce(function (a, c) { return a + Number(c.change); }, 0);
+    if (idle) facts.push('🧊 Not playing cost you <b>' + PadPal.fmt(Math.abs(idle)) + '</b> point' + (Math.abs(idle) === 1 ? '' : 's') + '. Keep playing!');
+    if (nFriends >= 2) facts.push('👥 You played with <b>' + nFriends + '</b> different friends');
+    if (key === 'all' && myMatches.length) {
+      var first = myMatches[myMatches.length - 1];
+      facts.push('🎂 Your first PadPal match: <b>' + new Date(first.when).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) + '</b>');
+    }
+    return facts;
+  }
+
+  function person(icon, label, id, stat, sub) {
+    var p = people[id];
+    var url = p && p.avatar_url && urls[p.avatar_url];
+    return '<div class="person"><div class="avatar">' + (url ? '<img src="' + url + '" alt="">' : pname(id)[0]) + '</div>' +
+      '<div><div class="label">' + icon + ' ' + label + '</div><div class="name">' + pname(id) + '</div></div>' +
       '<div class="stat">' + stat + '<small>' + sub + '</small></div></div>';
   }
+  var urls = {};   // friends' profile pictures for the Stats tab
 
   // ===== History (real) =====
   var myMatches = [];   // newest first, each with .won, .partner, .opp[], .change
@@ -481,9 +552,10 @@
     var r = await db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at')
       .or('a1.eq.' + id + ',a2.eq.' + id + ',b1.eq.' + id + ',b2.eq.' + id)
       .order('played_at', { ascending: false }).limit(200);
-    var cr = await db.from('point_changes').select('match_id, change').eq('user_id', id);
+    var cr = await db.from('point_changes').select('match_id, game_id, change, reason, created_at').eq('user_id', id);
+    myChanges = cr.data || [];
     var changeOf = {};
-    (cr.data || []).forEach(function (c) { if (c.match_id) changeOf[c.match_id] = c.change; });
+    myChanges.forEach(function (c) { if (c.match_id) changeOf[c.match_id] = c.change; });
     myMatches = (r.data || []).map(function (m) {
       var team = (m.a1 === id || m.a2 === id) ? 'a' : 'b';
       var mine = team === 'a' ? [m.a1, m.a2] : [m.b1, m.b2];
@@ -492,12 +564,15 @@
         partner: mine[0] === id ? mine[1] : mine[0],
         opp: team === 'a' ? [m.b1, m.b2] : [m.a1, m.a2],
         score: m.sets.map(function (s) { return team === 'a' ? s[0] + '-' + s[1] : s[1] + '-' + s[0]; }).join(' '),
+        sets: m.sets.map(function (s) { return team === 'a' ? [s[0], s[1]] : [s[1], s[0]]; }),   // your games first
         change: changeOf[m.id],
         when: m.played_at
       };
     });
+    try { urls = await PadPal.photoUrls(list.map(function (m) { return m.avatar_url; })); } catch (err) {}
     renderRank(list);
     renderMatches();
+    renderStats(statsPeriod);
     var foes = {};
     myMatches.forEach(function (m) { m.opp.forEach(function (o) { foes[o] = true; }); });
     var first = Object.keys(foes)[0];
@@ -602,7 +677,6 @@
   });
 
   renderRadar();
-  renderStats('month');
 
   // ===== Real data from your account (the rest above is still sample data) =====
   var SIDES = { right: '➡️ Right (drive)', left: '⬅️ Left (revés)', both: '↔️ Both' };
