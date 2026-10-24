@@ -160,7 +160,7 @@
         var top = s ? s.players.slice().sort(function (a, b) { return s.points[b] - s.points[a]; }).slice(0, 3)
           .map(function (id, i) { return ['🥇', '🥈', '🥉'][i] + ' ' + esc(nameOf(id)) + ' (' + s.points[id] + ')'; }).join(' · ') : '';
         return '<div class="card">' +
-          '<div class="name">' + (g && g.kind === 'mexicano' ? '🌮 Mexicano' : '🔄 Americano') + ' session</div>' +
+          '<div class="name">' + ({ mexicano: '🌮 Mexicano', mixicano: '🔀 Mixicano', team_americano: '🤝 Team Americano', round_robin: '⭕ Round Robin', king: '👑 King of the Court' }[g && g.kind] || '🔄 Americano') + ' session</div>' +
           '<div class="meta">' + top + ' · ' + ago(rep.created_at) + '</div>' +
           '<p style="margin:10px 0 0;font-size:14px">💬 <b>' + esc(nameOf(rep.user_id)) + ':</b> ' + esc(rep.reason) + '</p>' +
           '<div class="actions"><button class="btn btn-ghost" data-dismiss="' + rep.id + '">Score is OK</button>' +

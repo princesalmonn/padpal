@@ -502,7 +502,8 @@
     var s = g.session_state;
     function nm(id) { var p = people[id]; return esc(p ? (p.display_name || p.username) : '?'); }
     var order = s.players.slice().sort(function (a, b) { return s.points[b] - s.points[a]; });
-    var title = (g.kind === 'mexicano' ? '🌮 Mexicano' : '🔄 Americano') + ' · ' + s.players.length + ' players · ' + s.rounds.length + ' rounds';
+    var KINDS = { americano: '🔄 Americano', mexicano: '🌮 Mexicano', mixicano: '🔀 Mixicano', team_americano: '🤝 Team Americano', round_robin: '⭕ Round Robin', king: '👑 King of the Court' };
+    var title = (KINDS[g.kind] || '🔄 Session') + ' · ' + s.players.length + ' players · ' + s.rounds.length + ' rounds';
     return '<p class="post-text" style="font-weight:600">' + title + '</p><div class="match">' +
       order.map(function (id, i) {
         var c = g.changes[id];

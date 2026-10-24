@@ -249,7 +249,8 @@
     if (c.kind === 'dm') return c.others[0] ? nameOf(c.others[0]) : 'Just you';
     if (c.kind === 'group') return c.name || 'Group';
     var g = c.game;
-    return g ? (g.kind === 'match' ? '🎾 Match' : g.kind === 'americano' ? '🔄 Americano' : '🌮 Mexicano') + ' · ' + gameWhen(g) : 'Game chat';
+    var KINDS = { match: '🎾 Match', americano: '🔄 Americano', mexicano: '🌮 Mexicano', mixicano: '🔀 Mixicano', team_americano: '🤝 Team Americano', round_robin: '⭕ Round Robin', king: '👑 King' };
+    return g ? (KINDS[g.kind] || '🎾 Game') + ' · ' + gameWhen(g) : 'Game chat';
   }
   function chatAvatar(c) {
     if (c.kind === 'dm') return '<div class="avatar">' + (c.others[0] ? avatarInner(c.others[0]) : '?') + '</div>';

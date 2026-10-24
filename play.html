@@ -285,9 +285,8 @@
   }
 
   function kindLabel(g) {
-    return g.kind === 'americano' ? '🔄 Americano · up to ' + g.size
-      : g.kind === 'mexicano' ? '🌮 Mexicano · up to ' + g.size
-      : '🎾 Match · 2 vs 2';
+    var names = { americano: '🔄 Americano', mexicano: '🌮 Mexicano', mixicano: '🔀 Mixicano', team_americano: '🤝 Team Americano', round_robin: '⭕ Round Robin', king: '👑 King of the Court' };
+    return names[g.kind] ? names[g.kind] + ' · up to ' + g.size : '🎾 Match · 2 vs 2';
   }
 
   function gameCard(g, buttons) {
@@ -338,7 +337,7 @@
       '<h3>🎾 New game</h3>' +
       '<form id="createForm">' +
         '<div class="field"><span class="label">What do you want to play?</span><div class="choices">' +
-          radio('match', '🎾 Match (4)') + radio('americano', '🔄 Americano (5+)') + radio('mexicano', '🌮 Mexicano (5+)') +
+          radio('match', '🎾 Match (4)') + radio('americano', '🔄 Americano') + radio('mexicano', '🌮 Mexicano') + radio('mixicano', '🔀 Mixicano') + radio('team_americano', '🤝 Team Americano') + radio('round_robin', '⭕ Round Robin') + radio('king', '👑 King of the Court') +
         '</div></div>' +
         '<div id="cSession"' + (kind === 'match' ? ' hidden' : '') + '>' +
           '<div class="field"><label for="cSize">Max players</label><select class="input" id="cSize">' +
@@ -466,7 +465,7 @@
   async function shareJoinLink() {
     var g = gameById(lobbyId);
     var link = new URL('play.html?join=' + g.join_code, location.href).href;
-    var what = g.kind === 'match' ? 'padel match' : (g.kind === 'americano' ? 'Americano' : 'Mexicano');
+    var what = g.kind === 'match' ? 'padel match' : kindLabel(g).split(' · ')[0];
     var text = 'Join my ' + what + ' on PadPal 🎾 ' + whenText(g.scheduled_at) + (g.place ? ' · ' + g.place : '');
     if (navigator.share) {
       try { await navigator.share({ title: 'PadPal match', text: text, url: link }); return; }
@@ -509,24 +508,24 @@
       how: ['Round 1 is random.', 'After each round, players are re-ranked by total points.', 'Then #1 + #4 play #2 + #3 on court 1, #5 + #8 vs #6 + #7 on court 2, and so on.', 'Most points at the end wins.'],
       ex: 'After round 2 you are #1 → you partner #4 against #2 & #3. Close games every time!',
       tip: 'Best when levels are very different. Games get more even each round.' },
-    { id: 'mixicano', icon: '🔀', name: 'Mixicano', short: 'Mexicano, always mixed',
+    { id: 'mixicano', icon: '🔀', name: 'Mixicano', short: 'Mexicano, always mixed', ready: true,
       how: ['Same as Mexicano, but every team is 1 man + 1 woman.', 'Men and women are ranked separately.', 'Top man partners with the lowest-ranked woman in his group, and so on.'],
-      ex: 'Needs equal numbers of men and women (e.g. 4 + 4).', tip: 'Uses the 0.75 Strength Factor when balancing.' },
-    { id: 'team', icon: '🤝', name: 'Team Americano', short: 'Fixed partner',
-      how: ['You keep the SAME partner all session.', 'Each round you face a different team.', 'Your team collects points together.'],
-      ex: '4 teams → every team plays every other team once (3 rounds).', tip: 'Perfect when you come with your usual partner.' },
-    { id: 'robin', icon: '⭕', name: 'Round Robin', short: 'Everyone vs everyone',
-      how: ['Fixed teams.', 'Every team plays every other team once.', 'Win = 3 pts, draw = 1 pt. Most points wins.'],
-      ex: '5 teams = 10 matches.', tip: 'Fair but takes longer.' },
-    { id: 'king', icon: '👑', name: 'King of the Court', short: 'Winners move up',
-      how: ['Courts are ranked: Court 1 is the "King" court.', 'Play a short timed game (e.g. 10 min).', 'Winners move UP one court, losers move DOWN.', 'Whoever wins on Court 1 at the end is King/Queen.'],
-      ex: '3 courts, 12 players, 6 rounds of 10 minutes.', tip: 'Very fun and very competitive 😈' },
+      ex: 'Needs at least 2 men and 2 women (best: equal numbers, e.g. 4 + 4).', tip: 'Every team is 1 man + 1 woman. The best man plays with the lower-ranked woman of his court, so games stay close.' },
+    { id: 'team_americano', icon: '🤝', name: 'Team Americano', short: 'Fixed partner', ready: true,
+      how: ['PadPal makes fixed pairs: the strongest player with the weakest.', 'You keep the SAME partner all session.', 'Each round you face a different team (up to 7 rounds).', 'Every point your team wins counts for both of you.'],
+      ex: '8 players → 4 teams → 3 rounds.', tip: 'Needs an even number of players.' },
+    { id: 'round_robin', icon: '⭕', name: 'Round Robin', short: 'Everyone vs everyone', ready: true,
+      how: ['PadPal makes fixed pairs: the strongest player with the weakest.', 'Every team plays EVERY other team once (no round limit).', 'Every point your team wins counts. Most points wins.'],
+      ex: '10 players → 5 teams → 10 games.', tip: 'The fairest format, but it takes longer. Needs an even number of players.' },
+    { id: 'king', icon: '👑', name: 'King of the Court', short: 'Winners move up', ready: true,
+      how: ['Courts are ranked: Court 1 is the "King" court.', 'Each game is played to the points target.', 'Winners move UP one court, losers move DOWN (on the king court winners stay).', 'You get a new partner every round. Extra players rest on the bottom court.', 'Most points after 6 rounds wins.'],
+      ex: '2 courts, 8 players, 6 rounds.', tip: 'Very fun and very competitive 😈 Works best with 4, 8 or 12 players.' },
     { id: 'knockout', icon: '⚔️', name: 'Knockout', short: 'Lose and you\'re out',
       how: ['Teams are placed in a bracket.', 'Lose once → you\'re out.', 'Winners continue until the final.'],
-      ex: '8 teams → quarter-finals, semi-finals, final.', tip: 'Add a "consolation" bracket so losers keep playing.' },
+      ex: '8 teams → quarter-finals, semi-finals, final.', tip: 'Want a knockout? Ask the admin to create a tournament in 🏆 Tourneys.' },
     { id: 'groups', icon: '🌍', name: 'Groups + Knockout', short: 'Like the World Cup',
       how: ['Teams play round robin in small groups.', 'Top 2 of each group go to the knockout bracket.', 'Knockout until the final.'],
-      ex: '12 teams → 4 groups of 3 → quarter-finals.', tip: 'Format used for official PadPal tournaments.' },
+      ex: '12 teams → 4 groups of 3 → quarter-finals.', tip: 'This is how PadPal tournaments work: see 🏆 Tourneys.' },
     { id: 'box', icon: '📦', name: 'Box League', short: 'Over several weeks',
       how: ['Players are put in "boxes" of 4–5 by level.', 'Over 2–4 weeks, play everyone in your box (schedule it yourselves).', 'Top of the box moves up, bottom moves down next season.'],
       ex: 'Box A (best) … Box D. Season = 1 month.', tip: 'Keeps everyone playing weekly, so no inactivity loss!' },
@@ -581,6 +580,110 @@
 
   // Make the next round: who plays, who rests, who partners whom
   function makeRound() {
+    var f = session.format;
+    if (f === 'team_americano' || f === 'round_robin') return session.plan[session.rounds.length];
+    if (f === 'king') return kingRound();
+    if (f === 'mixicano') return mixicanoRound();
+    return americanoRound();
+  }
+
+  // 🔀 Mixicano: always 1 man + 1 woman. Top man plays with the lower woman of his court.
+  function mixicanoRound() {
+    var s = session;
+    function gender(id) { var p = personById(id); return p && p.gender === 'f' ? 'f' : 'm'; }
+    function pick(list) {   // fewest games first (fair resting), then best ranked first
+      return list.sort(function (a, b) { return (s.played[a] - s.played[b]) || (s.points[b] - s.points[a]) || (Math.random() - 0.5); });
+    }
+    var men = pick(s.players.filter(function (id) { return gender(id) === 'm'; }));
+    var women = pick(s.players.filter(function (id) { return gender(id) === 'f'; }));
+    var n = s.courts * 2;
+    var pm = men.slice(0, n), pw = women.slice(0, n);
+    if (s.rounds.length === 0) { pm.sort(function () { return Math.random() - 0.5; }); pw.sort(function () { return Math.random() - 0.5; }); }
+    else { pm.sort(function (a, b) { return s.points[b] - s.points[a]; }); pw.sort(function (a, b) { return s.points[b] - s.points[a]; }); }
+    var matches = [];
+    for (var c = 0; c < s.courts; c++) {
+      var M = pm.slice(c * 2, c * 2 + 2), W = pw.slice(c * 2, c * 2 + 2);
+      matches.push({ a: [M[0], W[1]], b: [M[1], W[0]], score: null });
+    }
+    return { matches: matches, resting: men.slice(n).concat(women.slice(n)) };
+  }
+
+  // 👑 King of the Court: winners move up a court, losers move down. Court 1 is the king court.
+  function kingRound() {
+    var s = session;
+    var prev = s.rounds[s.rounds.length - 1];
+    var k = s.courts;
+    if (!prev) {
+      var order = s.players.slice().sort(function () { return Math.random() - 0.5; });
+      var ms = [];
+      for (var c = 0; c < k; c++) { var q = order.slice(c * 4, c * 4 + 4); ms.push({ a: [q[0], q[1]], b: [q[2], q[3]], score: null }); }
+      return { matches: ms, resting: order.slice(k * 4) };
+    }
+    var courts = [];
+    for (var i = 0; i < k; i++) courts.push([]);
+    prev.matches.forEach(function (m, i) {
+      var aWon = m.score[0] >= m.score[1];
+      var W = aWon ? m.a : m.b, L = aWon ? m.b : m.a;
+      courts[Math.max(0, i - 1)] = courts[Math.max(0, i - 1)].concat(W);   // winners up (king stays)
+      if (i < k - 1) courts[i + 1] = courts[i + 1].concat(L);               // losers down
+      else courts[i] = courts[i].concat(['__bottom__', L[0], L[1]]);        // bottom court losers: maybe rest
+    });
+    // resting players come back on the bottom court; the bottom court's losers rest instead
+    var bottom = courts[k - 1];
+    var cut = bottom.indexOf('__bottom__');
+    var bottomLosers = bottom.slice(cut + 1);
+    courts[k - 1] = bottom.slice(0, cut);
+    var pool = prev.resting.concat(bottomLosers);
+    while (courts[k - 1].length < 4) courts[k - 1].push(pool.shift());
+    var matches = courts.map(function (q) {
+      // one player who came up with one who came down, so partners change every round
+      return { a: [q[0], q[3]], b: [q[1], q[2]], score: null };
+    });
+    return { matches: matches, resting: pool };
+  }
+
+  // 🤝 Team Americano / ⭕ Round Robin: fixed teams, everyone plays everyone (circle method)
+  function teamPlan(teams, courts, maxRounds) {
+    var list = teams.map(function (t, i) { return i; });
+    if (list.length % 2) list.push(null);                       // odd → one team rests
+    var pairings = [];
+    for (var r = 0; r < list.length - 1; r++) {
+      for (var i = 0; i < list.length / 2; i++) {
+        var a = list[i], b = list[list.length - 1 - i];
+        if (a !== null && b !== null) pairings.push([a, b]);
+      }
+      list.splice(1, 0, list.pop());                             // rotate, first team stays
+    }
+    // fill rounds: max `courts` games, a team plays once per round
+    var rounds = [];
+    while (pairings.length && rounds.length < maxRounds) {
+      var busy = {}, games = [];
+      for (var j = 0; j < pairings.length && games.length < courts; j++) {
+        var p = pairings[j];
+        if (!busy[p[0]] && !busy[p[1]]) { games.push(p); busy[p[0]] = busy[p[1]] = true; pairings.splice(j, 1); j--; }
+      }
+      var playing = {};
+      games.forEach(function (gm) { teams[gm[0]].concat(teams[gm[1]]).forEach(function (id) { playing[id] = true; }); });
+      rounds.push({
+        matches: games.map(function (gm) { return { a: teams[gm[0]].slice(), b: teams[gm[1]].slice(), score: null }; }),
+        resting: [].concat.apply([], teams).filter(function (id) { return !playing[id]; })
+      });
+    }
+    return rounds;
+  }
+
+  // Pairs for team formats: strongest with weakest (or 1 man + 1 woman when possible)
+  function makeTeams(players) {
+    var sorted = players.slice().sort(function (a, b) {
+      return Number((personById(b) || {}).points || 0) - Number((personById(a) || {}).points || 0);
+    });
+    var teams = [];
+    while (sorted.length >= 2) teams.push([sorted.shift(), sorted.pop()]);
+    return teams;
+  }
+
+  // ⚡ Americano (and Mexicano): Mexicano pairs by ranking from round 2
+  function americanoRound() {
     var s = session;
     var courtsNeeded = s.courts * 4;
     var order;
@@ -624,12 +727,36 @@
       var players = joinedOf(g);
       var st = g.settings || {};
       var courts = Math.max(1, Math.min(st.courts || 2, Math.floor(players.length / 4)));
+      var problem = null;
+      var totalRounds = Math.min(7, Math.max(3, players.length - 1));
+      var plan = null;
+      if (g.kind === 'mixicano') {
+        var nf = players.filter(function (id) { return (personById(id) || {}).gender === 'f'; }).length;
+        var nm = players.length - nf;
+        if (nf < 2 || nm < 2) problem = 'Mixicano needs at least 2 men and 2 women';
+        courts = Math.max(1, Math.min(courts, Math.floor(Math.min(nf, nm) / 2)));
+      }
+      if (g.kind === 'team_americano' || g.kind === 'round_robin') {
+        if (players.length % 2) problem = 'This format has fixed pairs: you need an even number of players';
+        else {
+          var teams = makeTeams(players);
+          courts = Math.max(1, Math.min(courts, Math.floor(teams.length / 2)));
+          plan = teamPlan(teams, courts, g.kind === 'round_robin' ? 99 : 7);
+          totalRounds = plan.length;
+        }
+      }
+      if (g.kind === 'king') {
+        courts = Math.max(1, Math.min(courts, Math.floor(players.length / 4)));
+        totalRounds = 6;
+      }
+      if (problem) { toast('⚠️ ' + problem); return; }
       session = {
         format: g.kind,
         players: players,
         target: st.target || 21,
         courts: courts,
-        totalRounds: Math.min(7, Math.max(3, players.length - 1)),
+        totalRounds: totalRounds,
+        plan: plan,
         rounds: [], view: 0,
         points: {}, played: {}, partners: {}
       };
