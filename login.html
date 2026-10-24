@@ -20,8 +20,14 @@
   .auth .btn { width: 100%; padding: 14px; font-size: 16px; }
   .hint { font-size: 13px; color: var(--text-2); text-align: center; margin: 14px 0 0; line-height: 1.45; }
   .invite-banner { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); border-radius: 12px; padding: 10px 12px; font-weight: 600; font-size: 14px; margin-bottom: 16px; text-align: center; }
-  .code-input { text-align: center; font-size: 28px; letter-spacing: 8px; font-variant-numeric: tabular-nums; }
   .linkish { border: 0; background: none; color: var(--accent); font-weight: 600; font-size: 14px; padding: 12px 0 0; width: 100%; }
+  .row-between { display: flex; justify-content: space-between; align-items: center; margin: -4px 0 16px; }
+  .row-between .linkish { width: auto; padding: 0; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+  .check input { width: 20px; height: 20px; accent-color: var(--primary); margin: 0; }
+  .pw-wrap { position: relative; }
+  .pw-wrap .input { padding-right: 56px; }
+  .pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--text-2); font-size: 13px; font-weight: 600; padding: 8px; }
   .big-emoji { font-size: 56px; text-align: center; margin-bottom: 6px; }
   .center { text-align: center; }
   .stack { display: grid; gap: 10px; }
@@ -39,43 +45,109 @@
   <!-- Loading -->
   <section class="card center" id="stepLoading"><p class="meta">Loading…</p></section>
 
-  <!-- 1. Email -->
-  <section class="card" id="stepEmail" hidden>
+  <!-- Log in -->
+  <section class="card" id="stepLogin" hidden>
+    <h1>Log in</h1>
+    <p class="lead">Welcome back! 👋</p>
+    <form id="loginForm">
+      <div class="field">
+        <label for="loginEmail">Email</label>
+        <input class="input" id="loginEmail" type="email" autocomplete="username" inputmode="email" required placeholder="you@email.com">
+      </div>
+      <div class="field">
+        <label for="loginPassword">Password</label>
+        <div class="pw-wrap">
+          <input class="input" id="loginPassword" type="password" autocomplete="current-password" required>
+          <button type="button" class="pw-toggle" data-toggle="loginPassword">Show</button>
+        </div>
+      </div>
+      <div class="row-between">
+        <label class="check"><input type="checkbox" id="remember" checked> Remember me</label>
+        <button type="button" class="linkish" data-go="stepForgot">Forgot password?</button>
+      </div>
+      <button class="btn btn-primary" id="loginBtn">Log in</button>
+    </form>
+    <button class="linkish" type="button" data-go="stepSignup">Have an invite? Create an account</button>
+  </section>
+
+  <!-- Create account (with invite) -->
+  <section class="card" id="stepSignup" hidden>
     <div class="invite-banner" id="inviteBanner" hidden>🎟️ You've been invited to PadPal!</div>
-    <h1>Log in or join</h1>
-    <p class="lead">No password needed. We'll email you a login link.</p>
-    <form id="emailForm">
+    <h1>Create your account</h1>
+    <p class="lead" id="signupLead">PadPal is invite-only. You need an invite link from a member.</p>
+    <form id="signupForm">
       <div class="field">
-        <label for="email">Your email</label>
-        <input class="input" id="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@email.com">
+        <label for="signupEmail">Email</label>
+        <input class="input" id="signupEmail" type="email" autocomplete="username" inputmode="email" required placeholder="you@email.com">
       </div>
-      <button class="btn btn-primary" id="emailBtn">Send me a login link</button>
+      <div class="field">
+        <label for="signupPassword">Password</label>
+        <div class="pw-wrap">
+          <input class="input" id="signupPassword" type="password" autocomplete="new-password" minlength="8" required>
+          <button type="button" class="pw-toggle" data-toggle="signupPassword">Show</button>
+        </div>
+        <small>At least 8 characters</small>
+      </div>
+      <div class="field">
+        <label for="signupPassword2">Password again</label>
+        <input class="input" id="signupPassword2" type="password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <button class="btn btn-primary" id="signupBtn">Create account</button>
     </form>
-    <p class="hint">PadPal is invite-only. New here? Ask a member for an invite link.</p>
+    <button class="linkish" type="button" data-go="stepLogin">Already have an account? Log in</button>
   </section>
 
-  <!-- 2. Code -->
-  <section class="card" id="stepCode" hidden>
-    <h1>Check your email 📬</h1>
-    <p class="lead">We sent an email to <b id="sentTo"></b>. <b>Tap the link in it</b> on this device to log in. It can take a minute, so check spam too.</p>
-    <form id="codeForm">
-      <div class="field">
-        <label for="code">Or type the code, if the email shows one</label>
-        <input class="input code-input" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required placeholder="••••••">
-      </div>
-      <button class="btn btn-primary" id="codeBtn">Log in</button>
-    </form>
-    <button class="linkish" id="changeEmail" type="button">Use a different email</button>
+  <!-- Confirm email (only if Supabase asks for it) -->
+  <section class="card center" id="stepConfirm" hidden>
+    <div class="big-emoji">📬</div>
+    <h1>Confirm your email</h1>
+    <p class="lead">We sent a link to <b id="confirmTo"></b>. Tap it, then come back and log in.</p>
+    <button class="btn btn-ghost" data-go="stepLogin">Go to log in</button>
   </section>
 
-  <!-- 3. Profile setup (first time only) -->
+  <!-- Forgot password -->
+  <section class="card" id="stepForgot" hidden>
+    <h1>Forgot password?</h1>
+    <p class="lead">No problem. We'll email you a link to choose a new one.</p>
+    <form id="forgotForm">
+      <div class="field">
+        <label for="forgotEmail">Email</label>
+        <input class="input" id="forgotEmail" type="email" autocomplete="username" inputmode="email" required placeholder="you@email.com">
+      </div>
+      <button class="btn btn-primary" id="forgotBtn">Send reset link</button>
+    </form>
+    <p class="hint" id="forgotSent" hidden>📬 Sent! Open the email <b>on this device</b> and tap the link. Check spam too.</p>
+    <button class="linkish" type="button" data-go="stepLogin">Back to log in</button>
+  </section>
+
+  <!-- New password (after the reset link) -->
+  <section class="card" id="stepNewPassword" hidden>
+    <h1>Choose a new password</h1>
+    <form id="newPwForm">
+      <div class="field">
+        <label for="newPw">New password</label>
+        <div class="pw-wrap">
+          <input class="input" id="newPw" type="password" autocomplete="new-password" minlength="8" required>
+          <button type="button" class="pw-toggle" data-toggle="newPw">Show</button>
+        </div>
+        <small>At least 8 characters</small>
+      </div>
+      <div class="field">
+        <label for="newPw2">New password again</label>
+        <input class="input" id="newPw2" type="password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <button class="btn btn-primary" id="newPwBtn">Save password</button>
+    </form>
+  </section>
+
+  <!-- Profile setup (first time only) -->
   <section class="card" id="stepSetup" hidden>
     <h1>Set up your profile</h1>
     <p class="lead">Your friends will see this. You can change it later.</p>
     <form id="setupForm">
       <div class="field">
         <label for="username">Username *</label>
-        <input class="input" id="username" required autocomplete="username" autocapitalize="none" placeholder="yoga.bandeja" maxlength="20">
+        <input class="input" id="username" required autocapitalize="none" placeholder="yoga.bandeja" maxlength="20">
         <small>3–20 characters: lowercase letters, numbers, dots and underscores</small>
       </div>
       <div class="field">
@@ -118,7 +190,7 @@
     </form>
   </section>
 
-  <!-- 4. Waiting for approval -->
+  <!-- Waiting for approval -->
   <section class="card center" id="stepWaiting" hidden>
     <div class="big-emoji">⏳</div>
     <h1>Waiting for approval</h1>
@@ -129,7 +201,7 @@
     </div>
   </section>
 
-  <!-- 5. Rejected -->
+  <!-- Rejected -->
   <section class="card center" id="stepRejected" hidden>
     <div class="big-emoji">🚫</div>
     <h1>Not approved</h1>
@@ -142,8 +214,8 @@
 
 <script>
   var db = PadPal.db;
-  var STEPS = ['stepLoading', 'stepEmail', 'stepCode', 'stepSetup', 'stepWaiting', 'stepRejected'];
-  var email = '';
+  var STEPS = ['stepLoading', 'stepLogin', 'stepSignup', 'stepConfirm', 'stepForgot', 'stepNewPassword', 'stepSetup', 'stepWaiting', 'stepRejected'];
+  var here = new URL('login.html', location.href).href;
 
   function $(id) { return document.getElementById(id); }
   function show(step) {
@@ -152,7 +224,11 @@
   }
   function showError(err) { $('error').textContent = PadPal.friendlyError(err); $('error').hidden = false; }
   function hideError() { $('error').hidden = true; }
-  function busy(btn, label) { btn.disabled = !!label; if (label) { btn.dataset.text = btn.textContent; btn.textContent = label; } else if (btn.dataset.text) btn.textContent = btn.dataset.text; }
+  function busy(btn, label) {
+    btn.disabled = !!label;
+    if (label) { btn.dataset.text = btn.textContent; btn.textContent = label; }
+    else if (btn.dataset.text) btn.textContent = btn.dataset.text;
+  }
 
   // Remember the invite code even if the page reloads
   var invite = new URLSearchParams(location.search).get('invite');
@@ -161,57 +237,105 @@
     else invite = localStorage.getItem('padpal_invite');
   } catch (e) {}
   $('inviteBanner').hidden = !invite;
+  if (invite) $('signupLead').textContent = 'Choose your email and a password. After that, the admin approves you.';
+
+  // Coming back from a "reset password" email?
+  var recovering = /type=recovery/.test(location.hash);
+  db.auth.onAuthStateChange(function (event) {
+    if (event === 'PASSWORD_RECOVERY') { recovering = true; show('stepNewPassword'); }
+  });
 
   // Decide which screen this person should see
   async function route() {
+    if (recovering) return show('stepNewPassword');
     var me;
-    try { me = await PadPal.myProfile(); } catch (e) { show('stepEmail'); showError(e); return; }
-    if (!me) return show('stepEmail');
+    try { me = await PadPal.myProfile(); } catch (e) { show('stepLogin'); showError(e); return; }
+    if (!me) return show(invite ? 'stepSignup' : 'stepLogin');
     var p = me.profile;
-    if (!p) { show('stepEmail'); showError('Your account has no PadPal profile. Ask the admin for help.'); return; }
+    if (!p) { show('stepLogin'); showError('Your account has no PadPal profile. Ask the admin for help.'); return; }
     if (p.status === 'rejected') return show('stepRejected');
     if (!p.username) return fillSetup(p);
     if (p.status === 'pending') return show('stepWaiting');
     location.replace('feed.html');
   }
 
-  // 1. Send the code
-  $('emailForm').addEventListener('submit', async function (e) {
-    e.preventDefault();
-    hideError();
-    email = $('email').value.trim().toLowerCase();
-    busy($('emailBtn'), 'Sending…');
-    var r = await db.auth.signInWithOtp({
-      email: email,
-      options: {
-        shouldCreateUser: true,
-        data: invite ? { invite_code: invite } : {},
-        // the link in the email brings you back here
-        emailRedirectTo: new URL('login.html', location.href).href
-      }
-    });
-    busy($('emailBtn'));
-    if (r.error) return showError(r.error);
-    $('sentTo').textContent = email;
-    $('code').value = '';
-    show('stepCode');
-    $('code').focus();
+  // Switch between screens with links
+  document.addEventListener('click', function (e) {
+    var go = e.target.closest('[data-go]');
+    if (go) { show(go.dataset.go); return; }
+    var t = e.target.closest('[data-toggle]');
+    if (t) {
+      var input = $(t.dataset.toggle);
+      input.type = input.type === 'password' ? 'text' : 'password';
+      t.textContent = input.type === 'password' ? 'Show' : 'Hide';
+    }
   });
 
-  // 2. Check the code
-  $('codeForm').addEventListener('submit', async function (e) {
+  // Log in
+  $('remember').checked = PadPal.remembered();
+  $('loginForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     hideError();
-    busy($('codeBtn'), 'Checking…');
-    var r = await db.auth.verifyOtp({ email: email, token: $('code').value.trim(), type: 'email' });
-    busy($('codeBtn'));
+    PadPal.setRemember($('remember').checked);
+    busy($('loginBtn'), 'Logging in…');
+    var r = await db.auth.signInWithPassword({
+      email: $('loginEmail').value.trim().toLowerCase(),
+      password: $('loginPassword').value
+    });
+    busy($('loginBtn'));
     if (r.error) return showError(r.error);
-    try { localStorage.removeItem('padpal_invite'); } catch (err) {}
     route();
   });
-  $('changeEmail').addEventListener('click', function () { show('stepEmail'); });
 
-  // 3. Profile setup
+  // Create account (needs a valid invite; the database checks it)
+  $('signupForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideError();
+    if ($('signupPassword').value !== $('signupPassword2').value) return showError("The two passwords don't match.");
+    if (!invite) return showError('PadPal is invite-only 🎟️ Ask a member for an invite link, then open it.');
+    PadPal.setRemember(true);
+    busy($('signupBtn'), 'Creating…');
+    var email = $('signupEmail').value.trim().toLowerCase();
+    var r = await db.auth.signUp({
+      email: email,
+      password: $('signupPassword').value,
+      options: { data: { invite_code: invite }, emailRedirectTo: here }
+    });
+    busy($('signupBtn'));
+    if (r.error) return showError(r.error);
+    try { localStorage.removeItem('padpal_invite'); } catch (err) {}
+    invite = null;
+    if (r.data.session) return route();
+    $('confirmTo').textContent = email;
+    show('stepConfirm');
+  });
+
+  // Forgot password
+  $('forgotForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideError();
+    busy($('forgotBtn'), 'Sending…');
+    var r = await db.auth.resetPasswordForEmail($('forgotEmail').value.trim().toLowerCase(), { redirectTo: here });
+    busy($('forgotBtn'));
+    if (r.error) return showError(r.error);
+    $('forgotSent').hidden = false;
+  });
+
+  // New password (after tapping the reset link)
+  $('newPwForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideError();
+    if ($('newPw').value !== $('newPw2').value) return showError("The two passwords don't match.");
+    busy($('newPwBtn'), 'Saving…');
+    var r = await db.auth.updateUser({ password: $('newPw').value });
+    busy($('newPwBtn'));
+    if (r.error) return showError(r.error);
+    recovering = false;
+    history.replaceState(null, '', 'login.html');
+    route();
+  });
+
+  // Profile setup
   function fillSetup(p) {
     $('username').value = p.username || '';
     $('displayName').value = p.display_name || '';
@@ -246,10 +370,10 @@
     route();
   });
 
-  // 4. Waiting
+  // Waiting
   $('checkAgain').addEventListener('click', route);
   document.querySelectorAll('[data-signout]').forEach(function (b) {
-    b.addEventListener('click', async function () { await PadPal.signOut(); show('stepEmail'); });
+    b.addEventListener('click', async function () { await PadPal.signOut(); show('stepLogin'); });
   });
 
   route();

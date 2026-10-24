@@ -254,8 +254,29 @@
   <div style="display:grid;gap:10px">
     <a class="btn btn-accent" id="adminLink" href="admin.html" style="text-align:center;text-decoration:none" hidden>👑 Admin panel</a>
     <button class="btn btn-ghost" data-edit>✏️ Edit profile</button>
+    <button class="btn btn-ghost" id="pwBtn">🔑 Set or change password</button>
     <button class="btn btn-ghost" id="logoutBtn">🚪 Log out</button>
   </div>
+</div>
+
+<!-- Set / change password -->
+<div class="sheet" id="pwSheet">
+  <div class="grab"></div>
+  <h3>Set or change password</h3>
+  <form id="pwForm">
+    <input type="email" id="pwUser" autocomplete="username" hidden>
+    <div class="field">
+      <label for="pw1">New password</label>
+      <input class="input" id="pw1" type="password" autocomplete="new-password" minlength="8" required>
+      <small>At least 8 characters. Your iPhone can save it for you.</small>
+    </div>
+    <div class="field">
+      <label for="pw2">New password again</label>
+      <input class="input" id="pw2" type="password" autocomplete="new-password" minlength="8" required>
+    </div>
+    <div class="error-box" id="pwError" role="alert" hidden></div>
+    <button class="btn btn-primary" id="pwSave" style="width:100%;margin-top:10px">Save password</button>
+  </form>
 </div>
 
 <!-- Edit profile -->
@@ -668,6 +689,34 @@
 
   // Settings sheet
   $('settingsBtn').addEventListener('click', function () { openSheet($('settingsSheet')); });
+
+  // Set or change password (so you can log in with email + password)
+  $('pwBtn').addEventListener('click', async function () {
+    closeSheets();
+    $('pw1').value = ''; $('pw2').value = '';
+    $('pwError').hidden = true;
+    var me = await PadPal.myProfile();
+    $('pwUser').value = me.session.user.email; // helps the iPhone save it with your email
+    openSheet($('pwSheet'));
+  });
+  $('pwForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if ($('pw1').value !== $('pw2').value) {
+      $('pwError').textContent = "The two passwords don't match.";
+      $('pwError').hidden = false;
+      return;
+    }
+    $('pwSave').disabled = true;
+    var r = await db.auth.updateUser({ password: $('pw1').value });
+    $('pwSave').disabled = false;
+    if (r.error) {
+      $('pwError').textContent = PadPal.friendlyError(r.error);
+      $('pwError').hidden = false;
+      return;
+    }
+    closeSheets();
+    toast('🔑 Password saved');
+  });
   $('backdrop').addEventListener('click', closeSheets);
   $('logoutBtn').addEventListener('click', async function () {
     await PadPal.signOut();

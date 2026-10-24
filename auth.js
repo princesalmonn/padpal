@@ -2,7 +2,32 @@
 // Needs (in this order): supabase-js from the CDN, config.js, then this file.
 (function () {
   var cfg = window.PADPAL_CONFIG;
-  var db = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+
+  // "Remember me": ON = stay logged in (localStorage), OFF = logged out when the app/browser closes (sessionStorage)
+  function remembered() {
+    try { return localStorage.getItem('padpal_remember') !== 'no'; } catch (e) { return true; }
+  }
+  function setRemember(on) {
+    try { localStorage.setItem('padpal_remember', on ? 'yes' : 'no'); } catch (e) {}
+  }
+  var loginStorage = {
+    getItem: function (k) {
+      try { var v = localStorage.getItem(k); return v !== null ? v : sessionStorage.getItem(k); } catch (e) { return null; }
+    },
+    setItem: function (k, v) {
+      try {
+        if (remembered()) { localStorage.setItem(k, v); sessionStorage.removeItem(k); }
+        else { sessionStorage.setItem(k, v); localStorage.removeItem(k); }
+      } catch (e) {}
+    },
+    removeItem: function (k) {
+      try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch (e) {}
+    }
+  };
+
+  var db = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, {
+    auth: { storage: loginStorage, persistSession: true, autoRefreshToken: true }
+  });
 
   // Who is logged in, and their PadPal profile (null if nobody)
   async function myProfile() {
@@ -99,6 +124,16 @@
   // Turn technical errors into plain words
   function friendlyError(err) {
     var m = (err && (err.message || err.msg || err.code)) || String(err);
+    if (/invalid login credentials/i.test(m))
+      return 'Wrong email or password. Forgot it? Tap "Forgot password?".';
+    if (/already registered|already been registered/i.test(m))
+      return 'This email already has an account. Log in instead.';
+    if (/email not confirmed/i.test(m))
+      return 'Confirm your email first: tap the link in the email we sent (check spam too).';
+    if (/password should be|password.*(at least|characters)|weak password/i.test(m))
+      return 'Password is too short or too easy. Use at least 8 characters.';
+    if (/same.*password|different from the old/i.test(m))
+      return 'That is your current password. Choose a new one.';
     if (/saving new user|invite-only/i.test(m))
       return "PadPal is invite-only 🎟️ This invite link isn't valid or was already used. Ask a member for a new one.";
     if (/rate limit|too many/i.test(m))
@@ -121,6 +156,7 @@
   window.PadPal = {
     db: db, myProfile: myProfile, guard: guard, signOut: signOut,
     createInvite: createInvite, shareInvite: shareInvite, friendlyError: friendlyError,
-    uploadPhoto: uploadPhoto, photoUrls: photoUrls
+    uploadPhoto: uploadPhoto, photoUrls: photoUrls,
+    remembered: remembered, setRemember: setRemember
   };
 })();
