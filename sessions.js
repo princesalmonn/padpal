@@ -44,8 +44,8 @@
     var order = [[top[1], 'p2'], [top[0], 'p1'], [top[2], 'p3']];
     return '<div class="s-podium">' + order.map(function (o) {
       var x = o[0];
-      return '<div class="col ' + o[1] + '"><div class="avatar">' + avatarFn(x.id) + '</div>' +
-        '<div class="nm">' + nameFn(x.id) + '</div><div class="sc">' + x.total + ' pts' + (x.change != null ? ' · ' + PadPal.fmtChange(x.change) : '') + '</div>' +
+      return '<div class="col ' + o[1] + '"><div class="avatar" data-uid="' + x.id + '">' + avatarFn(x.id) + '</div>' +
+        '<div class="nm" data-uid="' + x.id + '">' + nameFn(x.id) + '</div><div class="sc">' + x.total + ' pts' + (x.change != null ? ' · ' + PadPal.fmtChange(x.change) : '') + '</div>' +
         '<div class="block">' + medal(x.place) + '</div></div>';
     }).join('') + '</div>';
   }
@@ -55,7 +55,7 @@
     return list.map(function (x) {
       var why = x.out ? ' ' + (REASONS[x.out.reason] || REASONS.other)[0] : '';
       return '<div class="s-row' + (x.id === meId ? ' me' : '') + '"><span class="pos">' + medal(x.place) + '</span>' +
-        '<div class="who">' + nameFn(x.id) + why + '<small>' + x.w + 'W ' + x.l + 'L · ' + x.played + ' game' + (x.played === 1 ? '' : 's') +
+        '<div class="who"><span data-uid="' + x.id + '">' + nameFn(x.id) + '</span>' + why + '<small>' + x.w + 'W ' + x.l + 'L · ' + x.played + ' game' + (x.played === 1 ? '' : 's') +
         (x.out ? ' · ' + (REASONS[x.out.reason] || REASONS.other)[1].toLowerCase() + ' from round ' + x.out.round : '') + '</small></div>' +
         '<span class="num">' + x.total + '</span>' + chg(x.change) + '</div>';
     }).join('');

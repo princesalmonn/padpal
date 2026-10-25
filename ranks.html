@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="levels.js"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Ranks-only styles ===== */
@@ -159,7 +160,7 @@
   function nameOf(p) { return p.display_name || p.username; }
   function avatar(p) {
     var url = p.avatar_url && urls[p.avatar_url];
-    return '<div class="avatar" style="border-color:' + PadPal.tierOf(p.points).color + '">' +
+    return '<div class="avatar" data-uid="' + p.id + '" style="border-color:' + PadPal.tierOf(p.points).color + '">' +
       (url ? '<img src="' + url + '" alt="">' : esc(nameOf(p)[0].toUpperCase())) + '</div>';
   }
   function pill(p) {
@@ -277,7 +278,7 @@
       $('podium').innerHTML = order.map(function (x, i) {
         return '<button class="step ' + cls[i] + '" data-player="' + x.p.id + '">' +
           '<div class="crown">' + (cls[i] === 'p1' ? '👑' : '') + '</div>' + avatar(x.p) +
-          '<div class="nm">' + esc(nameOf(x.p)) + (x.p.id === me.id ? ' (you)' : '') + '</div>' +
+          '<div class="nm" data-uid="' + x.p.id + '">' + esc(nameOf(x.p)) + (x.p.id === me.id ? ' (you)' : '') + '</div>' +
           '<div class="pt">' + valueText(x.value) + ' pts</div>' +
           '<div class="block">' + x.rank + '</div></button>';
       }).join('');
@@ -304,7 +305,7 @@
       var idle = daysIdle(p);
       html += '<button class="row' + (p.id === me.id ? ' me' : '') + '" data-player="' + p.id + '">' +
         '<div class="pos">' + x.rank + '</div>' + avatar(p) +
-        '<div class="info"><div class="nm">' + esc(nameOf(p)) + (p.id === me.id ? ' <span class="meta">(you)</span>' : '') + '</div>' +
+        '<div class="info"><div class="nm" data-uid="' + p.id + '">' + esc(nameOf(p)) + (p.id === me.id ? ' <span class="meta">(you)</span>' : '') + '</div>' +
         '<div class="sub">' + pill(p) + (x.noMixed ? '<span class="meta" style="font-size:11px">no mixed games yet</span>' : '') +
           (idle !== null && idle >= 7 ? '<span class="ice">🧊 ' + idle + 'd idle</span>' : '') + '</div></div>' +
         '<div class="score">' + valueText(x.value) + '<small>' + arrow + '</small></div></button>';
@@ -320,7 +321,7 @@
     var idle = daysIdle(p);
     $('playerBody').innerHTML =
       '<div class="pp-head">' + avatar(p) +
-        '<div><div class="name">' + esc(nameOf(p)) + (p.id === me.id ? ' (you)' : '') + '</div><div class="meta">@' + esc(p.username) + '</div>' +
+        '<div><div class="name" data-uid="' + p.id + '">' + esc(nameOf(p)) + (p.id === me.id ? ' (you)' : '') + '</div><div class="meta">@' + esc(p.username) + '</div>' +
         '<div style="margin-top:4px">' + pill(p) + '</div></div></div>' +
       '<div class="pp-grid">' +
         '<div><strong>' + PadPal.fmt(p.points) + '</strong><small>Points</small></div>' +

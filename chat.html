@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="levels.js"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Chat-only styles ===== */
@@ -301,7 +302,7 @@
     return g ? (KINDS[g.kind] || '🎾 Game') + ' · ' + gameWhen(g) : 'Game chat';
   }
   function chatAvatar(c) {
-    if (c.kind === 'dm') return '<div class="avatar">' + (c.others[0] ? avatarInner(c.others[0]) : '?') + '</div>';
+    if (c.kind === 'dm') return '<div class="avatar"' + (c.others[0] ? ' data-uid="' + c.others[0] + '"' : '') + '>' + (c.others[0] ? avatarInner(c.others[0]) : '?') + '</div>';
     if (c.kind === 'group') return '<div class="avatar group">👥</div>';
     return '<div class="avatar game">' + (c.game && c.game.kind !== 'match' ? '🔄' : '🎾') + '</div>';
   }
@@ -333,7 +334,7 @@
       var icons = (c.pinned ? '📌' : '') + (c.muted ? '🔕' : '');
       return '<div class="swipe"><div class="swipe-actions">' + swipeButtons(c) + '</div>' +
         '<button class="chat-row' + (c.unread ? ' unread' : '') + '" data-chat="' + c.id + '">' + chatAvatar(c) +
-        '<div class="mid"><div class="top"><span class="nm">' + esc(chatTitle(c)) + '</span><span class="time">' + (icons ? '<span class="icons">' + icons + '</span> ' : '') + (c.last ? timeText(c.last.created_at) : '') + '</span></div>' +
+        '<div class="mid"><div class="top"><span class="nm"' + (c.kind === 'dm' && c.others[0] ? ' data-uid="' + c.others[0] + '"' : '') + '>' + esc(chatTitle(c)) + '</span><span class="time">' + (icons ? '<span class="icons">' + icons + '</span> ' : '') + (c.last ? timeText(c.last.created_at) : '') + '</span></div>' +
         '<div class="top"><div class="last">' + esc(lastText(c)) + '</div>' + (c.unread ? '<span class="badge-n' + (c.muted ? ' muted' : '') + '">' + c.unread + '</span>' : '') + '</div>' +
         (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') + '</div></button></div>';
     }).join('') + '<p class="swipe-hint">👈 Swipe a chat to the left to pin, mute or delete it</p>';
@@ -457,7 +458,7 @@
         content += '<div class="bubble">' + esc(m.body) + '</div>';
       }
       html += '<div class="msg ' + (mine ? 'me' : 'them') + '"' + (m.deleted_at ? '' : ' data-mid="' + m.id + '"') + ' id="m' + m.id + '">' +
-        (!mine && c.kind !== 'dm' ? '<div class="who">' + esc(nameOf(m.author_id)) + '</div>' : '') +
+        (!mine && c.kind !== 'dm' ? '<div class="who" data-uid="' + m.author_id + '">' + esc(nameOf(m.author_id)) + '</div>' : '') +
         content + '<div class="t">' + (current.pinnedMsg === m.id ? '📌 ' : '') + timeText(m.created_at) + '</div></div>';
     });
     $('cBody').innerHTML = html;
@@ -662,7 +663,7 @@
     if (tab === 'dm') {
       html += others.length ? others.map(function (id) {
         var t = PadPal.tierOf(people[id].points);
-        return '<button class="person-row" data-dm="' + id + '"><div class="avatar">' + avatarInner(id) + '</div><div><div class="name">' + esc(nameOf(id)) + '</div><div class="meta">@' + esc(people[id].username) + ' · ' + t.icon + ' ' + t.name + '</div></div></button>';
+        return '<button class="person-row" data-dm="' + id + '"><div class="avatar" data-uid="' + id + '">' + avatarInner(id) + '</div><div><div class="name" data-uid="' + id + '">' + esc(nameOf(id)) + '</div><div class="meta">@' + esc(people[id].username) + ' · ' + t.icon + ' ' + t.name + '</div></div></button>';
       }).join('') : '<p class="meta">No other members yet. Invite friends from your profile!</p>';
     } else {
       html += '<div class="field"><label for="gName">Group name</label><input class="input" id="gName" maxlength="40" placeholder="Tuesday Crew 🔥"></div>' +
@@ -692,7 +693,7 @@
     var html = '<h3>ℹ️ ' + esc(chatTitle(c)) + '</h3>' +
       '<div class="label" style="font-size:13px;color:var(--text-2);font-weight:600">Members (' + c.members.length + ') · tap to see a profile</div>' +
       c.members.map(function (id) {
-        return '<a class="person-row" href="profile.html' + (id === me.id ? '' : '?id=' + id) + '"><div class="avatar">' + avatarInner(id) + '</div><div><div class="name">' + esc(nameOf(id)) + (id === me.id ? ' (you)' : '') + '</div></div></a>';
+        return '<a class="person-row" href="profile.html' + (id === me.id ? '' : '?id=' + id) + '"><div class="avatar" data-uid="' + id + '">' + avatarInner(id) + '</div><div><div class="name" data-uid="' + id + '">' + esc(nameOf(id)) + (id === me.id ? ' (you)' : '') + '</div></div></a>';
       }).join('') +
       '<button class="btn btn-ghost" style="width:100%;margin-top:14px" data-cact="' + (c.muted ? 'unmute' : 'mute') + '" data-cid="' + c.id + '">' + (c.muted ? '🔔 Unmute this chat' : '🔕 Mute this chat') + '</button>';
     if (c.kind === 'group') {

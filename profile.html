@@ -14,13 +14,23 @@
 <script src="auth.js"></script>
 <script src="rate.js"></script>
 <script src="sessions.js"></script>
+<script src="levels.js"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Profile-only styles ===== */
 
   /* Header */
   .hero { text-align: center; padding: 6px 0 4px; }
-  .hero .avatar { width: 92px; height: 92px; font-size: 36px; margin: 0 auto 10px; border-width: 3px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .hero .avatar { width: 92px; height: 92px; font-size: 36px; margin: 0 auto 10px; border-width: 3px; }
+  .hero .avatar:not([class*="frame-"]) { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .hero .lvl-title { font-size: 13px; color: var(--gold); font-style: italic; margin-top: 4px; }
+  .rank-link { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; }
+  .next-line { font-size: 12px; margin-top: 6px; color: var(--text); }
+  .flair-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+  .flair-pick button { border: 1px solid var(--line); background: var(--card-2); border-radius: 12px; padding: 6px 8px; font-size: 22px; line-height: 1; min-width: 46px; }
+  .flair-pick button small { display: block; font-size: 9px; color: var(--text-2); margin-top: 2px; }
+  .flair-pick button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .flair-pick button:disabled { opacity: .4; }
   .hero h1 { margin: 0; font-size: 22px; }
   .hero .handle { color: var(--text-2); font-size: 14px; margin-top: 2px; }
   .hero .bio { margin: 10px auto 0; max-width: 320px; font-size: 14px; line-height: 1.45; }
@@ -172,6 +182,7 @@
     <input type="file" id="avatarInput" accept="image/*" hidden>
     <h1 id="heroName"></h1>
     <div class="handle" id="heroHandle"></div>
+    <div class="lvl-title" id="heroTitle"></div>
     <p class="bio" id="heroBio"></p>
     <div class="chips" id="heroChips"></div>
     <button class="pals-btn" id="palsBtn">👥 <b id="palsN">…</b> PadPals</button>
@@ -187,8 +198,10 @@
     </div>
     <div class="progress"><i id="rBar" style="width:0%"></i></div>
     <div class="prog-label"><span id="rFrom"></span><span id="rTo"></span></div>
+    <div class="next-line" id="rNext" hidden></div>
     <div class="meta" id="rMixed" style="margin-top:8px"></div>
     <div class="warn" id="rWarn"></div>
+    <a class="rank-link" href="road.html"><span>ⓘ What do levels do?</span><span>🗺️ Road to Legend ›</span></a>
   </div>
 
   <div class="quick">
@@ -358,6 +371,10 @@
         <option>Chiquita</option><option>Lob</option><option>Bajada</option><option>Rulo</option>
         <option>Volley</option><option>Wall exit</option>
       </select>
+    </div>
+    <div class="field">
+      <span class="label">Profile emoji <small class="meta">· next to your name, new ones unlock as you level up</small></span>
+      <div class="flair-pick" id="flairPick"></div>
     </div>
     <p class="meta" style="margin:0 0 12px">Want to change your ladder (men / women)? Ask the admin.</p>
     <div class="error-box" id="editError" role="alert" hidden></div>
@@ -616,8 +633,8 @@
   function person(icon, label, id, stat, sub) {
     var p = people[id];
     var url = p && p.avatar_url && urls[p.avatar_url];
-    return '<div class="person"><div class="avatar">' + (url ? '<img src="' + url + '" alt="">' : pname(id)[0]) + '</div>' +
-      '<div><div class="label">' + icon + ' ' + label + '</div><div class="name">' + pname(id) + '</div></div>' +
+    return '<div class="person"><div class="avatar" data-uid="' + id + '">' + (url ? '<img src="' + url + '" alt="">' : pname(id)[0]) + '</div>' +
+      '<div><div class="label">' + icon + ' ' + label + '</div><div class="name" data-uid="' + id + '">' + pname(id) + '</div></div>' +
       '<div class="stat">' + stat + '<small>' + sub + '</small></div></div>';
   }
   var urls = {};   // friends' profile pictures for the Stats tab
@@ -715,6 +732,10 @@
     $('rTo').textContent = !next ? 'Top tier! 👑'
       : pts >= 500 ? '🏆 Tournaments unlock ' + next.icon + ' ' + next.name
       : PadPal.fmt(next.min - pts) + ' pts to ' + next.icon + ' ' + next.name;
+    if (isMe) {   // "Next: ⚡ Amateur, 90 pts away · about 36 wins at your level"
+      $('rNext').textContent = PadPal.levels.nextStep(profile).text;
+      $('rNext').hidden = false;
+    }
     if (!isMe) {   // someone else's inactivity is their business
       $('rWarn').hidden = true;
     } else if (!profile.last_played) $('rWarn').textContent = '🎾 No matches yet. Play your first match from the Play tab!';
@@ -832,8 +853,8 @@
     });
     $('palList').innerHTML = list.length ? list.map(function (x) {
       var p = people[x.user_id], t = PadPal.tierOf(p.points);
-      return '<a class="pal-row" href="profile.html' + (x.user_id === viewer.id ? '' : '?id=' + x.user_id) + '"><div class="avatar">' + avatarOf(x.user_id) + '</div>' +
-        '<div><div class="name">' + pname(x.user_id) + (x.user_id === viewer.id ? ' (you)' : '') + '</div><div class="meta">' + t.icon + ' ' + t.name + '</div></div>' +
+      return '<a class="pal-row" href="profile.html' + (x.user_id === viewer.id ? '' : '?id=' + x.user_id) + '"><div class="avatar" data-uid="' + x.user_id + '">' + avatarOf(x.user_id) + '</div>' +
+        '<div><div class="name" data-uid="' + x.user_id + '">' + pname(x.user_id) + (x.user_id === viewer.id ? ' (you)' : '') + '</div><div class="meta">' + t.icon + ' ' + t.name + '</div></div>' +
         '<div class="n">' + x.games + '<small>game' + (x.games === 1 ? '' : 's') + ' together</small></div></a>';
     }).join('') : '<p class="meta">' + (pals.length ? 'Nobody found.' : 'No PadPals yet. Play a game to get some! 🎾') + '</p>';
   }
@@ -983,8 +1004,15 @@
         if (urls[p.avatar_url]) $('heroAvatar').innerHTML = '<img src="' + urls[p.avatar_url] + '" alt="">';
       } catch (err) { /* keep the letter if the photo can't load */ }
     }
-    $('heroName').textContent = p.display_name || p.username;
+    $('heroAvatar').setAttribute('data-uid', p.id);
+    $('heroName').setAttribute('data-uid', p.id);
+    PadPal.levels.setPoints(p.id, p.points);
+    PadPal.levels.paint($('avatarBtn'));
+    PadPal.levels.paint($('heroName'));
+    $('heroName').textContent = (p.display_name || p.username) + (p.flair ? ' ' + p.flair : '');
     $('heroHandle').textContent = '@' + p.username;
+    var tier = PadPal.tierOf(p.points);
+    $('heroTitle').textContent = tier.icon + ' "' + PadPal.levels.info(tier).title + '"';
     $('heroBio').textContent = p.bio || '';
     $('heroBio').hidden = !p.bio;
     var chips = [];
@@ -1041,10 +1069,28 @@
       setRadio('eSide', profile.side);
       setRadio('eHand', profile.hand);
       $('eShot').value = profile.fav_shot || '';
+      flairChoice = profile.flair || null;
+      renderFlairs();
       $('editError').hidden = true;
       openSheet($('editSheet'));
     });
   });
+  // Profile emoji: locked ones show the level that unlocks them
+  var flairChoice = null;
+  function renderFlairs() {
+    $('flairPick').innerHTML = '<button type="button" class="' + (flairChoice ? '' : 'on') + '" data-flair="">∅<small>none</small></button>' +
+      PadPal.levels.emojiList(profile.points).map(function (x) {
+        return '<button type="button" class="' + (flairChoice === x.emoji ? 'on' : '') + '" data-flair="' + x.emoji + '"' + (x.open ? '' : ' disabled') + '>' +
+          x.emoji + '<small>' + (x.open ? x.tier.name : '🔒 ' + x.tier.name) + '</small></button>';
+      }).join('');
+  }
+  $('flairPick').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-flair]');
+    if (!b || b.disabled) return;
+    flairChoice = b.dataset.flair || null;
+    renderFlairs();
+  });
+
   $('eUsername').addEventListener('input', function () { this.value = this.value.toLowerCase().replace(/[^a-z0-9._]/g, ''); });
   $('eBio').addEventListener('input', function () { $('bioCount').textContent = this.value.length; });
   $('editForm').addEventListener('submit', async function (e) {
@@ -1058,6 +1104,7 @@
       hand: getRadio('eHand'),
       fav_shot: $('eShot').value || null
     };
+    if (flairChoice !== (profile.flair || null)) changes.flair = flairChoice;
     var r = await db.from('profiles').update(changes).eq('id', profile.id);
     $('editSave').disabled = false;
     if (r.error) {

@@ -185,6 +185,31 @@ nav.tabbar a.on { color: var(--primary); font-weight: 700; }
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* Level rewards (levels.js): frames from Pro up, gold Legend names */
+.avatar.frame-pro { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px #C9D1DB; }
+.avatar.frame-prostar { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px #D9822B, 0 0 12px 2px rgba(217,130,43,.55); }
+.avatar.frame-star { box-shadow: 0 0 0 2px #F2C14E, 0 0 0 4px var(--bg), 0 0 0 6px #F2C14E, 0 0 14px 3px rgba(242,193,78,.5); }
+.avatar.frame-legend { animation: legendGlow 2.4s ease-in-out infinite; }
+@keyframes legendGlow {
+  0%, 100% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 5px #B3261E, 0 0 14px 4px rgba(242,193,78,.6); }
+  50%      { box-shadow: 0 0 0 2px var(--bg), 0 0 0 5px #F2C14E, 0 0 20px 6px rgba(179,38,30,.6); }
+}
+.legend-name { color: var(--gold) !important; text-shadow: 0 0 10px color-mix(in srgb, var(--gold) 40%, transparent); }
+
+/* 🎉 Level-up celebration */
+.lvl-up { position: fixed; inset: 0; z-index: 90; background: rgba(6,12,26,.97); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); display: grid; place-items: center; padding: 20px; overflow-y: auto; }
+.lvl-confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.lvl-card { position: relative; width: 100%; max-width: 360px; text-align: center; color: #fff; animation: lvlPop .5s cubic-bezier(.2,1.4,.4,1); }
+@keyframes lvlPop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.lvl-kicker { font-size: 15px; font-weight: 900; letter-spacing: 4px; color: #C9E52C; }
+.lvl-icon { width: 120px; height: 120px; border-radius: 50%; margin: 14px auto; display: grid; place-items: center; font-size: 62px; box-shadow: 0 0 0 6px rgba(255,255,255,.12), 0 0 40px rgba(201,229,44,.4); }
+.lvl-name { font-size: 34px; font-weight: 900; }
+.lvl-title { font-style: italic; color: #F2C14E; margin-top: 2px; }
+.lvl-unlocks { background: rgba(255,255,255,.08); border-radius: 14px; padding: 12px; margin: 18px 0; font-size: 14px; text-align: left; display: grid; gap: 6px; }
+.lvl-unlocks b { color: #C9E52C; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+.lvl-card .btn { width: 100%; margin-top: 8px; }
+.lvl-road { display: block; margin-top: 14px; color: rgba(255,255,255,.7); font-size: 13px; }
+
 /* Session results (sessions.js): podium, standings, rounds */
 .s-podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; align-items: end; gap: 8px; margin: 6px 0 12px; }
 .s-podium .col { text-align: center; min-width: 0; }

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Road to Legend · PadPal</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-title" content="PadPal">
+<meta name="theme-color" content="#0B1426">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="levels.js"></script>
+<script>PadPal.me = PadPal.guard(); // members only</script>
+<style>
+  /* ===== Road-only styles ===== */
+  .icon-btn.back { font-size: 26px; }
+  .you-card { display: flex; gap: 12px; align-items: center; }
+  .you-card .avatar { width: 56px; height: 56px; font-size: 22px; overflow: hidden; }
+  .you-card .avatar img, .stop .faces img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+  .you-card h1 { margin: 0; font-size: 19px; }
+  .you-card .t { font-size: 13px; color: var(--gold); font-style: italic; }
+  .next { margin-top: 12px; font-size: 13px; line-height: 1.5; }
+  .next b { color: var(--accent); }
+  .progress { height: 10px; border-radius: 999px; background: var(--card-2); overflow: hidden; margin: 10px 0 4px; }
+  .progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); }
+
+  /* The road: Legend at the top, First Timer at the bottom */
+  .road { position: relative; padding-left: 34px; margin-top: 8px; }
+  .road::before { content: ''; position: absolute; left: 15px; top: 20px; bottom: 20px; width: 4px; border-radius: 2px; background: var(--line); }
+  .road .fill { position: absolute; left: 15px; bottom: 20px; width: 4px; border-radius: 2px; background: linear-gradient(0deg, var(--primary), var(--accent)); }
+  .stop { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; margin-bottom: 12px; }
+  .stop.locked { opacity: .78; }
+  .stop.here { border: 2px solid var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .stop .dot { position: absolute; left: -31px; top: 16px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; background: var(--card-2); border: 2px solid var(--line); }
+  .stop.done .dot { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .stop.here .dot { background: var(--accent); border-color: var(--accent); }
+  .stop .head { display: flex; align-items: center; gap: 10px; }
+  .stop .ico { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; flex-shrink: 0; }
+  .stop .nm { font-weight: 800; font-size: 16px; }
+  .stop .ttl { font-size: 12px; color: var(--text-2); font-style: italic; }
+  .stop .pts { margin-left: auto; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stop .pts small { display: block; font-weight: 500; font-size: 11px; color: var(--text-2); }
+  .stop .status { font-size: 12px; margin: 8px 0 0; font-weight: 600; }
+  .stop ul { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; display: grid; gap: 4px; }
+  .stop .unlock { margin-top: 8px; font-size: 13px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .stop .unlock span.e { font-size: 20px; }
+  .stop .frame-demo { width: 30px; height: 30px; font-size: 13px; }
+  .stop .faces { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-left: 6px; }
+  .stop .faces .avatar { width: 26px; height: 26px; font-size: 11px; border-width: 2px; overflow: hidden; }
+  .stop .faces small { margin-left: 2px; color: var(--text-2); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><img class="logo-img logo-for-dark" src="logo-dark.svg" alt=""><img class="logo-img logo-for-light" src="logo-light.svg" alt=""><span>Pad</span><b>Pal</b></div>
+    <button class="icon-btn back" id="backBtn" aria-label="Back">‹</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <h2 style="font-size:20px;margin:6px 0 12px">🗺️ Road to Legend</h2>
+  <div class="card" id="you"><p class="meta">Loading…</p></div>
+  <p class="meta" style="margin:0 0 6px">Every level has its own rules and rewards. Rewards are only looks: they never give points. 😉</p>
+  <div class="road" id="road"><div class="fill" id="fill"></div></div>
+</main>
+
+<nav class="tabbar">
+  <div class="tabs">
+    <a href="feed.html"><span>🏠</span>Feed</a>
+    <a href="play.html"><span>🎾</span>Play</a>
+    <a href="chat.html"><span>💬</span>Chat</a>
+    <a href="ranks.html"><span>🏆</span>Ranks</a>
+    <a href="profile.html"><span>👤</span>Me</a>
+  </div>
+</nav>
+
+<script>
+  var db = PadPal.db;
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function dateText(iso) { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+
+  $('backBtn').addEventListener('click', function () { if (history.length > 1) history.back(); else location.href = 'profile.html'; });
+
+  PadPal.me.then(async function (who) {
+    if (!who) return;
+    var me = who.profile;
+    var pts = Number(me.points) || 0;
+    var mine = PadPal.tierOf(pts);
+    var members = [];
+    try { members = await PadPal.members(); } catch (e) {}
+    var urls = {};
+    try { urls = await PadPal.photoUrls(members.map(function (m) { return m.avatar_url; })); } catch (e) {}
+    var r = await db.from('point_changes').select('change, points_after, created_at').eq('user_id', me.id).order('created_at', { ascending: true });
+    var changes = r.data || [];
+
+    function face(m) {
+      var url = m.avatar_url && urls[m.avatar_url];
+      return '<div class="avatar" data-uid="' + m.id + '">' + (url ? '<img src="' + url + '" alt="">' : esc((m.display_name || m.username)[0].toUpperCase())) + '</div>';
+    }
+
+    // ===== You: level, next step, pace =====
+    var step = PadPal.levels.nextStep(me);
+    var since = Date.now() - 28 * 86400000;
+    var month = changes.filter(function (c) { return new Date(c.created_at) >= since; }).reduce(function (a, c) { return a + Number(c.change); }, 0);
+    var perWeek = month / 4;
+    var pace = '';
+    if (step.next && pts < 500) {
+      var goal = Math.min(step.next.min, 500);   // normal games stop at 500
+      var weeks = Math.max(1, Math.ceil((goal - pts) / perWeek));
+      pace = perWeek > 0.2
+        ? '📈 At your pace (' + PadPal.fmtChange(Math.round(perWeek * 10) / 10) + ' pts a week): ' + (goal === 500 && step.next.min > 500 ? '500 pts' : step.next.icon + ' ' + step.next.name) +
+          ' in about <b>' + weeks + ' week' + (weeks > 1 ? 's' : '') + '</b>'
+        : '📈 Play a few games this month and we\'ll guess when you reach ' + step.next.icon + ' ' + step.next.name + '.';
+    }
+    var nx = PadPal.nextTier(pts);
+    var pct = nx ? Math.round((pts - mine.min) / (nx.min - mine.min) * 100) : 100;
+    $('you').innerHTML = '<div class="you-card">' + face(me) +
+      '<div><h1 data-uid="' + me.id + '">' + mine.icon + ' ' + mine.name + ' · ' + PadPal.fmt(pts) + ' pts</h1><div class="t">"' + PadPal.levels.info(mine).title + '"</div></div></div>' +
+      '<div class="progress"><i style="width:' + Math.max(2, Math.min(100, pct)) + '%"></i></div>' +
+      '<div class="next">' + step.text.replace(/^Next:/, '<b>Next:</b>') + (pace ? '<br>' + pace : '') + '</div>';
+
+    // ===== When you reached each level =====
+    var reached = {};
+    PadPal.TIERS.forEach(function (t) {
+      if (t.min === 0) { reached[t.name] = me.created_at; return; }
+      var c = changes.filter(function (x) { return Number(x.points_after) >= t.min; })[0];
+      if (c) reached[t.name] = c.created_at;
+    });
+
+    // ===== The road, top (Legend) to bottom (First Timer) =====
+    var myIdx = PadPal.TIERS.indexOf(mine);
+    var html = PadPal.TIERS.slice().reverse().map(function (t) {
+      var idx = PadPal.TIERS.indexOf(t);
+      var inf = PadPal.levels.info(t);
+      var next = PadPal.TIERS[idx + 1];
+      var here = idx === myIdx, done = idx < myIdx;
+      var who = members.filter(function (m) { return PadPal.tierOf(m.points) === t; });
+      var status = here ? '👉 <b>You are here</b>' + (reached[t.name] ? ' · since ' + dateText(reached[t.name]) : '')
+        : done ? '✅ Reached' + (reached[t.name] ? ' ' + dateText(reached[t.name]) : '')
+        : '🔒 ' + PadPal.fmt(t.min - pts) + ' pts to go';
+      return '<div class="stop ' + (here ? 'here' : done ? 'done' : 'locked') + '"' + (here ? ' id="here"' : '') + '>' +
+        '<div class="dot">' + (done ? '✓' : here ? '📍' : '') + '</div>' +
+        '<div class="head"><div class="ico" style="background:' + t.color + '">' + t.icon + '</div>' +
+          '<div><div class="nm">' + t.name + '</div><div class="ttl">"' + inf.title + '"</div></div>' +
+          '<div class="pts">' + t.min + '<small>' + (next ? 'to ' + (next.min - 1) : 'and up') + ' pts</small></div></div>' +
+        '<div class="status">' + status + '</div>' +
+        '<ul>' + inf.rules.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>' +
+        '<div class="unlock"><span class="meta">Unlocks:</span>' + inf.emojis.map(function (e) { return '<span class="e">' + e + '</span>'; }).join('') +
+          '<span class="meta">profile emoji</span>' +
+          (inf.frame ? '<span class="meta">·</span><div class="avatar frame-demo ' + inf.frame + '" style="border-color:' + t.color + '">' + t.icon + '</div><span class="meta">frame</span>' : '') + '</div>' +
+        '<div class="faces">' + who.slice(0, 6).map(face).join('') +
+          '<small>' + (who.length ? who.length + ' player' + (who.length > 1 ? 's' : '') + ' here' : 'Nobody here yet') + '</small></div>' +
+        '</div>';
+    }).join('');
+    $('road').insertAdjacentHTML('beforeend', html);
+    // green line from the bottom up to your level
+    var here = $('here');
+    $('fill').style.height = ($('road').offsetHeight - here.offsetTop - 20) + 'px';
+    here.scrollIntoView({ block: 'center' });
+  });
+</script>
+</body>
+</html>
