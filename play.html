@@ -77,6 +77,18 @@
   .court .sc { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .court .tap { font-size: 12px; color: var(--accent); margin-top: 8px; text-align: center; }
   .rest { font-size: 13px; color: var(--text-2); margin: 4px 0 12px; }
+  .court { cursor: pointer; }
+  .court .tap { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .type-btn { border: 1px solid var(--line); background: var(--card-2); color: var(--text); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; }
+  /* rounds carousel: swipe left / right */
+  .r-track { display: flex; align-items: flex-start; overflow-x: auto; overflow-y: hidden; transition: height .2s; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin: 0 -2px; }
+  .r-track::-webkit-scrollbar { display: none; }
+  .r-slide { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; padding: 0 2px; box-sizing: border-box; }
+  .r-dots { display: flex; justify-content: center; gap: 6px; margin: 2px 0 12px; }
+  .r-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); transition: all .2s; }
+  .r-dots i.on { width: 18px; border-radius: 4px; background: var(--accent); }
+  .type-row { display: grid; grid-template-columns: 1fr 90px; gap: 10px; align-items: center; margin-bottom: 10px; font-weight: 600; font-size: 14px; }
+  .type-row input { text-align: center; font-size: 22px; font-weight: 800; }
   .lb-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
   .lb-row:first-child { border-top: 0; }
   .lb-row .pos { width: 24px; text-align: center; font-weight: 800; }
@@ -138,7 +150,6 @@
 </header>
 
 <main class="wrap">
-  <div class="sample-note">🎾 Matches, Americano, Mexicano, invites and open games are all real now! Tournaments are coming later.</div>
   <div class="seg" id="seg">
     <button class="on" data-panel="open">📣 Open games</button>
     <button data-panel="organize">🎯 Organize</button>
@@ -200,6 +211,7 @@
   <div class="t-bar">
     <button id="tClose">✕</button>
     <div class="title" id="tTitle">Normal match</div>
+    <button id="tType" data-typeinstead="1" hidden>⌨️ Type</button>
     <button id="tMode"></button>
   </div>
   <button class="zone a" data-point="0">
@@ -709,8 +721,15 @@
     var f = session.format;
     if (f === 'team_americano' || f === 'round_robin') return session.plan[session.rounds.length];
     if (f === 'king') return kingRound();
-    if (f === 'mixicano') return mixicanoRound();
-    return americanoRound();
+    var busy = busyOf(session);
+    var r = f === 'mixicano' ? mixicanoRound() : americanoRound();
+    r.busy = activeOf(session).filter(function (id) { return busy[id]; });   // still on court in an earlier round
+    return r;
+  }
+  // Players who can play the next round: not taken out, not still on court
+  function freeOf(s) {
+    var busy = busyOf(s);
+    return activeOf(s).filter(function (id) { return !busy[id]; });
   }
 
   // 🔀 Mixicano: always 1 man + 1 woman. Top man plays with the lower woman of his court.
@@ -720,8 +739,8 @@
     function pick(list) {   // fewest games first (fair resting), then best ranked first
       return list.sort(function (a, b) { return (s.played[a] - s.played[b]) || (s.points[b] - s.points[a]) || (Math.random() - 0.5); });
     }
-    var men = pick(activeOf(s).filter(function (id) { return gender(id) === 'm'; }));
-    var women = pick(activeOf(s).filter(function (id) { return gender(id) === 'f'; }));
+    var men = pick(freeOf(s).filter(function (id) { return gender(id) === 'm'; }));
+    var women = pick(freeOf(s).filter(function (id) { return gender(id) === 'f'; }));
     var courtsNow = Math.max(1, Math.min(s.courts, Math.floor(Math.min(men.length, women.length) / 2)));
     var n = courtsNow * 2;
     var pm = men.slice(0, n), pw = women.slice(0, n);
@@ -749,6 +768,7 @@
     var courts = [];
     for (var i = 0; i < k; i++) courts.push([]);
     prev.matches.forEach(function (m, i) {
+      if (!m.score) { courts[i] = courts[i].concat(m.a, m.b); return; }   // skipped game: both teams stay on their court
       var aWon = m.score[0] >= m.score[1];
       var W = aWon ? m.a : m.b, L = aWon ? m.b : m.a;
       courts[Math.max(0, i - 1)] = courts[Math.max(0, i - 1)].concat(W);   // winners up (king stays)
@@ -758,8 +778,8 @@
     // resting players come back on the bottom court; the bottom court's losers rest instead
     var bottom = courts[k - 1];
     var cut = bottom.indexOf('__bottom__');
-    var bottomLosers = bottom.slice(cut + 1);
-    courts[k - 1] = bottom.slice(0, cut);
+    var bottomLosers = cut < 0 ? [] : bottom.slice(cut + 1);
+    courts[k - 1] = cut < 0 ? bottom : bottom.slice(0, cut);
     var pool = prev.resting.concat(bottomLosers);
     while (courts[k - 1].length < 4 && pool.length) courts[k - 1].push(pool.shift());
 
@@ -825,12 +845,13 @@
   // ⚡ Americano (and Mexicano): Mexicano pairs by ranking from round 2
   function americanoRound() {
     var s = session;
-    var courtsNow = Math.max(1, Math.min(s.courts, Math.floor(activeOf(s).length / 4)));   // fewer courts if people left
+    var free = freeOf(s);
+    var courtsNow = Math.max(1, Math.min(s.courts, Math.floor(free.length / 4)));   // fewer courts if people left or are still playing
     var courtsNeeded = courtsNow * 4;
     var order;
     if (s.format === 'mexicano' && s.rounds.length > 0) {
       // ranking order (most points first), but people who rested least sit out first
-      order = activeOf(s).sort(function (a, b) {
+      order = free.sort(function (a, b) {
         return (s.played[a] - s.played[b]) || (s.points[b] - s.points[a]);
       });
       var playing = order.slice(0, courtsNeeded).sort(function (a, b) { return s.points[b] - s.points[a]; });
@@ -843,7 +864,7 @@
       return { matches: matches, resting: resting };
     }
     // Americano (and Mexicano round 1): fewest games first, then avoid repeat partners
-    var shuffled = activeOf(s).sort(function () { return Math.random() - 0.5; });
+    var shuffled = free.sort(function () { return Math.random() - 0.5; });
     order = shuffled.sort(function (a, b) { return s.played[a] - s.played[b]; });
     var playing2 = order.slice(0, courtsNeeded);
     var resting2 = order.slice(courtsNeeded);
@@ -1026,6 +1047,7 @@
       s.partners[partnerKey(m.a[0], m.a[1])]--; s.partners[partnerKey(m.b[0], m.b[1])]--;
     }
     m.score = [a, b];
+    delete m.skipped;
     m.a.forEach(function (p) { s.points[p] += a; s.played[p]++; });
     m.b.forEach(function (p) { s.points[p] += b; s.played[p]++; });
     s.partners[partnerKey(m.a[0], m.a[1])] = (s.partners[partnerKey(m.a[0], m.a[1])] || 0) + 1;
@@ -1034,21 +1056,39 @@
 
   function roundDone(r) { return r.matches.every(function (m) { return m.score; }); }
 
+  // Games without a score yet, in any round: [{ ri, mi, m }]
+  function openGames(s) {
+    var list = [];
+    s.rounds.forEach(function (r, ri) { r.matches.forEach(function (m, mi) { if (!m.score && !m.skipped) list.push({ ri: ri, mi: mi, m: m }); }); });
+    return list;
+  }
+  // Players still on court in an unfinished game: they rest in the next round
+  function busyOf(s) {
+    var busy = {};
+    openGames(s).forEach(function (x) { x.m.a.concat(x.m.b).forEach(function (id) { busy[id] = x.ri + 1; }); });
+    return busy;
+  }
+  // Americano, Mexicano and Mixicano can start the next round while a court is still playing.
+  // King (needs every result to move courts) and fixed-pair formats (fixed plan) need every court done or skipped.
+  function canOverlap(s) { return s.format === 'americano' || s.format === 'mexicano' || s.format === 'mixicano'; }
+
   function renderSession() {
     var area = $('sessionArea');
     if (!session) { area.innerHTML = ''; $('organizeHome').style.display = ''; return; }
     $('organizeHome').style.display = 'none';
     var s = session;
     var f = FORMATS.filter(function (x) { return x.id === s.format; })[0];
-    var r = s.rounds[s.view];
-    var isLast = s.view === s.rounds.length - 1;
-    var finished = s.rounds.length === s.totalRounds && roundDone(s.rounds[s.rounds.length - 1]);
+    var last = s.rounds[s.rounds.length - 1];
+    var open = openGames(s);
+    var anyScore = s.rounds.some(function (r) { return r.matches.some(function (m) { return m.score; }); });
+    var allPlanned = s.rounds.length >= s.totalRounds;
+    var lastStarted = last.matches.some(function (m) { return m.score; });
 
     var html = '<div class="session-top"><h3>' + f.icon + ' ' + f.name + '</h3>' +
       '<div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-pplayers="1">👥 Players</button>' +
       '<button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-end="1">Cancel</button></div></div>' +
       '<p class="meta" style="margin:0 0 10px">' + s.players.length + ' players · ' + s.courts + ' court' + (s.courts > 1 ? 's' : '') + ' · ' + (s.scoring === 'games' ? 'first to ' + s.gamesTarget + ' games · ' + (s.golden ? '⚡ golden point' : '🔁 advantage') : s.target + ' pts per game') + '</p>' +
-      '<div class="rounds">';
+      '<div class="rounds" id="roundTabs">';
     for (var i = 0; i < s.totalRounds; i++) {
       var exists = i < s.rounds.length;
       html += '<button class="' + (i === s.view ? 'on ' : '') + (exists && roundDone(s.rounds[i]) ? 'done' : '') + '"' +
@@ -1056,24 +1096,148 @@
     }
     html += '</div>';
 
-    r.matches.forEach(function (m, mi) {
-      html += '<button class="card court" data-score="' + mi + '">' +
-        '<div class="ct"><span>Court ' + (mi + 1) + '</span><span>' + (m.score ? '✅ Done' : '⏳ Playing') + '</span></div>' +
-        '<div class="vs"><div class="tm">' + teamName(m.a) + '</div>' +
-        '<div class="sc">' + (m.score ? m.score[0] + ' – ' + m.score[1] : 'vs') + '</div>' +
-        '<div class="tm">' + teamName(m.b) + '</div></div>' +
-        '<div class="tap">' + (m.score ? 'Tap to fix score' : '👆 Tap to keep score') + '</div></button>';
-    });
-    if (r.resting.length) html += '<div class="rest">🪑 Resting this round: <b>' + r.resting.map(nameOfId).join(', ') + '</b></div>';
+    // every round is a slide: swipe left / right
+    html += '<div class="r-track" id="roundTrack">' + s.rounds.map(function (r, ri) {
+      var h = '<div class="r-slide">';
+      r.matches.forEach(function (m, mi) {
+        h += '<div class="card court" data-score="' + ri + ':' + mi + '" role="button">' +
+          '<div class="ct"><span>Court ' + (mi + 1) + '</span><span>' + (m.score ? '✅ Done' : ri < s.rounds.length - 1 ? '⏳ Still playing' : '⏳ Playing') + '</span></div>' +
+          '<div class="vs"><div class="tm">' + teamName(m.a) + '</div>' +
+          '<div class="sc">' + (m.score ? m.score[0] + ' – ' + m.score[1] : 'vs') + '</div>' +
+          '<div class="tm">' + teamName(m.b) + '</div></div>' +
+          '<div class="tap">' + (m.score ? 'Tap to fix score' : '👆 Tap to keep score') + '<button class="type-btn" data-typescore="' + ri + ':' + mi + '">⌨️ Type score</button></div></div>';
+      });
+      if (r.busy && r.busy.length) h += '<div class="rest">⏳ Still playing an earlier round: <b>' + r.busy.map(nameOfId).join(', ') + '</b></div>';
+      if (r.resting.length) h += '<div class="rest">🪑 Resting this round: <b>' + r.resting.map(nameOfId).join(', ') + '</b></div>';
+      return h + '</div>';
+    }).join('') + '</div>';
+    if (s.rounds.length > 1) {
+      html += '<div class="r-dots" id="roundDots">' + s.rounds.map(function (r, ri) { return '<i class="' + (ri === s.view ? 'on' : '') + '"></i>'; }).join('') + '</div>';
+    }
 
-    if (isLast && roundDone(r) && !finished) {
-      html += '<button class="btn btn-primary big-btn" data-next="1">Next round ➡️</button>';
-    } else if (finished && isLast) {
+    // next round / finish
+    if (!allPlanned) {
+      if (roundDone(last)) {
+        html += '<button class="btn btn-primary big-btn" data-next="1">Next round ➡️</button>';
+      } else if (lastStarted && canOverlap(s)) {
+        var still = last.matches.filter(function (m) { return !m.score; }).length;
+        html += '<button class="btn btn-primary big-btn" data-next="1">Next round ➡️</button>' +
+          '<p class="note" style="text-align:center;margin-top:-4px">⏳ ' + still + ' court' + (still > 1 ? 's are' : ' is') + ' still playing. They rest next round, and you can add their score later.</p>';
+      } else if (lastStarted) {
+        html += '<button class="btn btn-ghost big-btn" data-skipnext="1">⏭️ Skip unfinished games & next round</button>' +
+          '<p class="note" style="text-align:center;margin-top:-4px">' + f.name + ' needs every result before the next round. Skipped games give no points.</p>';
+      }
+    }
+    if (allPlanned && !open.length) {
       html += '<button class="btn btn-accent big-btn" data-finish="1">🏁 Finish & give points</button>';
+    } else if (anyScore) {
+      html += '<button class="btn btn-ghost big-btn" data-finishearly="1">🏁 Finish session now</button>';
     }
 
     html += '<h2>Live leaderboard</h2>' + standingsHtml(s);
     area.innerHTML = html;
+
+    // show the round you're looking at, and follow swipes
+    var track = $('roundTrack');
+    track.scrollLeft = s.view * track.clientWidth;
+    fitTrack();
+    var swipeTimer;
+    track.addEventListener('scroll', function () {
+      clearTimeout(swipeTimer);
+      swipeTimer = setTimeout(function () {
+        var v = Math.round(track.scrollLeft / track.clientWidth);
+        if (v !== s.view && v >= 0 && v < s.rounds.length) { s.view = v; markRound(); }
+      }, 80);
+    }, { passive: true });
+  }
+
+  function nextRound() {
+    var r = makeRound();
+    var ok = r && r.matches.length && r.matches.every(function (m) { return m.a.concat(m.b).every(function (id) { return id; }); });
+    if (!ok) return toast('⏳ Not enough free players yet. Wait for a court to finish.');
+    session.rounds.push(r);
+    session.view = session.rounds.length - 1;
+    renderSession();
+    persistSession();
+    window.scrollTo(0, 0);
+  }
+  var T_ri = 0, T_mi = 0;   // the court the score screen is open for
+
+  // Update the Round tabs and dots after a swipe (no full redraw)
+  // the carousel is as tall as the round you're looking at
+  function fitTrack() {
+    var slide = document.querySelectorAll('#roundTrack .r-slide')[session.view];
+    if (slide) $('roundTrack').style.height = slide.offsetHeight ? slide.offsetHeight + 'px' : '';   // 0 = tab hidden: measure later
+  }
+  function markRound() {
+    fitTrack();
+    document.querySelectorAll('#roundTabs button').forEach(function (b, i) { b.classList.toggle('on', i === session.view); });
+    document.querySelectorAll('#roundDots i').forEach(function (d, i) { d.classList.toggle('on', i === session.view); });
+    var tab = document.querySelectorAll('#roundTabs button')[session.view];
+    if (tab) tab.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }
+  function showRound(i) {
+    session.view = i;
+    var track = $('roundTrack');
+    track.scrollTo({ left: i * track.clientWidth, behavior: 'smooth' });
+    markRound();
+  }
+
+  // ⌨️ Type a score instead of tapping every point
+  function openTypeScore(ri, mi) {
+    var s = session, m = s.rounds[ri].matches[mi];
+    var games = s.scoring === 'games';
+    var G = s.gamesTarget;
+    openSheet('<h3>⌨️ Round ' + (ri + 1) + ' · Court ' + (mi + 1) + '</h3>' +
+      '<p class="meta" style="margin:-6px 0 12px">' + (games
+        ? 'Games won. First to ' + G + ' (' + G + '-' + (G - 2) + ' or less), ' + (G + 1) + '-' + (G - 1) + ', or ' + (G + 1) + '-' + G + ' after a tiebreak.'
+        : 'Points won. The two scores add up to ' + s.target + '.') + '</p>' +
+      '<form id="typeForm">' +
+        '<div class="type-row"><span>' + teamName(m.a) + '</span><input class="input" id="tsA" type="number" inputmode="numeric" min="0" max="99" value="' + (m.score ? m.score[0] : '') + '" required></div>' +
+        '<div class="type-row"><span>' + teamName(m.b) + '</span><input class="input" id="tsB" type="number" inputmode="numeric" min="0" max="99" value="' + (m.score ? m.score[1] : '') + '" required></div>' +
+        '<div class="error-box" id="tsError" hidden></div>' +
+        '<button class="btn btn-primary" style="width:100%;margin-top:12px">✅ Save score</button>' +
+      '</form>');
+    // points: typing one score fills in the other
+    if (!games) {
+      $('tsA').addEventListener('input', function () { if (this.value !== '') $('tsB').value = Math.max(0, s.target - this.value); });
+      $('tsB').addEventListener('input', function () { if (this.value !== '') $('tsA').value = Math.max(0, s.target - this.value); });
+    }
+    setTimeout(function () { $('tsA').focus(); }, 250);
+    $('typeForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var a = parseInt($('tsA').value, 10), b = parseInt($('tsB').value, 10);
+      var problem = typedScoreProblem(a, b);
+      if (problem) { $('tsError').textContent = problem; $('tsError').hidden = false; return; }
+      saveScore(ri, mi, a, b);
+      closeSheet(); renderSession(); persistSession();
+      toast('✅ Score saved');
+    });
+  }
+  function typedScoreProblem(a, b) {
+    var s = session;
+    if (isNaN(a) || isNaN(b) || a < 0 || b < 0) return 'Type both scores (0 or more).';
+    if (s.scoring !== 'games') return a + b === s.target ? null : 'The scores must add up to ' + s.target + ' (now ' + (a + b) + ').';
+    var G = s.gamesTarget, hi = Math.max(a, b), lo = Math.min(a, b);
+    if ((hi === G && lo <= G - 2) || (hi === G + 1 && (lo === G - 1 || lo === G))) return null;
+    return 'That is not a finished set. Examples: ' + G + '-' + (G - 2) + ', ' + (G + 1) + '-' + (G - 1) + ', ' + (G + 1) + '-' + G + ' (tiebreak).';
+  }
+
+  // 🏁 Finish early: show what will be skipped first
+  function openFinishEarly() {
+    var s = session;
+    var open = openGames(s);
+    var notStarted = s.totalRounds - s.rounds.length;
+    openSheet('<h3>🏁 Finish the session now?</h3>' +
+      (open.length ? '<p style="margin:0 0 6px">⚠️ <b>' + open.length + ' game' + (open.length > 1 ? 's were' : ' was') + ' not played:</b></p>' +
+        '<div class="card" style="padding:6px 12px;font-size:13px">' + open.map(function (x) {
+          return '<div style="padding:4px 0">Round ' + (x.ri + 1) + ' · Court ' + (x.mi + 1) + ': ' + teamName(x.m.a) + ' vs ' + teamName(x.m.b) + '</div>';
+        }).join('') + '</div><p class="note" style="margin-top:-4px">They are skipped: nobody gets points for them.</p>' : '') +
+      (notStarted > 0 ? '<p style="margin:10px 0 0">📅 ' + (notStarted === 1 ? 'Round ' + s.totalRounds + ' was' : 'Rounds ' + (s.rounds.length + 1) + '–' + s.totalRounds + ' were') + ' not started: dropped.</p>' : '') +
+      '<p class="note">The ranking is everyone\'s total points from the games that were played.</p>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">' +
+        '<button class="btn btn-ghost" data-close-sheet="1">Go back</button>' +
+        '<button class="btn btn-accent" data-finish="1">✅ Finish & give points</button></div>');
   }
 
   function teamName(ids) { return ids.map(nameOfId).join(' & '); }
@@ -1085,7 +1249,7 @@
       var medal = ['🥇', '🥈', '🥉'][i] || (i + 1);
       var o = s.out && s.out[p];
       return '<div class="lb-row"><span class="pos">' + medal + '</span><span>' + nameOfId(p) + (o ? ' ' + REASONS[o.reason][0] : '') + '</span>' +
-        '<small>' + s.played[p] + ' games' + (o ? ' · ' + REASONS[o.reason][1].toLowerCase() : '') + '</small><span class="pts">' + s.points[p] + '</span></div>';
+        '<small>' + s.played[p] + ' game' + (s.played[p] === 1 ? '' : 's') + (o ? ' · ' + REASONS[o.reason][1].toLowerCase() : '') + '</small><span class="pts">' + s.points[p] + '</span></div>';
     }).join('') + '</div>';
   }
 
@@ -1245,6 +1409,7 @@
         $('flag' + t).textContent = flag;
       }
     }
+    $('tType').hidden = !T.inSession;   // sessions: type the score instead
     if (T.mode === 'points') {
       $('tMode').textContent = T.target + ' pts';
       $('tMid').innerHTML = '<span>Points played</span><span class="sets">' + (T.pts[0] + T.pts[1]) + ' / ' + T.target + '</span>';
@@ -1319,13 +1484,14 @@
   // CLICKS
   // =====================================================
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-invto],[data-invnew],[data-gdone],[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-gsession],[data-pplayers],[data-pout],[data-pback],[data-padd],[data-preason],[data-psub],[data-pshare],[data-close-sheet],[data-rate],[data-guide],[data-open-guide],[data-setup],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
+    var el = e.target.closest('[data-typescore],[data-typeinstead],[data-finishearly],[data-skipnext],[data-invto],[data-invnew],[data-gdone],[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-gsession],[data-pplayers],[data-pout],[data-pback],[data-padd],[data-preason],[data-psub],[data-pshare],[data-close-sheet],[data-rate],[data-guide],[data-open-guide],[data-setup],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
     if (!el) return;
     var d = el.dataset;
 
     if (d.panel) {
       document.querySelectorAll('#seg button').forEach(function (b) { b.classList.toggle('on', b === el); });
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.toggle('on', p.id === d.panel); });
+      if (session && $('roundTrack')) fitTrack();
     }
     // ----- games & lobby -----
     else if (d.gcreate) openCreate();
@@ -1376,9 +1542,19 @@
     else if (d.pshare) { lobbyId = sessionGame; shareJoinLink(); lobbyId = null; }
     else if (d.rate) { closeSheet(); PadPal.openRating(d.rate.split(',')); }
     else if (d.closeSheet) closeSheet();
-    else if (d.view !== undefined) { session.view = +d.view; renderSession(); }
+    else if (d.view !== undefined) showRound(+d.view);
+    else if (d.typescore) { var tsp = d.typescore.split(':'); openTypeScore(+tsp[0], +tsp[1]); }
+    else if (d.typeinstead) { closeTracker(); openTypeScore(T_ri, T_mi); }
+    else if (d.finishearly) openFinishEarly();
+    else if (d.skipnext) {
+      if (!tapTwice('skipnext', 'Tap again: unfinished games are skipped (no points) and the next round starts')) return;
+      session.rounds[session.rounds.length - 1].matches.forEach(function (m) { if (!m.score) m.skipped = true; });
+      nextRound();
+    }
     else if (d.score !== undefined) {
-      var ri = session.view, mi = +d.score;
+      var sp = d.score.split(':');
+      var ri = +sp[0], mi = +sp[1];
+      T_ri = ri; T_mi = mi;
       var m = session.rounds[ri].matches[mi];
       var title = 'Round ' + (ri + 1) + ' · Court ' + (mi + 1);
       var names = [teamName(m.a).replace(/&amp;/g, '&'), teamName(m.b).replace(/&amp;/g, '&')];
@@ -1390,26 +1566,20 @@
       if (session.scoring === 'games') {
         // tennis scoring: one mini-set to 4 or 6 games, total = games won
         openTracker({
-          mode: 'sets', title: title, names: names, setGames: session.gamesTarget, setsToWin: 1, golden: session.golden,
+          mode: 'sets', inSession: true, title: title, names: names, setGames: session.gamesTarget, setsToWin: 1, golden: session.golden,
           pts: [0, 0], games: [0, 0], sets: [], setsWon: [0, 0], tiebreak: false, over: false,
           onSave: function () { done(T.sets[0][0], T.sets[0][1]); }
         });
       } else {
         openTracker({
-          mode: 'points', title: title, names: names, target: session.target, pts: [0, 0], over: false,
+          mode: 'points', inSession: true, title: title, names: names, target: session.target, pts: [0, 0], over: false,
           onSave: function () { done(T.pts[0], T.pts[1]); }
         });
       }
     }
     else if (d.saveScore) T.onSave();
     else if (d.undoLast) undo();
-    else if (d.next) {
-      session.rounds.push(makeRound());
-      session.view = session.rounds.length - 1;
-      renderSession();
-      persistSession();
-      window.scrollTo(0, 0);
-    }
+    else if (d.next) nextRound();
     else if (d.finish) finishSession(el);
     else if (d.end) {
       if (tapTwice('end', 'Tap Cancel again: the session is cancelled and nobody gets points.')) {
