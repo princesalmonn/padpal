@@ -12,6 +12,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="rate.js"></script>
+<script src="sessions.js"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Profile-only styles ===== */
@@ -134,6 +136,21 @@
   .h2h .avatar { width: 52px; height: 52px; margin: 0 auto 6px; font-size: 20px; }
   .h2h .big { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .h2h-note { text-align: center; font-size: 13px; color: var(--text-2); margin-top: 10px; }
+
+  /* Visiting someone: PadPals, You vs Them, history rows you can tap */
+  .pals-btn { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 14px; font-size: 13px; color: var(--text); margin-top: 10px; }
+  .pals-btn b { color: var(--accent); }
+  .vs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; }
+  .vs-grid div { background: var(--card-2); border-radius: 12px; padding: 10px 6px; }
+  .vs-grid strong { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .vs-grid small { color: var(--text-2); font-size: 11px; }
+  button.match-row { width: 100%; text-align: left; color: var(--text); font: inherit; }
+  .kind-ico { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 16px; flex-shrink: 0; background: var(--card-2); }
+  .pal-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--text); }
+  .pal-row .avatar { width: 38px; height: 38px; font-size: 15px; }
+  .pal-row .n { margin-left: auto; text-align: right; font-weight: 700; font-size: 14px; }
+  .pal-row .n small { display: block; font-weight: 500; font-size: 11px; color: var(--text-2); }
+  .icon-btn.back { font-size: 26px; }
 </style>
 </head>
 <body>
@@ -157,6 +174,7 @@
     <div class="handle" id="heroHandle"></div>
     <p class="bio" id="heroBio"></p>
     <div class="chips" id="heroChips"></div>
+    <button class="pals-btn" id="palsBtn">👥 <b id="palsN">…</b> PadPals</button>
   </section>
 
   <div style="height:14px"></div>
@@ -179,10 +197,16 @@
     <div><strong id="qStreak">0</strong><small>Win streak</small></div>
   </div>
 
-  <div class="row-btns">
+  <div class="row-btns" id="myBtns">
     <button class="btn btn-ghost" data-edit>✏️ Edit profile</button>
     <button class="btn btn-primary" id="inviteBtn">➕ Invite friend</button>
   </div>
+  <div class="row-btns" id="theirBtns" hidden>
+    <a class="btn btn-primary" id="msgBtn" style="text-align:center;text-decoration:none">💬 Message</a>
+    <a class="btn btn-ghost" id="gameBtn" style="text-align:center;text-decoration:none">🎾 Invite</a>
+    <button class="btn btn-ghost" id="starBtn" style="flex:0 0 52px">☆</button>
+  </div>
+  <button class="btn btn-accent" id="rateBtn" style="width:100%;margin:-6px 0 16px" hidden>🎯 Rate their shots</button>
 
   <div id="segAnchor"></div>
   <div class="seg" id="seg">
@@ -193,6 +217,11 @@
 
   <!-- ===== Overview ===== -->
   <section class="panel on" id="overview">
+    <div id="vsBox" hidden>
+      <h2>⚔️ You vs <span id="vsName"></span></h2>
+      <div class="card" id="vsCard"></div>
+    </div>
+
     <h2>Pinned photos <small id="pinCount"></small></h2>
     <div class="pins" id="pins"></div>
     <input type="file" id="pinInput" accept="image/*" hidden>
@@ -217,7 +246,7 @@
     </div>
     <div class="tiles" id="tiles"></div>
 
-    <h2>Your people</h2>
+    <h2 id="peopleTitle">Your people</h2>
     <div class="people" id="people"></div>
 
     <h2>Fun facts 🤓</h2>
@@ -226,11 +255,19 @@
 
   <!-- ===== History ===== -->
   <section class="panel" id="history">
-    <h2>Head-to-head</h2>
-    <div class="h2h-pick" id="h2hPick"></div>
-    <div class="card" id="h2hCard"></div>
+    <div id="h2hBox">
+      <h2>Head-to-head</h2>
+      <div class="h2h-pick" id="h2hPick"></div>
+      <div class="card" id="h2hCard"></div>
+    </div>
 
-    <h2>Match history</h2>
+    <h2>History</h2>
+    <div class="chips-row" id="histChips">
+      <button class="on" data-hist="all">All</button>
+      <button data-hist="match">🎾 Matches</button>
+      <button data-hist="session">🔄 Sessions</button>
+      <button data-hist="tourney">🏆 Tournaments</button>
+    </div>
     <div id="matches"></div>
   </section>
 
@@ -328,6 +365,9 @@
   </form>
 </div>
 
+<!-- Session details / PadPals list -->
+<div class="sheet" id="infoSheet"><div class="grab"></div><div id="infoBody"></div></div>
+
 <!-- Photo viewer -->
 <div class="viewer" id="viewer">
   <button class="v-close" id="vClose" aria-label="Close">×</button>
@@ -351,6 +391,15 @@
   var statsPeriod = 'month';
   var myChanges = [];     // every points change of yours (matches, sessions, ratings, inactivity)
   var myExits = [];       // sessions you had to stop: { reason, when }
+  var mySessions = [];    // finished sessions: { game, row (your result), n, change, when }
+  var myTourneys = [];    // tournament teams you were in
+  var pals = null;        // PadPals: [{ user_id, games }]
+  var histFilter = 'all';
+
+  // On someone else's profile, these are "their" numbers. The page shows whoever `profile` is;
+  // `viewer` is always you.
+  var viewer = null;
+  var isMe = true;
 
   // ===== Helpers =====
   function $(id) { return document.getElementById(id); }
@@ -503,8 +552,16 @@
         (most ? person('👥', 'Most played with', most, stat[most].with + stat[most].vs, 'games') : '')
       : '<p class="meta" style="margin:0">No matches in this period yet. 🎾</p>';
 
-    $('facts').innerHTML = funFacts(ms, ch, nSessions, ids.length, key).map(function (f) { return '<div class="fact">' + f + '</div>'; }).join('') ||
+    $('facts').innerHTML = funFacts(ms, ch, nSessions, ids.length, key).map(function (f) { return '<div class="fact">' + aboutThem(f) + '</div>'; }).join('') ||
       '<p class="meta" style="margin:0">Play some matches to unlock fun facts! 🤓</p>';
+  }
+
+  // "You came back…" → "Budi came back…" when you look at Budi's profile
+  function firstName() { return esc((profile.display_name || profile.username).split(' ')[0]); }
+  function aboutThem(text) {
+    if (isMe) return text;
+    var n = firstName();
+    return text.replace(/\bYour\b/g, n + '\'s').replace(/\bYou\b/g, n).replace(/\byou\b/g, n);
   }
 
   function funFacts(ms, ch, nSessions, nFriends, key) {
@@ -539,7 +596,7 @@
     var skill = ch.filter(function (c) { return c.reason === 'skill'; }).reduce(function (a, c) { return a + Number(c.change); }, 0);
     if (skill) facts.push('🎯 Friends\' shot ratings gave you <b>' + PadPal.fmtChange(skill) + '</b> points');
     var idle = ch.filter(function (c) { return c.reason === 'inactive' || c.reason === 'skill-shrink'; }).reduce(function (a, c) { return a + Number(c.change); }, 0);
-    if (idle) facts.push('🧊 Not playing cost you <b>' + PadPal.fmt(Math.abs(idle)) + '</b> point' + (Math.abs(idle) === 1 ? '' : 's') + '. Keep playing!');
+    if (idle && isMe) facts.push('🧊 Not playing cost you <b>' + PadPal.fmt(Math.abs(idle)) + '</b> point' + (Math.abs(idle) === 1 ? '' : 's') + '. Keep playing!');
     if (nFriends >= 2) facts.push('👥 You played with <b>' + nFriends + '</b> different friends');
     // sessions you had to stop (the host's reason)
     var exits = myExits.filter(function (x) { return new Date(x.when).getTime() >= Date.now() - PERIOD_DAYS[key] * 86400000; });
@@ -581,16 +638,33 @@
       .order('played_at', { ascending: false }).limit(200);
     var cr = await db.from('point_changes').select('match_id, game_id, change, reason, created_at').eq('user_id', id);
     myChanges = cr.data || [];
-    // sessions where the host took you out (injured, sick, tired…)
+    // sessions played (for History) and where the host took you out (injured, sick, tired…)
     myExits = [];
-    var sessionIds = myChanges.filter(function (c) { return c.reason === 'session' && c.game_id; }).map(function (c) { return c.game_id; });
+    mySessions = [];
+    var sessionChange = {};
+    myChanges.forEach(function (c) { if (c.reason === 'session' && c.game_id) sessionChange[c.game_id] = c; });
+    var sessionIds = Object.keys(sessionChange);
     if (sessionIds.length) {
-      var gs = await db.from('games').select('id, session_state, scheduled_at').in('id', sessionIds);
+      var gs = await db.from('games').select('id, kind, host_id, place, session_state, scheduled_at').in('id', sessionIds);
       (gs.data || []).forEach(function (g) {
         var o = g.session_state && g.session_state.out && g.session_state.out[id];
         if (o) myExits.push({ reason: o.reason, when: g.scheduled_at });
+        if (!g.session_state || !g.session_state.players) return;
+        var rows = PadPal.sessions.rows(g.session_state);
+        var mine = rows.filter(function (x) { return x.id === id; })[0];
+        mySessions.push({ game: g, row: mine, n: rows.length, change: Number(sessionChange[g.id].change), when: sessionChange[g.id].created_at });
       });
     }
+    // tournaments played
+    var tr = await db.from('tournament_teams').select('place, p1, p2, tournaments(id, name, kind, status, scheduled_at)')
+      .or('p1.eq.' + id + ',p2.eq.' + id);
+    myTourneys = (tr.data || []).filter(function (t) { return t.tournaments && t.tournaments.status !== 'cancelled'; });
+    // PadPals: everyone they played at least one game with
+    db.rpc('padpals', { p_user: id }).then(function (pr) {
+      pals = pr.error ? null : pr.data;
+      $('palsN').textContent = pals ? pals.length : '?';
+      renderVs();
+    });
     var changeOf = {};
     myChanges.forEach(function (c) { if (c.match_id) changeOf[c.match_id] = c.change; });
     myMatches = (r.data || []).map(function (m) {
@@ -608,8 +682,11 @@
     });
     try { urls = await PadPal.photoUrls(list.map(function (m) { return m.avatar_url; })); } catch (err) {}
     renderRank(list);
-    renderMatches();
+    renderHistory();
     renderStats(statsPeriod);
+    renderVs();
+    checkRate();
+    if (!isMe) return;   // the head-to-head picker is only on your own profile
     var foes = {};
     myMatches.forEach(function (m) { m.opp.forEach(function (o) { foes[o] = true; }); });
     var first = Object.keys(foes)[0];
@@ -638,7 +715,9 @@
     $('rTo').textContent = !next ? 'Top tier! 👑'
       : pts >= 500 ? '🏆 Tournaments unlock ' + next.icon + ' ' + next.name
       : PadPal.fmt(next.min - pts) + ' pts to ' + next.icon + ' ' + next.name;
-    if (!profile.last_played) $('rWarn').textContent = '🎾 No matches yet. Play your first match from the Play tab!';
+    if (!isMe) {   // someone else's inactivity is their business
+      $('rWarn').hidden = true;
+    } else if (!profile.last_played) $('rWarn').textContent = '🎾 No matches yet. Play your first match from the Play tab!';
     else {
       var days = Math.floor((Date.now() - new Date(profile.last_played + 'T00:00:00')) / 86400000);
       $('rWarn').textContent = days <= 0 ? '🔥 You played today!' : '⏳ Last game ' + days + ' day' + (days > 1 ? 's' : '') + ' ago. Play at least once a week!';
@@ -679,24 +758,131 @@
       '</div><div class="h2h-note">' + note + '</div>';
   }
 
-  function renderMatches() {
-    $('matches').innerHTML = myMatches.length ? myMatches.map(function (m) {
-      var c = m.change;
-      return '<div class="match-row">' +
+  // ===== History: matches, sessions and tournaments, newest first =====
+  function dateText(iso) { return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }); }
+  function changeHtml(c) { return c == null || isNaN(c) ? '' : '<small class="' + (c >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(c) + '</small>'; }
+
+  function renderHistory() {
+    var items = [];
+    if (histFilter === 'all' || histFilter === 'match') myMatches.forEach(function (m) {
+      items.push({ when: m.when, html: '<div class="match-row">' +
         '<div class="wlb ' + (m.won ? 'w' : 'l') + '">' + (m.won ? 'W' : 'L') + '</div>' +
         '<div class="who">with <b>' + pname(m.partner) + '</b> vs ' + pname(m.opp[0]) + ' & ' + pname(m.opp[1]) +
-        '<small>' + new Date(m.when).toLocaleDateString() + '</small></div>' +
-        '<div class="score">' + m.score +
-        (c === undefined ? '' : '<small class="' + (c >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(c) + '</small>') +
-        '</div></div>';
-    }).join('') : '<p class="meta">No matches yet. Start one from the 🎾 Play tab!</p>';
+        '<small>🎾 Match · ' + dateText(m.when) + '</small></div>' +
+        '<div class="score">' + m.score + changeHtml(m.change) + '</div></div>' });
+    });
+    if (histFilter === 'all' || histFilter === 'session') mySessions.forEach(function (s, i) {
+      var g = s.game, r = s.row;
+      var kind = (PadPal.sessions.KINDS[g.kind] || '🔄 Session').split(' ');
+      var out = r && r.out ? ' · ' + (PadPal.sessions.REASONS[r.out.reason] || PadPal.sessions.REASONS.other)[0] + ' left at round ' + r.out.round : '';
+      items.push({ when: g.scheduled_at, html: '<button class="match-row" data-session="' + i + '">' +
+        '<div class="kind-ico">' + kind[0] + '</div>' +
+        '<div class="who"><b>' + kind.slice(1).join(' ') + '</b>' + (g.host_id === profile.id ? ' 👑' : '') + ' · ' +
+          (r ? (r.place <= 3 ? PadPal.sessions.medal(r.place) + ' ' : '') + PadPal.sessions.ordinal(r.place) + ' of ' + s.n + ' · ' + r.w + 'W ' + r.l + 'L' : s.n + ' players') +
+        '<small>' + dateText(g.scheduled_at) + (g.place ? ' · ' + esc(g.place) : '') + out + '</small></div>' +
+        '<div class="score">' + (r ? r.total + ' pts' : '') + changeHtml(s.change) + '</div></button>' });
+    });
+    if (histFilter === 'all' || histFilter === 'tourney') myTourneys.forEach(function (t) {
+      var T = t.tournaments;
+      var partner = t.p1 === profile.id ? t.p2 : t.p1;
+      var place = t.place ? (['🥇 Champion', '🥈 2nd place', '🥉 3rd place'][t.place - 1] || PadPal.sessions.ordinal(t.place) + ' place') : (T.status === 'done' ? 'Out early' : '🔴 Playing now');
+      items.push({ when: T.scheduled_at, html: '<a class="match-row" href="tourney.html?id=' + T.id + '" style="text-decoration:none;color:var(--text)">' +
+        '<div class="kind-ico">' + (T.kind === 'official' ? '🏆' : '🎉') + '</div>' +
+        '<div class="who"><b>' + esc(T.name) + '</b> with ' + pname(partner) + '<small>' + dateText(T.scheduled_at) + (T.kind === 'friendly' ? ' · Season 0' : '') + '</small></div>' +
+        '<div class="score">' + place + '</div></a>' });
+    });
+    items.sort(function (a, b) { return new Date(b.when) - new Date(a.when); });
+    var empty = { all: 'Nothing played yet.', match: 'No matches yet.', session: 'No sessions yet.', tourney: 'No tournaments yet.' }[histFilter];
+    $('matches').innerHTML = items.length ? items.map(function (x) { return x.html; }).join('')
+      : '<p class="meta">' + empty + (isMe ? ' Start one from the 🎾 Play tab!' : '') + '</p>';
+  }
+
+  // Tap a session in History: podium, everyone's result and every round
+  async function openSession(i) {
+    var s = mySessions[i];
+    $('infoBody').innerHTML = '<p class="meta">Loading…</p>';
+    openSheet($('infoSheet'));
+    var r = await db.from('point_changes').select('user_id, change').eq('game_id', s.game.id).eq('reason', 'session');
+    var changes = {};
+    (r.data || []).forEach(function (c) { changes[c.user_id] = c.change; });
+    $('infoBody').innerHTML = PadPal.sessions.detail(s.game, changes, pname, avatarOf, profile.id);
+  }
+  function avatarOf(id) {
+    var p = people[id];
+    var url = p && p.avatar_url && urls[p.avatar_url];
+    return url ? '<img src="' + url + '" alt="">' : pname(id)[0];
+  }
+
+  // PadPals list with search
+  function openPals() {
+    if (!pals) return toast('PadPals need an update: run 16_social.sql in Supabase');
+    var html = '<h3>👥 ' + (isMe ? 'Your' : firstName() + '\'s') + ' PadPals (' + pals.length + ')</h3>' +
+      '<p class="meta" style="margin:-6px 0 10px">Everyone ' + (isMe ? 'you' : firstName()) + ' played at least one game with.</p>' +
+      (pals.length > 6 ? '<input class="input" id="palSearch" placeholder="🔍 Search" style="margin-bottom:8px">' : '') +
+      '<div id="palList"></div>';
+    $('infoBody').innerHTML = html;
+    renderPalList('');
+    if ($('palSearch')) $('palSearch').addEventListener('input', function () { renderPalList(this.value.trim().toLowerCase()); });
+    openSheet($('infoSheet'));
+  }
+  function renderPalList(q) {
+    var list = pals.filter(function (x) {
+      var p = people[x.user_id];
+      return p && (!q || (p.display_name || '').toLowerCase().indexOf(q) > -1 || (p.username || '').toLowerCase().indexOf(q) > -1);
+    });
+    $('palList').innerHTML = list.length ? list.map(function (x) {
+      var p = people[x.user_id], t = PadPal.tierOf(p.points);
+      return '<a class="pal-row" href="profile.html' + (x.user_id === viewer.id ? '' : '?id=' + x.user_id) + '"><div class="avatar">' + avatarOf(x.user_id) + '</div>' +
+        '<div><div class="name">' + pname(x.user_id) + (x.user_id === viewer.id ? ' (you)' : '') + '</div><div class="meta">' + t.icon + ' ' + t.name + '</div></div>' +
+        '<div class="n">' + x.games + '<small>game' + (x.games === 1 ? '' : 's') + ' together</small></div></a>';
+    }).join('') : '<p class="meta">' + (pals.length ? 'Nobody found.' : 'No PadPals yet. Play a game to get some! 🎾') + '</p>';
+  }
+
+  // ⚔️ You vs Them (only on someone else's profile)
+  function renderVs() {
+    if (isMe) return;
+    var together = myMatches.filter(function (m) { return m.partner === viewer.id; });
+    var against = myMatches.filter(function (m) { return m.opp.indexOf(viewer.id) > -1; });
+    var tw = together.filter(function (m) { return m.won; }).length;
+    var youWin = against.filter(function (m) { return !m.won; }).length;   // their match lost = you won
+    var both = pals && pals.filter(function (x) { return x.user_id === viewer.id; })[0];
+    $('vsName').textContent = profile.display_name || profile.username;
+    $('vsCard').innerHTML = '<div class="vs-grid">' +
+      '<div><strong>' + tw + '–' + (together.length - tw) + '</strong><small>🤝 as partners</small></div>' +
+      '<div><strong><span class="' + (youWin >= against.length - youWin ? 'plus' : 'minus') + '">' + youWin + '</span>–' + (against.length - youWin) + '</strong><small>⚔️ you vs them</small></div>' +
+      '</div><p class="h2h-note">' + (both ? '🎾 ' + both.games + ' game' + (both.games === 1 ? '' : 's') + ' played together (matches, sessions & tournaments)'
+        : 'You haven\'t played together yet. Invite them to a game! 🎾') + '</p>';
+    $('vsBox').hidden = false;
+  }
+
+  // 🎯 Rate their shots: only when you played together in the last 24 hours
+  async function checkRate() {
+    if (isMe) return;
+    var since = Date.now() - 24 * 3600000;
+    var ok = myMatches.some(function (m) {
+      return new Date(m.when) > since && (m.partner === viewer.id || m.opp.indexOf(viewer.id) > -1);
+    });
+    if (!ok) {
+      var recent = mySessions.filter(function (s) { return new Date(s.when) > since; }).map(function (s) { return s.game.id; });
+      if (recent.length) {
+        var r = await db.from('point_changes').select('game_id').eq('user_id', viewer.id).eq('reason', 'session').in('game_id', recent).limit(1);
+        ok = !!(r.data && r.data.length);
+      }
+    }
+    $('rateBtn').hidden = !ok;
   }
 
   // ===== Clicks =====
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-panel],[data-period],[data-h2h],[data-soon]');
+    var el = e.target.closest('[data-panel],[data-period],[data-h2h],[data-hist],[data-session],[data-soon]');
     if (!el) return;
-    if (el.dataset.panel) {
+    if (el.dataset.hist) {
+      histFilter = el.dataset.hist;
+      document.querySelectorAll('#histChips button').forEach(function (b) { b.classList.toggle('on', b === el); });
+      renderHistory();
+    } else if (el.dataset.session !== undefined) {
+      openSession(+el.dataset.session);
+    } else if (el.dataset.panel) {
       document.querySelectorAll('#seg button').forEach(function (b) { b.classList.toggle('on', b === el); });
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.toggle('on', p.id === el.dataset.panel); });
       // if we've scrolled past the tabs, jump back so the new section starts at its top
@@ -726,13 +912,65 @@
   var pins = [];
   var viewing = null;
 
-  PadPal.me.then(function (me) {
+  PadPal.me.then(async function (me) {
     if (!me) return;
+    viewer = me.profile;
     profile = me.profile;
+    // profile.html?id=<member> shows someone else's profile
+    var otherId = new URLSearchParams(location.search).get('id');
+    if (otherId && otherId !== viewer.id) {
+      var r = await db.from('profiles').select('*').eq('id', otherId).eq('status', 'approved').maybeSingle();
+      if (!r.data) {
+        document.querySelector('main').innerHTML = '<div class="card" style="text-align:center;margin-top:30px"><div style="font-size:40px">🤷</div><p><b>Player not found</b></p><a class="btn btn-primary" href="ranks.html" style="text-decoration:none;display:inline-block">See all players</a></div>';
+        return;
+      }
+      profile = r.data;
+      isMe = false;
+      setupVisit();
+    }
     renderHero();
     loadPins();
     loadGame().then(loadShots).then(loadTrophies);
   });
+
+  // Looking at someone else: no editing, but Message / Invite / ⭐ buttons
+  function setupVisit() {
+    var name = profile.display_name || profile.username;
+    document.title = name + ' · PadPal';
+    $('settingsBtn').textContent = '‹';
+    $('settingsBtn').classList.add('back');
+    $('settingsBtn').setAttribute('aria-label', 'Back');
+    document.querySelector('.tabbar a.on').classList.remove('on');
+    $('avatarBtn').querySelector('.cam').hidden = true;
+    $('avatarBtn').style.cursor = 'default';
+    $('myBtns').hidden = true;
+    $('theirBtns').hidden = false;
+    $('msgBtn').href = 'chat.html?with=' + profile.id;
+    $('gameBtn').href = 'play.html?invite=' + profile.id;
+    $('h2hBox').hidden = true;
+    $('peopleTitle').textContent = name.split(' ')[0] + '\'s people';
+    $('vRemove').hidden = true;
+    db.from('favourites').select('fav_id').eq('fav_id', profile.id).then(function (fr) {
+      starred = !!(fr.data && fr.data.length);
+      renderStar();
+    });
+  }
+  var starred = false;
+  function renderStar() {
+    $('starBtn').textContent = starred ? '⭐' : '☆';
+    $('starBtn').setAttribute('aria-label', starred ? 'Remove from favourites' : 'Add to favourites');
+  }
+  $('starBtn').addEventListener('click', async function () {
+    var r = starred
+      ? await db.from('favourites').delete().eq('user_id', viewer.id).eq('fav_id', profile.id)
+      : await db.from('favourites').insert({ fav_id: profile.id });
+    if (r.error) return toast(/favourites/.test(r.error.message) ? 'Run 16_social.sql in Supabase first' : PadPal.friendlyError(r.error));
+    starred = !starred;
+    renderStar();
+    toast(starred ? '⭐ Favourite! They show first when you invite people' : 'Removed from favourites');
+  });
+  $('rateBtn').addEventListener('click', function () { PadPal.openRating([profile.id]); });
+  $('palsBtn').addEventListener('click', openPals);
 
   // ===== Your header (name, picture, chips) =====
   async function renderHero() {
@@ -759,7 +997,7 @@
   }
 
   // ===== Profile picture: kept forever, until you change it =====
-  $('avatarBtn').addEventListener('click', function () { $('avatarInput').click(); });
+  $('avatarBtn').addEventListener('click', function () { if (isMe) $('avatarInput').click(); });
   $('avatarInput').addEventListener('change', async function () {
     var file = this.files[0];
     this.value = '';
@@ -847,6 +1085,13 @@
   }
   function renderPins() {
     var html = '';
+    if (!isMe) {   // someone else's pins: just the photos
+      $('pins').innerHTML = pins.length ? pins.map(function (p, i) {
+        return '<button class="photo-btn" data-pin="' + i + '" aria-label="Open photo">' + (p.url ? '<img src="' + p.url + '" alt="" loading="lazy">' : '📷') + '</button>';
+      }).join('') : '<p class="meta" style="grid-column:1/-1;margin:0">No pinned photos yet.</p>';
+      $('pinCount').textContent = pins.length ? pins.length + ' photo' + (pins.length > 1 ? 's' : '') : '';
+      return;
+    }
     for (var i = 0; i < 6; i++) {
       var p = pins[i];
       html += p
@@ -906,11 +1151,14 @@
     var el = e.target.closest('[data-pin],[data-add-pin]');
     if (!el) return;
     if (el.dataset.pin !== undefined) openViewer(+el.dataset.pin);
-    else $('pinInput').click();
+    else if (isMe) $('pinInput').click();
   });
 
   // Settings sheet
-  $('settingsBtn').addEventListener('click', function () { openSheet($('settingsSheet')); });
+  $('settingsBtn').addEventListener('click', function () {
+    if (isMe) return openSheet($('settingsSheet'));
+    if (history.length > 1) history.back(); else location.href = 'ranks.html';   // ‹ back from someone's profile
+  });
 
   // Set or change password (so you can log in with email + password)
   $('pwBtn').addEventListener('click', async function () {

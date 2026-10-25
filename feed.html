@@ -13,6 +13,7 @@
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="rate.js"></script>
+<script src="sessions.js"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Feed-only styles ===== */
@@ -128,6 +129,10 @@
 <main class="wrap">
   <a class="idle-warn" id="idleWarn" href="play.html" hidden></a>
   <div class="stories" id="stories"></div>
+  <div class="chips-row" id="feedChips">
+    <button class="on" data-ffilter="all">🌍 All</button>
+    <button data-ffilter="pals">👥 PadPals</button>
+  </div>
   <div class="error-box" id="feedError" role="alert" hidden></div>
   <div id="feed"><div class="empty-feed">Loading…</div></div>
 </main>
@@ -174,6 +179,8 @@
     <button class="btn btn-primary" id="composeBtn" style="width:100%">Post</button>
   </form>
 </div>
+
+<div class="sheet" id="detailSheet"><div class="grab"></div><div id="detailBody"></div></div>
 
 <div class="sheet" id="reportSheet">
   <div class="grab"></div>
@@ -312,7 +319,7 @@
       (cr.data || []).forEach(function (c) { if (matches[c.match_id]) matches[c.match_id].changes[c.user_id] = c; });
     }
     if (gameIds.length) {
-      var gr = await db.from('games').select('id, kind, session_state').in('id', gameIds);
+      var gr = await db.from('games').select('id, kind, place, scheduled_at, session_state').in('id', gameIds);
       var gc = await db.from('point_changes').select('game_id, user_id, change, created_at').in('game_id', gameIds);
       (gr.data || []).forEach(function (g) { sessions[g.id] = g; g.changes = {}; });
       (gc.data || []).forEach(function (c) { var g = sessions[c.game_id]; if (g) { g.changes[c.user_id] = c; g.finished = c.created_at; } });
@@ -405,9 +412,9 @@
     var liked = p.likes.some(function (l) { return l.user_id === profile.id; });
     var nComments = p.comments && p.comments[0] ? p.comments[0].count : 0;
     var html = '<article class="card">' +
-      '<div class="post-head"><div class="user"><div class="avatar">' + avatarHtml(a) + '</div>' +
+      '<div class="post-head"><a class="user" href="' + profileLink(p.author_id) + '" style="text-decoration:none;color:var(--text)"><div class="avatar">' + avatarHtml(a) + '</div>' +
       '<div style="min-width:0"><div class="name">' + esc(nameOf(a)) + '</div>' +
-      '<div class="meta">@' + esc(a.username) + ' · ' + ago(p.created_at) + '</div></div></div>' +
+      '<div class="meta">@' + esc(a.username) + ' · ' + ago(p.created_at) + '</div></div></a>' +
       (mine || profile.is_admin ? '<button class="more" data-delete="' + p.id + '" aria-label="Delete post">🗑️</button>' : '') +
       '</div>';
     if (p.body) html += '<p class="post-text">' + esc(p.body) + '</p>';
@@ -496,31 +503,46 @@
     return html + '</div></a>';
   }
 
-  // Americano / Mexicano result: final ranking with everyone's points
+  // Session result: 🥇🥈🥉 podium, then everyone's place, games won/lost and points
+  function personName(id) { var p = people[id]; return esc(p ? (p.display_name || p.username) : '?'); }
+  function personAvatar(id) { return avatarHtml(people[id]); }
   function sessionHtml(g) {
-    if (!g || !g.session_state) return '<p class="meta">Session result unavailable.</p>';
+    if (!g || !g.session_state || !g.session_state.players) return '<p class="meta">Session result unavailable.</p>';
     var s = g.session_state;
-    function nm(id) { var p = people[id]; return esc(p ? (p.display_name || p.username) : '?'); }
-    var order = s.players.slice().sort(function (a, b) { return s.points[b] - s.points[a]; });
-    var KINDS = { americano: '🔄 Americano', mexicano: '🌮 Mexicano', mixicano: '🔀 Mixicano', team_americano: '🤝 Team Americano', round_robin: '⭕ Round Robin', king: '👑 King of the Court' };
-    var title = (KINDS[g.kind] || '🔄 Session') + ' · ' + s.players.length + ' players · ' + s.rounds.length + ' rounds';
-    return '<p class="post-text" style="font-weight:600">' + title + '</p><div class="match">' +
-      order.map(function (id, i) {
-        var c = g.changes[id];
-        var medal = ['🥇', '🥈', '🥉'][i] || (i + 1) + '.';
-        var o = s.out && s.out[id];
-        var why = o ? ' ' + ({ injured: '🤕', sick: '🤒', tired: '😴', left: '🏃', other: '🤷' }[o.reason] || '') : '';
-        return '<div class="team' + (i === 0 ? ' win' : '') + '"><div class="players">' + medal + ' ' + nm(id) + why + '</div>' +
-          '<div class="sets"><span>' + s.points[id] + '</span>' +
-          (c ? '<span class="' + (c.change >= 0 ? 'plus' : 'minus') + '" style="min-width:42px;text-align:right">' + PadPal.fmtChange(c.change) + '</span>' : '') +
-          '</div></div>';
-      }).join('') + '</div>';
+    var changes = {};
+    Object.keys(g.changes).forEach(function (id) { changes[id] = g.changes[id].change; });
+    var list = PadPal.sessions.rows(s, changes);
+    var title = (PadPal.sessions.KINDS[g.kind] || '🔄 Session') + ' · ' + s.players.length + ' players · ' + s.rounds.length + ' rounds';
+    return '<p class="post-text" style="font-weight:600">' + title + '</p>' +
+      PadPal.sessions.podium(list, personName, personAvatar) +
+      '<div class="match" style="padding:2px 12px">' + PadPal.sessions.table(list, personName, profile.id) + '</div>' +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:8px;padding:8px;font-size:13px" data-sdetail="' + g.id + '">📋 See all rounds</button>';
   }
 
+  function profileLink(id) { return id === profile.id ? 'profile.html' : 'profile.html?id=' + id; }
+
+  // All posts, or only from your PadPals (people you played with) and you
+  var feedFilter = 'all';
+  var myPals = null;   // id → true
   function renderFeed() {
-    $('feed').innerHTML = posts.length
-      ? posts.map(renderPost).join('')
-      : '<div class="empty-feed"><div class="big">🎾</div><p><b>No posts yet.</b></p><p>Be the first! Tap the <b>+</b> button to post a photo or a message.</p></div>';
+    var shown = posts;
+    if (feedFilter === 'pals' && myPals) shown = posts.filter(function (p) { return p.author_id === profile.id || myPals[p.author_id]; });
+    $('feed').innerHTML = shown.length
+      ? shown.map(renderPost).join('')
+      : feedFilter === 'pals'
+        ? '<div class="empty-feed"><div class="big">👥</div><p><b>No posts from your PadPals yet.</b></p><p>PadPals are everyone you played a game with. Go play! 🎾</p></div>'
+        : '<div class="empty-feed"><div class="big">🎾</div><p><b>No posts yet.</b></p><p>Be the first! Tap the <b>+</b> button to post a photo or a message.</p></div>';
+  }
+  async function setFeedFilter(f) {
+    if (f === 'pals' && !myPals) {
+      var r = await db.rpc('padpals', { p_user: profile.id });
+      if (r.error) return toast('PadPals need an update: run 16_social.sql in Supabase');
+      myPals = {};
+      r.data.forEach(function (x) { myPals[x.user_id] = true; });
+    }
+    feedFilter = f;
+    document.querySelectorAll('#feedChips button').forEach(function (b) { b.classList.toggle('on', b.dataset.ffilter === f); });
+    renderFeed();
   }
 
   function findPost(id) { return posts.filter(function (p) { return p.id === id; })[0]; }
@@ -680,10 +702,17 @@
 
   // ===== One click handler for the feed =====
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-report],[data-report-session],[data-rate],[data-soon]');
+    var el = e.target.closest('[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-report],[data-report-session],[data-rate],[data-ffilter],[data-sdetail],[data-soon]');
     if (!el) return;
     var d = el.dataset;
-    if (d.rate) PadPal.openRating(d.rate.split(','));
+    if (d.ffilter) setFeedFilter(d.ffilter);
+    else if (d.sdetail) {
+      var g = sessions[d.sdetail], ch = {};
+      Object.keys(g.changes).forEach(function (id) { ch[id] = g.changes[id].change; });
+      $('detailBody').innerHTML = PadPal.sessions.detail(g, ch, personName, personAvatar, profile.id);
+      openSheet($('detailSheet'));
+    }
+    else if (d.rate) PadPal.openRating(d.rate.split(','));
     else if (d.report) openReport(d.report, 'match');
     else if (d.reportSession) openReport(d.reportSession, 'session');
     else if (d.like) toggleLike(d.like);

@@ -26,8 +26,16 @@
   .avatar { overflow: hidden; }
   .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 
-  /* Chat list */
-  .chat-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 0; background: none; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+  /* Chat list (swipe a row to the left for Pin / Mute / Delete) */
+  .swipe { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+  .swipe-actions { position: absolute; top: 0; right: 0; bottom: 0; display: flex; }
+  .swipe-actions button { width: 72px; border: 0; font-size: 11px; font-weight: 700; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+  .swipe-actions button span { font-size: 20px; }
+  .swipe-actions .a-pin { background: #3B6FD8; }
+  .swipe-actions .a-mute { background: #7A8599; }
+  .swipe-actions .a-del { background: var(--loss); }
+  .chat-row { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 0; background: var(--bg); padding: 10px 2px; transition: transform .2s ease; touch-action: pan-y; }
+  .chat-row.dragging { transition: none; }
   .chat-row .avatar { width: 50px; height: 50px; font-size: 20px; }
   .chat-row .avatar.group { border-radius: 14px; border-color: var(--gold); }
   .chat-row .avatar.game { border-radius: 14px; border-color: var(--primary); background: color-mix(in srgb, var(--primary) 20%, var(--card)); }
@@ -38,7 +46,10 @@
   .chat-row .last { font-size: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
   .chat-row.unread .last { color: var(--text); font-weight: 600; }
   .chat-row .sub { font-size: 11px; color: var(--accent); margin-top: 2px; }
+  .chat-row .icons { font-size: 12px; flex-shrink: 0; }
   .badge-n { background: var(--primary); color: var(--primary-text); font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; padding: 0 6px; flex-shrink: 0; }
+  .badge-n.muted { background: var(--card-2); color: var(--text-2); }
+  .swipe-hint { font-size: 11px; color: var(--text-2); text-align: center; margin-top: 12px; }
   .empty { text-align: center; color: var(--text-2); padding: 40px 16px; }
   .empty .big { font-size: 46px; }
 
@@ -51,30 +62,43 @@
   .c-head { display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; border-bottom: 1px solid var(--line); background: var(--card); }
   .c-head .back { border: 0; background: none; font-size: 30px; padding: 0 6px 0 0; line-height: 1; color: var(--accent); }
   .c-head .avatar { width: 38px; height: 38px; font-size: 16px; }
-  .c-head .who { flex: 1; min-width: 0; }
+  .c-head .who { flex: 1; min-width: 0; border: 0; background: none; padding: 0; text-align: left; color: var(--text); }
   .c-head .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .c-head .members { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .c-head .info { border: 0; background: var(--card-2); border-radius: 50%; width: 36px; height: 36px; font-size: 16px; }
+  .pin-bar { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: var(--card); padding: 8px 14px; text-align: left; color: var(--text); font-size: 13px; }
+  .pin-bar b { color: var(--accent); flex-shrink: 0; }
+  .pin-bar span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .c-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 
   .game-pin { background: var(--card); border: 1px solid var(--primary); border-radius: 14px; padding: 10px 12px; font-size: 13px; margin-bottom: 6px; text-decoration: none; color: var(--text); display: block; }
   .game-pin b { display: block; font-size: 14px; margin-bottom: 2px; }
   .sys { align-self: center; font-size: 12px; color: var(--text-2); background: var(--card); border-radius: 999px; padding: 4px 12px; margin: 6px 0; text-align: center; }
 
-  .msg { max-width: 78%; display: flex; flex-direction: column; }
+  .msg { max-width: 78%; display: flex; flex-direction: column; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .msg .who { font-size: 11px; color: var(--accent); font-weight: 700; margin: 0 0 2px 10px; }
   .bubble { padding: 9px 13px; border-radius: 18px; font-size: 15px; line-height: 1.35; word-wrap: break-word; white-space: pre-wrap; }
   .msg.them { align-self: flex-start; }
   .msg.them .bubble { background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 6px; }
   .msg.me { align-self: flex-end; }
   .msg.me .bubble { background: var(--primary); color: var(--primary-text); border-bottom-right-radius: 6px; }
+  .msg .bubble.deleted { background: none !important; border: 1px dashed var(--line) !important; color: var(--text-2) !important; font-style: italic; font-size: 13px; }
   .msg .t { font-size: 10px; color: var(--text-2); margin: 2px 10px 0; }
   .msg.me .t { text-align: right; }
+  .msg.flash .bubble { animation: flash 1.2s ease; }
+  @keyframes flash { 0%, 60% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: none; } }
+  .quote { border: 0; border-left: 3px solid var(--accent); background: var(--card-2); border-radius: 10px; padding: 5px 10px; margin-bottom: 3px; font-size: 12px; color: var(--text-2); text-align: left; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .quote b { color: var(--text); display: block; font-size: 11px; }
   .pic { position: relative; border-radius: 16px; overflow: hidden; max-width: 220px; }
   .pic img { width: 100%; display: block; }
   .pic span { position: absolute; top: 8px; right: 8px; font-size: 11px; font-weight: 600; background: rgba(0,0,0,.55); color: #fff; padding: 3px 8px; border-radius: 999px; }
   .pic-gone { font-size: 13px; color: var(--text-2); font-style: italic; }
 
+  .reply-bar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--card); border-top: 1px solid var(--line); font-size: 13px; }
+  .reply-bar .q { flex: 1; min-width: 0; border-left: 3px solid var(--accent); padding-left: 8px; }
+  .reply-bar .q b { display: block; font-size: 12px; color: var(--accent); }
+  .reply-bar .q span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); }
+  .reply-bar button { border: 0; background: var(--card-2); border-radius: 50%; width: 28px; height: 28px; flex-shrink: 0; }
   .c-foot { display: flex; gap: 8px; align-items: center; padding: 8px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card); }
   .c-foot input {
     flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--card-2); color: var(--text);
@@ -89,11 +113,15 @@
   .pick { display: flex; flex-wrap: wrap; gap: 8px; }
   .pick button { border: 1px solid var(--line); background: var(--card-2); border-radius: 999px; padding: 7px 12px; font-size: 14px; }
   .pick button.on { background: var(--primary); border-color: var(--primary); color: var(--primary-text); font-weight: 600; }
-  .person-row { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 8px 0; text-align: left; border-bottom: 1px solid var(--line); }
+  .person-row { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 8px 0; text-align: left; border-bottom: 1px solid var(--line); color: var(--text); text-decoration: none; }
   .person-row .avatar { width: 38px; height: 38px; font-size: 15px; }
   .seg { display: flex; background: var(--card-2); border-radius: 12px; padding: 3px; margin-bottom: 12px; }
   .seg button { flex: 1; border: 0; background: none; padding: 8px 0; border-radius: 9px; font-size: 14px; color: var(--text-2); font-weight: 600; }
   .seg button.on { background: var(--primary); color: var(--primary-text); }
+  .msg-menu { display: grid; gap: 2px; }
+  .msg-menu button { display: flex; align-items: center; gap: 12px; border: 0; background: none; padding: 12px 4px; font-size: 16px; text-align: left; color: var(--text); border-bottom: 1px solid var(--line); }
+  .msg-menu button.danger { color: var(--loss); }
+  .msg-preview { background: var(--card-2); border-radius: 12px; padding: 8px 12px; font-size: 14px; color: var(--text-2); margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
@@ -133,10 +161,12 @@
   <div class="c-head">
     <button class="back" id="back" aria-label="Back">‹</button>
     <div class="avatar" id="cAvatar"></div>
-    <div class="who"><div class="nm" id="cName"></div><div class="members" id="cMembers"></div></div>
+    <button class="who" id="cWho"><div class="nm" id="cName"></div><div class="members" id="cMembers"></div></button>
     <button class="info" id="infoBtn" aria-label="Chat info">ℹ️</button>
   </div>
+  <button class="pin-bar" id="pinBar" hidden></button>
   <div class="c-body" id="cBody"></div>
+  <div class="reply-bar" id="replyBar" hidden></div>
   <form class="c-foot" id="cForm">
     <button type="button" class="round cam" id="camBtn" aria-label="Send a photo">📷</button>
     <input id="cInput" placeholder="Message…" autocomplete="off" maxlength="1000">
@@ -155,12 +185,14 @@
   var me = null;
   var people = {};        // member id → profile
   var urls = {};          // avatar / photo links
-  var chats = [];         // my chats, newest first
+  var chats = [];         // my chats, pinned first, then newest
   var filter = 'all';
   var current = null;     // the open chat
   var msgs = [];          // messages of the open chat
   var channel = null;     // live updates for the open chat
   var pollTimer = null;
+  var replyTo = null;     // the message you're answering
+  var MSG_COLS = 'id, chat_id, author_id, body, photo_path, reply_to, deleted_at, created_at';
 
   // ===== Helpers =====
   function $(id) { return document.getElementById(id); }
@@ -190,6 +222,12 @@
     return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   }
   function photoAlive(m) { return Date.now() - new Date(m.created_at) < 24 * 3600000; }
+  function msgText(m) {   // short text of a message, for previews
+    if (!m) return '';
+    if (m.deleted_at) return '🗑️ Message deleted';
+    return m.photo_path ? '📷 Photo' + (m.body ? ' · ' + m.body : '') : m.body;
+  }
+  function msgById(id) { return msgs.filter(function (m) { return m.id === +id; })[0]; }
   function openSheet(html) { $('sheetBody').innerHTML = html; $('sheet').classList.add('open'); $('backdrop').classList.add('open'); }
   function closeSheet() { $('sheet').classList.remove('open'); $('backdrop').classList.remove('open'); }
   $('backdrop').addEventListener('click', closeSheet);
@@ -202,33 +240,36 @@
     try { urls = await PadPal.photoUrls(Object.keys(people).map(function (id) { return people[id].avatar_url; })); } catch (e) {}
     await loadChats();
     cleanupMyOldPhotos();
-    // opened with ?with=<member id> (e.g. from Ranks) → straight into the DM
+    // opened with ?with=<member id> (e.g. from Ranks or a profile) → straight into the DM
     var withId = new URLSearchParams(location.search).get('with');
     if (withId) { history.replaceState(null, '', 'chat.html'); startDm(withId); }
   });
 
   async function loadChats() {
-    var r = await db.from('chat_members').select('chat_id, last_read_at, chats(id, kind, name, game_id, last_message_at)').eq('user_id', me.id);
+    var r = await db.from('chat_members').select('chat_id, last_read_at, chats(id, kind, name, game_id, last_message_at, pinned_message_id)').eq('user_id', me.id);
     if (r.error) {
       $('list').innerHTML = '';
-      $('error').textContent = /chat_members/.test(r.error.message) ? 'Chat is not set up yet. Run 10_chat.sql in Supabase.' : PadPal.friendlyError(r.error);
+      $('error').textContent = /pinned_message_id/.test(r.error.message) ? 'Chat needs an update. Run 16_social.sql in Supabase.'
+        : /chat_members/.test(r.error.message) ? 'Chat is not set up yet. Run 10_chat.sql in Supabase.' : PadPal.friendlyError(r.error);
       $('error').hidden = false;
       return;
     }
     $('error').hidden = true;
     var mine = r.data.filter(function (x) { return x.chats; });
     var ids = mine.map(function (x) { return x.chat_id; });
-    var members = {}, last = {}, unread = {}, games = {};
+    var members = {}, last = {}, unread = {}, games = {}, prefs = {};
     if (ids.length) {
+      var pr = await db.from('chat_prefs').select('chat_id, pinned_at, muted, cleared_at').eq('user_id', me.id);
+      (pr.data || []).forEach(function (x) { prefs[x.chat_id] = x; });
       var mr = await db.from('chat_members').select('chat_id, user_id').in('chat_id', ids);
       (mr.data || []).forEach(function (x) { (members[x.chat_id] = members[x.chat_id] || []).push(x.user_id); });
-      var lr = await db.from('messages').select('chat_id, author_id, body, photo_path, created_at').in('chat_id', ids)
+      var lr = await db.from('messages').select('chat_id, author_id, body, photo_path, deleted_at, created_at').in('chat_id', ids)
         .order('created_at', { ascending: false }).limit(800);
       var readAt = {};
       mine.forEach(function (x) { readAt[x.chat_id] = new Date(x.last_read_at); });
       (lr.data || []).forEach(function (m) {
         if (!last[m.chat_id]) last[m.chat_id] = m;
-        if (m.author_id && m.author_id !== me.id && new Date(m.created_at) > readAt[m.chat_id]) unread[m.chat_id] = (unread[m.chat_id] || 0) + 1;
+        if (m.author_id && m.author_id !== me.id && !m.deleted_at && new Date(m.created_at) > readAt[m.chat_id]) unread[m.chat_id] = (unread[m.chat_id] || 0) + 1;
       });
       var gameIds = mine.filter(function (x) { return x.chats.game_id; }).map(function (x) { return x.chats.game_id; });
       if (gameIds.length) {
@@ -237,11 +278,18 @@
       }
     }
     chats = mine.map(function (x) {
-      var c = x.chats;
+      var c = x.chats, p = prefs[c.id] || {};
       var others = (members[c.id] || []).filter(function (id) { return id !== me.id; });
       return { id: c.id, kind: c.kind, name: c.name, game: games[c.game_id], members: members[c.id] || [], others: others,
-               last: last[c.id], unread: unread[c.id] || 0, at: c.last_message_at };
-    }).sort(function (a, b) { return new Date(b.at) - new Date(a.at); });
+               last: last[c.id], unread: unread[c.id] || 0, at: c.last_message_at, pinnedMsg: c.pinned_message_id,
+               pinned: p.pinned_at || null, muted: !!p.muted, cleared: p.cleared_at || null };
+    }).filter(function (c) {
+      // a direct chat you deleted stays hidden until a new message arrives
+      return !c.cleared || (c.last && new Date(c.last.created_at) > new Date(c.cleared));
+    }).sort(function (a, b) {
+      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+      return new Date(b.at) - new Date(a.at);
+    });
     renderList();
   }
 
@@ -259,9 +307,18 @@
   }
   function lastText(c) {
     var m = c.last;
-    if (!m) return 'No messages yet. Say hi! 👋';
+    if (!m || (c.cleared && new Date(m.created_at) <= new Date(c.cleared))) return 'No messages yet. Say hi! 👋';
     var who = !m.author_id ? '' : m.author_id === me.id ? 'You: ' : (c.kind === 'dm' ? '' : nameOf(m.author_id) + ': ');
-    return who + (m.photo_path ? '📷 Photo' : m.body);
+    return who + msgText(m);
+  }
+
+  // Buttons behind a row: game chats can only be pinned or muted (you'd miss the court info)
+  function swipeButtons(c) {
+    var b = '<button class="a-pin" data-cact="' + (c.pinned ? 'unpin' : 'pin') + '" data-cid="' + c.id + '"><span>📌</span>' + (c.pinned ? 'Unpin' : 'Pin') + '</button>' +
+      '<button class="a-mute" data-cact="' + (c.muted ? 'unmute' : 'mute') + '" data-cid="' + c.id + '"><span>' + (c.muted ? '🔔' : '🔕') + '</span>' + (c.muted ? 'Unmute' : 'Mute') + '</button>';
+    if (c.kind === 'dm') b += '<button class="a-del" data-cact="clear" data-cid="' + c.id + '"><span>🗑️</span>Delete</button>';
+    if (c.kind === 'group') b += '<button class="a-del" data-cact="leave" data-cid="' + c.id + '"><span>🚪</span>Leave</button>';
+    return b;
   }
 
   function renderList() {
@@ -273,28 +330,96 @@
     $('list').innerHTML = shown.map(function (c) {
       var sub = c.kind === 'game' ? 'Game chat · ' + c.members.length + ' players' + (c.game && c.game.place ? ' · ' + c.game.place : '')
         : c.kind === 'group' ? c.members.length + ' members' : '';
-      return '<button class="chat-row' + (c.unread ? ' unread' : '') + '" data-chat="' + c.id + '">' + chatAvatar(c) +
-        '<div class="mid"><div class="top"><span class="nm">' + esc(chatTitle(c)) + '</span><span class="time">' + (c.last ? timeText(c.last.created_at) : '') + '</span></div>' +
-        '<div class="top"><div class="last">' + esc(lastText(c)) + '</div>' + (c.unread ? '<span class="badge-n">' + c.unread + '</span>' : '') + '</div>' +
-        (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') + '</div></button>';
-    }).join('');
+      var icons = (c.pinned ? '📌' : '') + (c.muted ? '🔕' : '');
+      return '<div class="swipe"><div class="swipe-actions">' + swipeButtons(c) + '</div>' +
+        '<button class="chat-row' + (c.unread ? ' unread' : '') + '" data-chat="' + c.id + '">' + chatAvatar(c) +
+        '<div class="mid"><div class="top"><span class="nm">' + esc(chatTitle(c)) + '</span><span class="time">' + (icons ? '<span class="icons">' + icons + '</span> ' : '') + (c.last ? timeText(c.last.created_at) : '') + '</span></div>' +
+        '<div class="top"><div class="last">' + esc(lastText(c)) + '</div>' + (c.unread ? '<span class="badge-n' + (c.muted ? ' muted' : '') + '">' + c.unread + '</span>' : '') + '</div>' +
+        (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') + '</div></button></div>';
+    }).join('') + '<p class="swipe-hint">👈 Swipe a chat to the left to pin, mute or delete it</p>';
+  }
+
+  // ===== Swipe a chat row to the left =====
+  var swiped = null;   // the row that's open
+  var drag = null;
+  function rowWidth(row) { return row.previousElementSibling.offsetWidth; }
+  function closeSwiped() { if (swiped) { swiped.style.transform = ''; swiped = null; } }
+  function openSwiped(row) { closeSwiped(); row.style.transform = 'translateX(-' + rowWidth(row) + 'px)'; swiped = row; }
+  $('list').addEventListener('touchstart', function (e) {
+    var row = e.target.closest('.chat-row');
+    if (!row) return;
+    drag = { row: row, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, base: row === swiped ? -rowWidth(row) : 0, side: null };
+  }, { passive: true });
+  $('list').addEventListener('touchmove', function (e) {
+    if (!drag) return;
+    var dx = e.touches[0].clientX - drag.x, dy = e.touches[0].clientY - drag.y;
+    if (!drag.side) { if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return; drag.side = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'; }
+    if (drag.side !== 'x') return;
+    if (swiped && swiped !== drag.row) closeSwiped();
+    drag.dx = dx;
+    var w = rowWidth(drag.row);
+    drag.row.classList.add('dragging');
+    drag.row.style.transform = 'translateX(' + Math.max(-w, Math.min(0, drag.base + dx)) + 'px)';
+  }, { passive: true });
+  $('list').addEventListener('touchend', function () {
+    if (!drag) return;
+    var d = drag; drag = null;
+    d.row.classList.remove('dragging');
+    if (d.side !== 'x') return;
+    d.row.dataset.justSwiped = '1';
+    setTimeout(function () { delete d.row.dataset.justSwiped; }, 350);
+    if (d.base + d.dx < -rowWidth(d.row) / 2) openSwiped(d.row);
+    else { d.row.style.transform = ''; if (swiped === d.row) swiped = null; }
+  });
+  // on a computer: right-click a chat to show the same buttons
+  $('list').addEventListener('contextmenu', function (e) {
+    var row = e.target.closest('.chat-row');
+    if (!row) return;
+    e.preventDefault();
+    if (swiped === row) closeSwiped(); else openSwiped(row);
+  });
+
+  async function chatAction(id, act) {
+    var c = chats.filter(function (x) { return x.id === id; })[0];
+    if (act === 'clear' && !tapTwice('clear' + id, 'Tap Delete again: the chat disappears until they message you again')) return;
+    if (act === 'leave' && !tapTwice('leave' + id, 'Tap Leave again to leave this group')) return;
+    var r = act === 'leave' ? await db.rpc('leave_group', { p_chat: id }) : await db.rpc('chat_action', { p_chat: id, p_action: act });
+    if (r.error) return toast(PadPal.friendlyError(r.error));
+    swiped = null;
+    toast({ pin: '📌 Pinned to the top', unpin: 'Unpinned', mute: '🔕 Muted. No more alerts from this chat', unmute: '🔔 Alerts are back on',
+            clear: '🗑️ Chat deleted', leave: '🚪 You left ' + (c ? chatTitle(c) : 'the group') }[act]);
+    if (current && current.id === id && (act === 'clear' || act === 'leave')) { closeSheet(); closeChat(); return; }
+    if (current && current.id === id) { current.muted = act === 'mute' ? true : act === 'unmute' ? false : current.muted; }
+    await loadChats();
   }
 
   // ===== A conversation =====
   async function openChat(id) {
     current = chats.filter(function (c) { return c.id === id; })[0];
     if (!current) { await loadChats(); current = chats.filter(function (c) { return c.id === id; })[0]; }
-    if (!current) return toast('Chat not found');
+    if (!current) {
+      // a deleted direct chat with no new messages: open it anyway
+      var r0 = await db.from('chats').select('id, kind, name, game_id, last_message_at, pinned_message_id').eq('id', id).single();
+      var m0 = await db.from('chat_members').select('user_id').eq('chat_id', id);
+      if (r0.error) return toast('Chat not found');
+      var ms = (m0.data || []).map(function (x) { return x.user_id; });
+      current = { id: id, kind: r0.data.kind, name: r0.data.name, members: ms, others: ms.filter(function (u) { return u !== me.id; }),
+                  pinnedMsg: r0.data.pinned_message_id, cleared: new Date().toISOString(), muted: false };
+    }
+    replyTo = null; renderReplyBar();
     $('cAvatar').outerHTML = chatAvatar(current).replace('class="avatar', 'id="cAvatar" class="avatar');
     $('cName').textContent = chatTitle(current);
-    $('cMembers').textContent = current.kind === 'dm' ? '@' + ((people[current.others[0]] || {}).username || '') : current.members.map(nameOf).join(', ');
+    $('cMembers').textContent = current.kind === 'dm' ? '@' + ((people[current.others[0]] || {}).username || '') + ' · tap for profile' : current.members.map(nameOf).join(', ');
     $('cBody').innerHTML = '<p class="meta" style="text-align:center">Loading…</p>';
+    $('pinBar').hidden = true;
     $('convo').classList.add('open');
-    var r = await db.from('messages').select('id, chat_id, author_id, body, photo_path, created_at')
-      .eq('chat_id', id).order('created_at', { ascending: false }).limit(200);
+    var q = db.from('messages').select(MSG_COLS).eq('chat_id', id);
+    if (current.cleared) q = q.gt('created_at', current.cleared);
+    var r = await q.order('created_at', { ascending: false }).limit(200);
     msgs = (r.data || []).reverse();
     await signPhotos(msgs);
     renderMsgs();
+    renderPinBar();
     db.rpc('mark_read', { p_chat: id });
     current.unread = 0;
     listenLive(id);
@@ -309,41 +434,80 @@
     var c = current;
     var html = '';
     if (c.kind === 'game' && c.game) {
-      html += '<a class="game-pin" href="play.html"><b>📌 ' + esc(chatTitle(c)) + '</b>' + (c.game.place ? '📍 ' + esc(c.game.place) + ' · ' : '') + 'Tap to open Play</a>';
+      html += '<a class="game-pin" href="play.html"><b>🎾 ' + esc(chatTitle(c)) + '</b>' + (c.game.place ? '📍 ' + esc(c.game.place) + ' · ' : '') + 'Tap to open Play</a>';
     }
-    html += '<div class="sys">🕐 Messages disappear after 1 month</div>';
+    html += '<div class="sys">🕐 Messages disappear after 1 month · hold a message to reply, pin or delete</div>';
     msgs.forEach(function (m) {
       if (!m.author_id) { html += '<div class="sys">' + esc(m.body) + '</div>'; return; }
       var mine = m.author_id === me.id;
-      var content;
-      if (m.photo_path) {
-        content = photoAlive(m) && urls[m.photo_path]
+      var content = '';
+      if (m.reply_to && !m.deleted_at) {
+        var q = msgById(m.reply_to);
+        content += '<button class="quote" data-jump="' + m.reply_to + '"><b>↩️ ' + esc(q ? (q.author_id === me.id ? 'You' : nameOf(q.author_id)) : 'Reply') + '</b>' +
+          esc(q ? msgText(q) : 'Older message') + '</button>';
+      }
+      if (m.deleted_at) {
+        content += '<div class="bubble deleted">🗑️ Message deleted</div>';
+      } else if (m.photo_path) {
+        content += photoAlive(m) && urls[m.photo_path]
           ? '<div class="pic"><img src="' + urls[m.photo_path] + '" alt=""><span>⏳ ' + Math.max(1, Math.ceil((24 * 3600000 - (Date.now() - new Date(m.created_at))) / 3600000)) + 'h left</span></div>'
           : '<div class="bubble pic-gone">📷 Photo expired</div>';
         if (m.body) content += '<div class="bubble" style="margin-top:4px">' + esc(m.body) + '</div>';
       } else {
-        content = '<div class="bubble">' + esc(m.body) + '</div>';
+        content += '<div class="bubble">' + esc(m.body) + '</div>';
       }
-      html += '<div class="msg ' + (mine ? 'me' : 'them') + '">' +
+      html += '<div class="msg ' + (mine ? 'me' : 'them') + '"' + (m.deleted_at ? '' : ' data-mid="' + m.id + '"') + ' id="m' + m.id + '">' +
         (!mine && c.kind !== 'dm' ? '<div class="who">' + esc(nameOf(m.author_id)) + '</div>' : '') +
-        content + '<div class="t">' + timeText(m.created_at) + '</div></div>';
+        content + '<div class="t">' + (current.pinnedMsg === m.id ? '📌 ' : '') + timeText(m.created_at) + '</div></div>';
     });
     $('cBody').innerHTML = html;
     $('cBody').scrollTop = $('cBody').scrollHeight;
   }
 
-  // New messages arrive live (and a slower check as a backup)
+  // The pinned message bar under the chat name
+  async function renderPinBar() {
+    var id = current && current.pinnedMsg;
+    if (!id) { $('pinBar').hidden = true; return; }
+    var m = msgById(id);
+    if (!m) {
+      var r = await db.from('messages').select(MSG_COLS).eq('id', id).maybeSingle();
+      m = r.data;
+    }
+    if (!m || m.deleted_at) { $('pinBar').hidden = true; return; }
+    $('pinBar').innerHTML = '<b>📌 Pinned</b><span>' + esc(msgText(m)) + '</span>';
+    $('pinBar').dataset.jump = m.id;
+    $('pinBar').hidden = false;
+  }
+
+  function jumpTo(id) {
+    var el = $('m' + id);
+    if (!el) return toast('That message is too old to show');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  }
+
+  // New and changed messages arrive live (and a slower check as a backup)
   function listenLive(id) {
     stopLive();
     channel = db.channel('chat-' + id)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'chat_id=eq.' + id }, function (payload) {
         addMessages([payload.new]);
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: 'chat_id=eq.' + id }, function (payload) {
+        updateMessages([payload.new]);
+      })
       .subscribe();
+    var checked = new Date().toISOString();
     pollTimer = setInterval(async function () {
+      if (!current) return;
       var lastId = msgs.length ? msgs[msgs.length - 1].id : 0;
-      var r = await db.from('messages').select('id, chat_id, author_id, body, photo_path, created_at').eq('chat_id', id).gt('id', lastId).order('id');
+      var since = checked; checked = new Date().toISOString();
+      var r = await db.from('messages').select(MSG_COLS).eq('chat_id', id).gt('id', lastId).order('id');
       if (r.data && r.data.length) addMessages(r.data);
+      var d = await db.from('messages').select(MSG_COLS).eq('chat_id', id).gte('deleted_at', since);
+      if (d.data && d.data.length) updateMessages(d.data);
+      var c = await db.from('chats').select('pinned_message_id').eq('id', id).maybeSingle();
+      if (c.data && current && c.data.pinned_message_id !== current.pinnedMsg) { current.pinnedMsg = c.data.pinned_message_id; renderMsgs(); renderPinBar(); }
     }, 8000);
   }
   function stopLive() {
@@ -356,8 +520,22 @@
     if (!fresh.length) return;
     await signPhotos(fresh);
     msgs = msgs.concat(fresh).sort(function (a, b) { return a.id - b.id; });
+    // someone pinned or unpinned: the system message tells us to look again
+    if (fresh.some(function (m) { return !m.author_id && /pinned/.test(m.body || ''); })) {
+      var c = await db.from('chats').select('pinned_message_id').eq('id', current.id).maybeSingle();
+      if (c.data) current.pinnedMsg = c.data.pinned_message_id;
+      renderPinBar();
+    }
     renderMsgs();
     db.rpc('mark_read', { p_chat: current.id });
+  }
+  function updateMessages(list) {
+    if (!current) return;
+    var changed = false;
+    list.forEach(function (m) {
+      msgs.forEach(function (x, i) { if (x.id === m.id && x.deleted_at !== m.deleted_at) { msgs[i] = m; changed = true; } });
+    });
+    if (changed) { renderMsgs(); renderPinBar(); }
   }
 
   function closeChat() {
@@ -367,6 +545,71 @@
     loadChats();
   }
   $('back').addEventListener('click', closeChat);
+  $('cWho').addEventListener('click', function () {
+    if (current && current.kind === 'dm' && current.others[0]) location.href = 'profile.html?id=' + current.others[0];
+    else openInfo();
+  });
+
+  // ===== Hold a message: Reply · Copy · Pin · Delete =====
+  var press = null;
+  $('cBody').addEventListener('touchstart', function (e) {
+    var el = e.target.closest('.msg[data-mid]');
+    if (!el) return;
+    press = { x: e.touches[0].clientX, y: e.touches[0].clientY,
+              timer: setTimeout(function () { press = null; if (navigator.vibrate) navigator.vibrate(10); openMsgMenu(el.dataset.mid); }, 450) };
+  }, { passive: true });
+  $('cBody').addEventListener('touchmove', function (e) {
+    if (press && (Math.abs(e.touches[0].clientX - press.x) > 10 || Math.abs(e.touches[0].clientY - press.y) > 10)) { clearTimeout(press.timer); press = null; }
+  }, { passive: true });
+  $('cBody').addEventListener('touchend', function () { if (press) { clearTimeout(press.timer); press = null; } });
+  $('cBody').addEventListener('contextmenu', function (e) {
+    var el = e.target.closest('.msg[data-mid]');
+    if (!el) return;
+    e.preventDefault();
+    openMsgMenu(el.dataset.mid);
+  });
+
+  function openMsgMenu(id) {
+    var m = msgById(id);
+    if (!m || m.deleted_at) return;
+    var mine = m.author_id === me.id;
+    var pinned = current.pinnedMsg === m.id;
+    openSheet('<div class="msg-preview">' + esc((mine ? 'You' : nameOf(m.author_id)) + ': ' + msgText(m)) + '</div><div class="msg-menu">' +
+      '<button data-mreply="' + m.id + '">↩️ Reply</button>' +
+      (m.body ? '<button data-mcopy="' + m.id + '">📋 Copy text</button>' : '') +
+      '<button data-mpin="' + (pinned ? 'off' : m.id) + '">📌 ' + (pinned ? 'Unpin' : 'Pin for everyone') + '</button>' +
+      (mine ? '<button class="danger" data-mdel="' + m.id + '">🗑️ Delete for everyone</button>' : '') +
+      '</div>' + (pinned || !current.pinnedMsg ? '' : '<p class="note meta" style="margin-top:10px">Only 1 pinned message per chat: this replaces the old one.</p>'));
+  }
+
+  function renderReplyBar() {
+    if (!replyTo) { $('replyBar').hidden = true; return; }
+    $('replyBar').innerHTML = '<div class="q"><b>↩️ Replying to ' + esc(replyTo.author_id === me.id ? 'yourself' : nameOf(replyTo.author_id)) + '</b><span>' + esc(msgText(replyTo)) + '</span></div>' +
+      '<button type="button" data-mreplyx="1" aria-label="Cancel reply">✕</button>';
+    $('replyBar').hidden = false;
+  }
+
+  async function deleteMessage(id) {
+    if (!tapTwice('del' + id, 'Tap Delete again: everyone will see "Message deleted"')) return;
+    var r = await db.rpc('delete_message', { p_message: +id });
+    if (r.error) return toast(PadPal.friendlyError(r.error));
+    if (r.data) db.storage.from('photos').remove([r.data]);   // the photo file goes too
+    closeSheet();
+    var m = msgById(id);
+    if (m) { m.deleted_at = new Date().toISOString(); m.body = null; m.photo_path = null; }
+    if (current.pinnedMsg === +id) current.pinnedMsg = null;
+    renderMsgs(); renderPinBar();
+    toast('🗑️ Message deleted');
+  }
+
+  async function pinMessage(id) {
+    var r = await db.rpc('pin_message', { p_chat: current.id, p_message: id === 'off' ? null : +id });
+    if (r.error) return toast(PadPal.friendlyError(r.error));
+    closeSheet();
+    current.pinnedMsg = id === 'off' ? null : +id;
+    renderPinBar();
+    toast(id === 'off' ? 'Unpinned' : '📌 Pinned for everyone');
+  }
 
   // Send text
   $('cForm').addEventListener('submit', async function (e) {
@@ -374,9 +617,11 @@
     var text = $('cInput').value.trim();
     if (!text || !current) return;
     $('cInput').value = '';
-    var r = await db.from('messages').insert({ chat_id: current.id, author_id: me.id, body: text })
-      .select('id, chat_id, author_id, body, photo_path, created_at').single();
+    var row = { chat_id: current.id, author_id: me.id, body: text };
+    if (replyTo) row.reply_to = replyTo.id;
+    var r = await db.from('messages').insert(row).select(MSG_COLS).single();
     if (r.error) { $('cInput').value = text; return toast(PadPal.friendlyError(r.error)); }
+    replyTo = null; renderReplyBar();
     addMessages([r.data]);
   });
 
@@ -389,9 +634,11 @@
     toast('⏳ Sending photo…');
     try {
       var path = await PadPal.uploadPhoto(file, 'chat');
-      var r = await db.from('messages').insert({ chat_id: current.id, author_id: me.id, photo_path: path })
-        .select('id, chat_id, author_id, body, photo_path, created_at').single();
+      var row = { chat_id: current.id, author_id: me.id, photo_path: path };
+      if (replyTo) row.reply_to = replyTo.id;
+      var r = await db.from('messages').insert(row).select(MSG_COLS).single();
       if (r.error) { db.storage.from('photos').remove([path]); throw r.error; }
+      replyTo = null; renderReplyBar();
       addMessages([r.data]);
     } catch (err) { toast(PadPal.friendlyError(err)); }
   });
@@ -439,21 +686,24 @@
     openChat(r.data);
   }
 
-  // ===== Chat info (members, add people, leave) =====
+  // ===== Chat info (members, mute, add people, leave) =====
   function openInfo() {
     var c = current;
     var html = '<h3>ℹ️ ' + esc(chatTitle(c)) + '</h3>' +
-      '<div class="label" style="font-size:13px;color:var(--text-2);font-weight:600">Members (' + c.members.length + ')</div>' +
+      '<div class="label" style="font-size:13px;color:var(--text-2);font-weight:600">Members (' + c.members.length + ') · tap to see a profile</div>' +
       c.members.map(function (id) {
-        return '<div class="person-row"><div class="avatar">' + avatarInner(id) + '</div><div><div class="name">' + esc(nameOf(id)) + (id === me.id ? ' (you)' : '') + '</div></div></div>';
-      }).join('');
+        return '<a class="person-row" href="profile.html' + (id === me.id ? '' : '?id=' + id) + '"><div class="avatar">' + avatarInner(id) + '</div><div><div class="name">' + esc(nameOf(id)) + (id === me.id ? ' (you)' : '') + '</div></div></a>';
+      }).join('') +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:14px" data-cact="' + (c.muted ? 'unmute' : 'mute') + '" data-cid="' + c.id + '">' + (c.muted ? '🔔 Unmute this chat' : '🔕 Mute this chat') + '</button>';
     if (c.kind === 'group') {
       var outside = Object.keys(people).filter(function (id) { return c.members.indexOf(id) < 0; });
       html += (outside.length ? '<div class="label" style="font-size:13px;color:var(--text-2);font-weight:600;margin-top:14px">Add people</div>' +
         '<div class="pick">' + outside.map(function (id) { return '<button data-add="' + id + '">➕ ' + esc(nameOf(id)) + '</button>'; }).join('') + '</div>' : '') +
-        '<button class="btn btn-ghost" style="width:100%;margin-top:14px" data-leave="1">🚪 Leave group</button>';
+        '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-cact="leave" data-cid="' + c.id + '">🚪 Leave group</button>';
+    } else if (c.kind === 'dm') {
+      html += '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-cact="clear" data-cid="' + c.id + '">🗑️ Delete chat</button>';
     } else if (c.kind === 'game') {
-      html += '<p class="note meta" style="margin-top:12px">Everyone who joins the game is in this chat. It closes 3 days after the game.</p>';
+      html += '<p class="note meta" style="margin-top:12px">Everyone who joins the game is in this chat, so you can\'t leave it, only mute it. It closes 3 days after the game.</p>';
     }
     openSheet(html);
   }
@@ -470,15 +720,29 @@
 
   // ===== Clicks =====
   document.addEventListener('click', async function (e) {
-    var el = e.target.closest('[data-filter],[data-chat],[data-newtab],[data-dm],[data-gpick],[data-gcreate],[data-add],[data-leave]');
-    if (!el) return;
+    var el = e.target.closest('[data-filter],[data-chat],[data-cact],[data-newtab],[data-dm],[data-gpick],[data-gcreate],[data-add],[data-jump],[data-mreply],[data-mreplyx],[data-mcopy],[data-mpin],[data-mdel]');
+    if (!el) { closeSwiped(); return; }
     var d = el.dataset;
     if (d.filter) {
       filter = d.filter;
       document.querySelectorAll('#filters button').forEach(function (b) { b.classList.toggle('on', b === el); });
       renderList();
     }
-    else if (d.chat) openChat(d.chat);
+    else if (d.chat) {
+      if (d.justSwiped) return;
+      if (swiped) { closeSwiped(); return; }   // first tap just closes the buttons
+      openChat(d.chat);
+    }
+    else if (d.cact) chatAction(d.cid, d.cact);
+    else if (d.jump) jumpTo(d.jump);
+    else if (d.mreply) { replyTo = msgById(d.mreply); closeSheet(); renderReplyBar(); $('cInput').focus(); }
+    else if (d.mreplyx) { replyTo = null; renderReplyBar(); }
+    else if (d.mcopy) {
+      try { await navigator.clipboard.writeText(msgById(d.mcopy).body); toast('📋 Copied'); } catch (err) { toast('Could not copy'); }
+      closeSheet();
+    }
+    else if (d.mpin) pinMessage(d.mpin);
+    else if (d.mdel) deleteMessage(d.mdel);
     else if (d.newtab) openNew(d.newtab);
     else if (d.dm) startDm(d.dm);
     else if (d.gpick) {
@@ -499,16 +763,10 @@
       toast('👋 Added ' + nameOf(d.add));
       openInfo();
     }
-    else if (d.leave) {
-      if (!tapTwice('leave', 'Tap again to leave this group')) return;
-      var r3 = await db.rpc('leave_group', { p_chat: current.id });
-      if (r3.error) return toast(PadPal.friendlyError(r3.error));
-      closeSheet(); closeChat(); toast('You left the group');
-    }
   });
 
   // Refresh the list now and then while you're on it
-  setInterval(function () { if (!current && me && document.visibilityState === 'visible') loadChats(); }, 20000);
+  setInterval(function () { if (!current && !swiped && me && document.visibilityState === 'visible') loadChats(); }, 20000);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && me && !current) loadChats(); });
 </script>
 </body>
