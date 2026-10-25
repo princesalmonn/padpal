@@ -8,11 +8,12 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=18">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="auth.js"></script>
-<script src="levels.js"></script>
+<script src="config.js?v=18"></script>
+<script src="auth.js?v=18"></script>
+<script src="levels.js?v=18"></script>
+<script src="sessions.js?v=18"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Ranks-only styles ===== */
@@ -49,6 +50,10 @@
   .p1 .block { height: 92px; background: linear-gradient(180deg, #E3C46F, #A88330); }
   .p2 .block { height: 68px; background: linear-gradient(180deg, #D6DAE0, #8E959F); }
   .p3 .block { height: 52px; background: linear-gradient(180deg, #D9A066, #B87333); }
+  /* colour follows the place, so tied players get the same medal colour */
+  .step .block.r1 { background: linear-gradient(180deg, #E3C46F, #A88330); }
+  .step .block.r2 { background: linear-gradient(180deg, #D6DAE0, #8E959F); }
+  .step .block.r3 { background: linear-gradient(180deg, #D9A066, #B87333); }
   .p1 .avatar { width: 62px; height: 62px; font-size: 22px; border-color: var(--gold); }
   .p2 .avatar, .p3 .avatar { width: 50px; height: 50px; font-size: 18px; }
   .avatar { overflow: hidden; }
@@ -210,6 +215,30 @@
         if (t >= since(DAYS[k])) { p[k] += Number(c.change); p['m' + k] += Number(c.mixed_change); }
       });
     });
+    // W-L counts every match: normal matches (above), every game inside a session, and tournament matches
+    players.forEach(function (p) { p.draws = 0; });
+    try {
+      var sg = await db.from('games').select('id, kind, scheduled_at, session_state').eq('status', 'done').neq('kind', 'match');
+      (sg.data || []).forEach(function (g) {
+        if (!g.session_state || !g.session_state.players) return;
+        g.session_state.players.forEach(function (id) {
+          var p = byId[id];
+          if (!p) return;
+          PadPal.sessions.gamesOf(g, id).forEach(function (x) { if (x.won) p.wins++; else if (x.lost) p.losses++; else p.draws++; });
+        });
+      });
+      var tt = await db.from('tournament_teams').select('id, p1, p2');
+      var tm = await db.from('tournament_matches').select('team_a, team_b, winner').not('winner', 'is', null);
+      var team = {};
+      (tt.data || []).forEach(function (t) { team[t.id] = t; });
+      (tm.data || []).forEach(function (m) {
+        ['a', 'b'].forEach(function (side) {
+          var t = team[side === 'a' ? m.team_a : m.team_b];
+          if (!t) return;
+          [t.p1, t.p2].forEach(function (id) { var p = byId[id]; if (!p) return; if (m.winner === side) p.wins++; else p.losses++; });
+        });
+      });
+    } catch (err) {}
     try { urls = await PadPal.photoUrls(players.map(function (p) { return p.avatar_url; })); } catch (err) {}
     render();
   });
@@ -226,24 +255,28 @@
     return true;  // mixed: everyone (people without mixed games sit at the bottom)
   }
   function playedMixed(p) { return Number(p.mixed_points) !== 0 || p.mweek || p.mmonth || p.myear; }
+  // Same rule as everywhere (PadPal.rankPlayers): equal points share a place
   function ranking() {
     var mixed = state.ladder === 'mixed';
-    var list = players.filter(inLadder).map(function (p) { return { p: p, value: valueOf(p), noMixed: mixed && !playedMixed(p) }; });
-    list.sort(function (a, b) { return (a.noMixed - b.noMixed) || b.value - a.value || nameOf(a.p).localeCompare(nameOf(b.p)); });
-    list.forEach(function (x, i) { x.rank = i + 1; });
-    return list;
+    var inIt = players.filter(inLadder);
+    if (!mixed) return PadPal.rankPlayers(inIt, valueOf);
+    // Mixed: people without mixed games come last, sharing one place
+    var played = PadPal.rankPlayers(inIt.filter(playedMixed), valueOf);
+    var none = PadPal.rankPlayers(inIt.filter(function (p) { return !playedMixed(p); }), function () { return 0; });
+    none.forEach(function (x) { x.noMixed = true; x.rank = played.length + 1; x.tied = none.length; });
+    return played.concat(none);
   }
-  // Places moved this week: compare with the ranking 7 days ago
+  // Places moved this week: compare with the ranking 7 days ago (same tie rule)
   function movement(list) {
     if (state.period !== 'all') return {};
     var mixed = state.ladder === 'mixed';
-    var before = list.map(function (x) {
-      return { id: x.p.id, v: x.value - (mixed ? x.p.mweek : x.p.week) };
-    }).sort(function (a, b) { return b.v - a.v; });
+    var weekAgo = {};
+    list.forEach(function (x) { weekAgo[x.p.id] = x.value - (mixed ? x.p.mweek : x.p.week); });
     var oldRank = {};
-    before.forEach(function (x, i) { oldRank[x.id] = i + 1; });
+    PadPal.rankPlayers(list.map(function (x) { return x.p; }), function (p) { return weekAgo[p.id]; })
+      .forEach(function (x) { oldRank[x.p.id] = x.rank; });
     var move = {};
-    list.forEach(function (x) { move[x.p.id] = oldRank[x.p.id] - x.rank; });
+    list.forEach(function (x) { move[x.p.id] = x.noMixed ? 0 : oldRank[x.p.id] - x.rank; });
     return move;
   }
   function valueText(v) { return state.period === 'all' ? PadPal.fmt(v) : PadPal.fmtChange(v); }
@@ -252,7 +285,7 @@
   function render() {
     var ladderName = { men: "men's ladder", women: "women's ladder", mixed: 'Mixed points (games with men and women)' }[state.ladder];
     $('explain').textContent = state.period === 'all'
-      ? 'Total points · ' + ladderName + '. Top 3 get the podium 🏆'
+      ? 'Total points · ' + ladderName
       : 'Points gained in the last ' + { week: '7 days', month: '30 days', year: '12 months' }[state.period] + ' · ' + ladderName;
 
     var list = ranking();
@@ -271,16 +304,20 @@
       return;
     }
 
-    var podium = !searching && shown.length >= 3 && !shown.slice(0, 3).some(function (x) { return x.noMixed; });
+    // podium only when somebody actually has points (0 for everyone = everyone tied, no winner yet)
+    var podium = !searching && shown.length >= 3 && shown[0].value > 0 && !shown.slice(0, 3).some(function (x) { return x.noMixed; });
+    if (!searching && list[0].value <= 0 && list[0].tied > 1) {
+      $('explain').textContent += ' · No points yet: everyone shares #1 🤝';
+    }
     if (podium) {
       var order = [shown[1], shown[0], shown[2]];
       var cls = ['p2', 'p1', 'p3'];
       $('podium').innerHTML = order.map(function (x, i) {
         return '<button class="step ' + cls[i] + '" data-player="' + x.p.id + '">' +
-          '<div class="crown">' + (cls[i] === 'p1' ? '👑' : '') + '</div>' + avatar(x.p) +
+          '<div class="crown">' + (x.rank === 1 ? '👑' : '') + '</div>' + avatar(x.p) +
           '<div class="nm" data-uid="' + x.p.id + '">' + esc(nameOf(x.p)) + (x.p.id === me.id ? ' (you)' : '') + '</div>' +
           '<div class="pt">' + valueText(x.value) + ' pts</div>' +
-          '<div class="block">' + x.rank + '</div></button>';
+          '<div class="block r' + Math.min(x.rank, 3) + '">' + x.rank + '</div></button>';
       }).join('');
       $('podium').style.display = 'grid';
     } else {
@@ -316,7 +353,7 @@
   // ===== Player pop-up =====
   function openPlayer(id) {
     var p = players.filter(function (x) { return x.id === id; })[0];
-    var games = p.wins + p.losses;
+    var games = p.wins + p.losses + p.draws;
     var rate = games ? Math.round(p.wins / games * 100) + '%' : '–';
     var idle = daysIdle(p);
     $('playerBody').innerHTML =
@@ -326,7 +363,7 @@
       '<div class="pp-grid">' +
         '<div><strong>' + PadPal.fmt(p.points) + '</strong><small>Points</small></div>' +
         '<div><strong>' + rate + '</strong><small>Win rate</small></div>' +
-        '<div><strong>' + p.wins + '-' + p.losses + '</strong><small>W-L</small></div>' +
+        '<div><strong>' + p.wins + '-' + p.losses + (p.draws ? '-' + p.draws : '') + '</strong><small>' + (p.draws ? 'W-L-D' : 'W-L') + '</small></div>' +
       '</div>' +
       '<p class="meta" style="margin:0 0 12px">🔀 Mixed: <b style="color:var(--text)">' + PadPal.fmt(p.mixed_points) + '</b> pts' +
         (p.fav_shot ? ' · 🎯 Fav shot: <b style="color:var(--text)">' + esc(p.fav_shot) + '</b>' : '') +
@@ -354,6 +391,7 @@
       '🚀 <b>Double</b> gains in your first 10 match days<br>' +
       '🐣 <b>First Timers</b> (under 100) never lose points<br>' +
       '🛑 Normal games stop at <b>500</b>. Above that: official tournaments only<br>' +
+      '🧢 Normal-match wins give at most <b>+10 a day</b> (new players +20). Sessions have no cap<br>' +
       '👨👩 Everyone is calculated on <b>their own ladder</b>. Mixed games also add 🔀 Mixed points.<br>' +
       '🔄 <b>Americano/Mexicano</b>: only your final place counts (8 players: 🥇 +6 · 🥈 +4 · 🥉 +3 … last −3)<br>' +
       '🎯 <b>Shot ratings</b> from friends: rating × 0.1 per shot, max 3 shots a day<br>' +

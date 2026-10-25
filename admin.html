@@ -8,11 +8,12 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=18">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="auth.js"></script>
-<script src="levels.js"></script>
+<script src="config.js?v=18"></script>
+<script src="auth.js?v=18"></script>
+<script src="levels.js?v=18"></script>
+<script src="sessions.js?v=18"></script>
 <style>
   /* ===== Admin-only styles ===== */
   .back { text-decoration: none; color: var(--accent); font-weight: 600; font-size: 15px; }
@@ -47,6 +48,10 @@
   <h2>⚠️ Score reports <span class="count" id="reportCount">0</span></h2>
   <div id="reports"></div>
 
+  <h2>👀 Worth a look <span class="count" id="flagCount">0</span></h2>
+  <p class="meta" style="margin:-4px 0 10px">Last 14 days. Nothing happens automatically: you decide to undo or ignore.</p>
+  <div id="flags"><div class="card empty">Loading…</div></div>
+
   <h2>Invite someone</h2>
   <div class="card">
     <p class="meta" style="margin:0 0 12px">Each link works for one person. They still need your approval after signing up.</p>
@@ -61,10 +66,7 @@
   <div class="card" id="members"></div>
 
   <h2>Settings</h2>
-  <div class="card soon">
-    <div class="name">⚖️ Strength Factor: 0.75</div>
-    <div class="meta">For mixed games. Editable when the points system arrives (Stage 2).</div>
-  </div>
+  <div class="card" id="settingsCard"><div class="meta">Loading…</div></div>
 
   <div class="error-box" id="error" role="alert" hidden></div>
 </main>
@@ -106,6 +108,91 @@
     people = r.data;
     render();
     loadReports();
+    loadFlags();
+    loadSettings();
+  }
+
+  async function loadSettings() {
+    var r = await db.from('settings').select('*').eq('id', 1).maybeSingle();
+    var s = r.data || {};
+    $('settingsCard').innerHTML =
+      '<div class="name">⚖️ Strength Factor: ' + (s.strength_factor != null ? s.strength_factor : '0.75') + '</div>' +
+      '<div class="meta">Women\'s points × this, when men and women play together.</div>' +
+      '<div class="name" style="margin-top:10px">🧢 Daily cap: +' + (s.daily_cap != null ? PadPal.fmt(s.daily_cap) : '10 (after you run 18_fairness.sql)') + '</div>' +
+      '<div class="meta">Most points a day from normal-match wins (new players ×2). Sessions have no cap.</div>' +
+      '<div class="meta" style="margin-top:10px">To change a number, ask Claude for a small SQL line to run.</div>';
+  }
+
+  // ===== 👀 Worth a look: patterns that might be point farming or typed-in scores =====
+  function dayOf(iso) { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }); }
+  function dayText(day) { return new Date(day + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }); }
+  function ignored() { try { return JSON.parse(localStorage.getItem('padpal_ignored_flags') || '{}'); } catch (e) { return {}; } }
+  function ignore(key) { var x = ignored(); x[key] = Date.now(); try { localStorage.setItem('padpal_ignored_flags', JSON.stringify(x)); } catch (e) {} }
+
+  async function loadFlags() {
+    var since = new Date(Date.now() - 14 * 86400000).toISOString();
+    var mr = await db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at').gte('played_at', since);
+    var gr = await db.from('games').select('id, host_id, kind, scheduled_at, session_state').eq('status', 'done').neq('kind', 'match').gte('scheduled_at', since);
+    var cr = await db.from('point_changes').select('user_id, change, reason, created_at').gte('created_at', since).neq('reason', 'tournament');   // tournament prizes are fine
+    var flags = [];
+
+    // 1) the same 4 players, 4+ normal matches in one day
+    var groups = {};
+    (mr.data || []).forEach(function (m) {
+      var key = [m.a1, m.a2, m.b1, m.b2].sort().join('|') + '@' + dayOf(m.played_at);
+      (groups[key] = groups[key] || []).push(m);
+    });
+    Object.keys(groups).forEach(function (key) {
+      var list = groups[key];
+      if (list.length < 4) return;
+      var ids = key.split('@')[0].split('|');
+      flags.push({ key: 'same:' + key, icon: '🔁', title: 'Same 4 players, ' + list.length + ' matches in one day',
+        text: ids.map(nameOf).map(esc).join(', ') + ' · ' + dayText(key.split('@')[1]),
+        undos: list.map(function (m) { return { attr: 'data-undo="' + m.id + '"', label: '↩️ ' + m.sets.map(function (s) { return s[0] + '-' + s[1]; }).join(' ') }; }) });
+    });
+
+    // 2) very one-sided normal matches: every set 6-0 (or 7-0…)
+    (mr.data || []).forEach(function (m) {
+      if (!m.sets.length || !m.sets.every(function (s) { return Math.min(s[0], s[1]) === 0 && Math.max(s[0], s[1]) >= 6; })) return;
+      var w = m.winner === 'a' ? [m.a1, m.a2] : [m.b1, m.b2], l = m.winner === 'a' ? [m.b1, m.b2] : [m.a1, m.a2];
+      flags.push({ key: 'zero:' + m.id, icon: '🥚', title: 'Bagel match: ' + m.sets.map(function (s) { return Math.max(s[0], s[1]) + '-0'; }).join(' '),
+        text: esc(nameOf(w[0])) + ' & ' + esc(nameOf(w[1])) + ' beat ' + esc(nameOf(l[0])) + ' & ' + esc(nameOf(l[1])) + ' · ' + dayText(dayOf(m.played_at)),
+        undos: [{ attr: 'data-undo="' + m.id + '"', label: '↩️ Undo match' }] });
+    });
+
+    // 3) sessions: a game ending x-0, or the host finishing 1st without losing a single game
+    (gr.data || []).forEach(function (g) {
+      var s = g.session_state;
+      if (!s || !s.players) return;
+      var zeros = 0;
+      (s.rounds || []).forEach(function (r) { (r.matches || []).forEach(function (m) { if (m.score && Math.min(m.score[0], m.score[1]) === 0 && Math.max(m.score[0], m.score[1]) > 0) zeros++; }); });
+      var kind = (PadPal.sessions && PadPal.sessions.KINDS[g.kind]) || '🔄 Session';
+      if (zeros) flags.push({ key: 'szero:' + g.id, icon: '🥚', title: kind + ' with ' + zeros + ' game' + (zeros > 1 ? 's' : '') + ' ending x-0',
+        text: 'Host ' + esc(nameOf(g.host_id)) + ' · ' + dayText(dayOf(g.scheduled_at)),
+        undos: [{ attr: 'data-undo-session="' + g.id + '"', label: '↩️ Undo session' }] });
+      var host = PadPal.sessions.rows(s).filter(function (x) { return x.id === g.host_id; })[0];
+      if (host && host.place === 1 && host.l === 0 && host.w >= 3) flags.push({ key: 'host:' + g.id, icon: '👑', title: 'Host won the session without losing a game',
+        text: esc(nameOf(g.host_id)) + ' · ' + PadPal.sessions.wlText(host) + ' · ' + kind + ' · ' + dayText(dayOf(g.scheduled_at)),
+        undos: [{ attr: 'data-undo-session="' + g.id + '"', label: '↩️ Undo session' }] });
+    });
+
+    // 4) +15 or more points in one day (all reasons together)
+    var perDay = {};
+    (cr.data || []).forEach(function (c) { var k = c.user_id + '@' + dayOf(c.created_at); perDay[k] = (perDay[k] || 0) + Number(c.change); });
+    Object.keys(perDay).forEach(function (k) {
+      if (perDay[k] < 15) return;
+      flags.push({ key: 'big:' + k, icon: '🚀', title: PadPal.fmtChange(perDay[k]) + ' points in one day',
+        text: esc(nameOf(k.split('@')[0])) + ' · ' + dayText(k.split('@')[1]) + ' · check their matches and sessions', undos: [] });
+    });
+
+    var skip = ignored();
+    flags = flags.filter(function (f) { return !skip[f.key]; });
+    $('flagCount').textContent = flags.length;
+    $('flags').innerHTML = flags.length ? flags.map(function (f) {
+      return '<div class="card"><div class="name">' + f.icon + ' ' + f.title + '</div><div class="meta">' + f.text + '</div>' +
+        '<div class="actions" style="flex-wrap:wrap">' + f.undos.map(function (u) { return '<button class="btn btn-ghost" ' + u.attr + '>' + u.label + '</button>'; }).join('') +
+        '<button class="btn btn-ghost" data-ignore="' + esc(f.key) + '">👍 Looks fine</button></div></div>';
+    }).join('') : '<div class="card empty">Nothing suspicious. 😇</div>';
   }
 
   // "Are you sure?" without pop-ups: tap once to warn, again within 3s to do it
@@ -189,9 +276,10 @@
   }
 
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-approve],[data-reject],[data-undo],[data-undo-session],[data-dismiss]');
+    var el = e.target.closest('[data-approve],[data-reject],[data-undo],[data-undo-session],[data-dismiss],[data-ignore]');
     if (!el) return;
-    if (el.dataset.approve) setStatus(el.dataset.approve, 'approved', el);
+    if (el.dataset.ignore) { ignore(el.dataset.ignore); toast('👍 Hidden from the list'); loadFlags(); }
+    else if (el.dataset.approve) setStatus(el.dataset.approve, 'approved', el);
     else if (el.dataset.reject) setStatus(el.dataset.reject, 'rejected', el);
     else if (el.dataset.undo) {
       if (!tapTwice('undo' + el.dataset.undo, 'Tap again to undo: points go back and the match is deleted')) return;
@@ -199,7 +287,7 @@
       db.rpc('undo_match', { p_match: el.dataset.undo }).then(function (r) {
         if (r.error) { el.disabled = false; return showError(r.error); }
         toast('↩️ Match undone. Points are back.');
-        loadReports();
+        loadReports(); loadFlags();
       });
     }
     else if (el.dataset.undoSession) {
@@ -208,14 +296,14 @@
       db.rpc('undo_session', { p_game: el.dataset.undoSession }).then(function (r) {
         if (r.error) { el.disabled = false; return showError(r.error); }
         toast('↩️ Session undone. Points are back.');
-        loadReports();
+        loadReports(); loadFlags();
       });
     }
     else if (el.dataset.dismiss) {
       db.rpc('dismiss_report', { p_report: +el.dataset.dismiss }).then(function (r) {
         if (r.error) return showError(r.error);
         toast('👍 Report closed');
-        loadReports();
+        loadReports(); loadFlags();
       });
     }
   });

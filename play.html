@@ -8,13 +8,13 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=18">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="auth.js"></script>
-<script src="levels.js"></script>
-<script src="rate.js"></script>
-<script src="sessions.js"></script>
+<script src="config.js?v=18"></script>
+<script src="auth.js?v=18"></script>
+<script src="levels.js?v=18"></script>
+<script src="rate.js?v=18"></script>
+<script src="sessions.js?v=18"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Play-only styles ===== */
@@ -377,7 +377,12 @@
           '<div class="field"><span class="label">Scoring</span><div class="choices">' +
             '<label><input type="radio" name="cScoring" value="points" checked><span>🔢 Points</span></label>' +
             '<label><input type="radio" name="cScoring" value="games"><span>🎾 Tennis (15-30-40)</span></label>' +
+            '<label><input type="radio" name="cScoring" value="fixed"><span>🔢 Fixed games</span></label>' +
           '</div></div>' +
+          '<div class="field" id="cFixedBox" hidden><span class="label">Each round: play exactly…</span><div class="choices">' +
+            '<label><input type="radio" name="cFixed" value="4" checked><span>4 games</span></label>' +
+            '<label><input type="radio" name="cFixed" value="6"><span>6 games</span></label>' +
+          '</div><small>Every court finishes at the same time. 2-2 or 3-3 is a draw 🤝. Your total = games won.</small></div>' +
           '<div class="field" id="cPointsBox"><span class="label">Points per game</span><div class="choices">' +
             [16, 21, 24, 32].map(function (t) { return '<label><input type="radio" name="cTarget" value="' + t + '"' + (t === 21 ? ' checked' : '') + '><span>' + t + '</span></label>'; }).join('') +
           '</div></div>' +
@@ -405,11 +410,12 @@
     // show only the options that matter for what you picked
     function refresh() {
       var k = document.querySelector('input[name=cKind]:checked').value;
-      var games = document.querySelector('input[name=cScoring]:checked').value === 'games';
+      var sc = document.querySelector('input[name=cScoring]:checked').value;
       $('cSession').hidden = k === 'match';
-      $('cPointsBox').hidden = games;
-      $('cGamesBox').hidden = !games;
-      $('cDeuceBox').hidden = k !== 'match' && !games;
+      $('cPointsBox').hidden = sc !== 'points';
+      $('cGamesBox').hidden = sc !== 'games';
+      $('cFixedBox').hidden = sc !== 'fixed';
+      $('cDeuceBox').hidden = k !== 'match' && sc === 'points';
     }
     document.querySelectorAll('input[name=cKind], input[name=cScoring]').forEach(function (r) { r.addEventListener('change', refresh); });
     $('createForm').addEventListener('submit', async function (e) {
@@ -428,6 +434,7 @@
               scoring: document.querySelector('input[name=cScoring]:checked').value,
               target: +document.querySelector('input[name=cTarget]:checked').value,
               games: +document.querySelector('input[name=cGames]:checked').value,
+              fixed: +document.querySelector('input[name=cFixed]:checked').value,
               golden: document.querySelector('input[name=cDeuce]:checked').value === 'golden',
               courts: +$('cCourts').value,
               rounds: +$('cRounds').value
@@ -917,8 +924,9 @@
         format: g.kind,
         players: players,
         target: st.target || 21,
-        scoring: st.scoring || 'points',   // 'points' (16/21/24/32) or 'games' (tennis mini-set)
+        scoring: st.scoring || 'points',   // 'points' (16/21/24/32), 'games' (tennis mini-set) or 'fixed' (exactly 4 or 6 games)
         gamesTarget: st.games || 4,
+        fixedGames: st.fixed || 4,
         golden: st.golden !== false,
         courts: courts,
         totalRounds: totalRounds,
@@ -1087,7 +1095,7 @@
     var html = '<div class="session-top"><h3>' + f.icon + ' ' + f.name + '</h3>' +
       '<div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-pplayers="1">👥 Players</button>' +
       '<button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-end="1">Cancel</button></div></div>' +
-      '<p class="meta" style="margin:0 0 10px">' + s.players.length + ' players · ' + s.courts + ' court' + (s.courts > 1 ? 's' : '') + ' · ' + (s.scoring === 'games' ? 'first to ' + s.gamesTarget + ' games · ' + (s.golden ? '⚡ golden point' : '🔁 advantage') : s.target + ' pts per game') + '</p>' +
+      '<p class="meta" style="margin:0 0 10px">' + s.players.length + ' players · ' + s.courts + ' court' + (s.courts > 1 ? 's' : '') + ' · ' + scoringText(s) + '</p>' +
       '<div class="rounds" id="roundTabs">';
     for (var i = 0; i < s.totalRounds; i++) {
       var exists = i < s.rounds.length;
@@ -1183,15 +1191,25 @@
     markRound();
   }
 
+  // How a session game is scored: points (21…), tennis mini-set, or a fixed number of games
+  function scoringText(s) {
+    if (s.scoring === 'games') return 'first to ' + s.gamesTarget + ' games · ' + (s.golden ? '⚡ golden point' : '🔁 advantage');
+    if (s.scoring === 'fixed') return 'exactly ' + s.fixedGames + ' games · draws possible';
+    return s.target + ' pts per game';
+  }
+  // points and fixed games: both scores always add up to this
+  function perGame(s) { return s.scoring === 'fixed' ? s.fixedGames : s.target; }
+
   // ⌨️ Type a score instead of tapping every point
   function openTypeScore(ri, mi) {
     var s = session, m = s.rounds[ri].matches[mi];
     var games = s.scoring === 'games';
-    var G = s.gamesTarget;
+    var G = s.gamesTarget, total = perGame(s);
     openSheet('<h3>⌨️ Round ' + (ri + 1) + ' · Court ' + (mi + 1) + '</h3>' +
       '<p class="meta" style="margin:-6px 0 12px">' + (games
         ? 'Games won. First to ' + G + ' (' + G + '-' + (G - 2) + ' or less), ' + (G + 1) + '-' + (G - 1) + ', or ' + (G + 1) + '-' + G + ' after a tiebreak.'
-        : 'Points won. The two scores add up to ' + s.target + '.') + '</p>' +
+        : s.scoring === 'fixed' ? 'Games won. The two scores add up to ' + total + ' (' + total / 2 + '-' + total / 2 + ' is a draw 🤝).'
+        : 'Points won. The two scores add up to ' + total + '.') + '</p>' +
       '<form id="typeForm">' +
         '<div class="type-row"><span>' + teamName(m.a) + '</span><input class="input" id="tsA" type="number" inputmode="numeric" min="0" max="99" value="' + (m.score ? m.score[0] : '') + '" required></div>' +
         '<div class="type-row"><span>' + teamName(m.b) + '</span><input class="input" id="tsB" type="number" inputmode="numeric" min="0" max="99" value="' + (m.score ? m.score[1] : '') + '" required></div>' +
@@ -1200,8 +1218,8 @@
       '</form>');
     // points: typing one score fills in the other
     if (!games) {
-      $('tsA').addEventListener('input', function () { if (this.value !== '') $('tsB').value = Math.max(0, s.target - this.value); });
-      $('tsB').addEventListener('input', function () { if (this.value !== '') $('tsA').value = Math.max(0, s.target - this.value); });
+      $('tsA').addEventListener('input', function () { if (this.value !== '') $('tsB').value = Math.max(0, total - this.value); });
+      $('tsB').addEventListener('input', function () { if (this.value !== '') $('tsA').value = Math.max(0, total - this.value); });
     }
     setTimeout(function () { $('tsA').focus(); }, 250);
     $('typeForm').addEventListener('submit', function (e) {
@@ -1217,7 +1235,7 @@
   function typedScoreProblem(a, b) {
     var s = session;
     if (isNaN(a) || isNaN(b) || a < 0 || b < 0) return 'Type both scores (0 or more).';
-    if (s.scoring !== 'games') return a + b === s.target ? null : 'The scores must add up to ' + s.target + ' (now ' + (a + b) + ').';
+    if (s.scoring !== 'games') return a + b === perGame(s) ? null : 'The scores must add up to ' + perGame(s) + ' (now ' + (a + b) + ').';
     var G = s.gamesTarget, hi = Math.max(a, b), lo = Math.min(a, b);
     if ((hi === G && lo <= G - 2) || (hi === G + 1 && (lo === G - 1 || lo === G))) return null;
     return 'That is not a finished set. Examples: ' + G + '-' + (G - 2) + ', ' + (G + 1) + '-' + (G - 1) + ', ' + (G + 1) + '-' + G + ' (tiebreak).';
@@ -1411,8 +1429,8 @@
     }
     $('tType').hidden = !T.inSession;   // sessions: type the score instead
     if (T.mode === 'points') {
-      $('tMode').textContent = T.target + ' pts';
-      $('tMid').innerHTML = '<span>Points played</span><span class="sets">' + (T.pts[0] + T.pts[1]) + ' / ' + T.target + '</span>';
+      $('tMode').textContent = T.target + ' ' + (T.unit || 'pts');
+      $('tMid').innerHTML = '<span>' + (T.unit === 'games' ? 'Games played' : 'Points played') + '</span><span class="sets">' + (T.pts[0] + T.pts[1]) + ' / ' + T.target + '</span>';
     } else {
       $('tMode').textContent = T.golden ? '⚡ Golden' : '🔁 Advantage';
       var sets = T.sets.map(function (s) { return s[0] + '-' + s[1]; }).join('  ');
@@ -1430,7 +1448,7 @@
     var buttons;
     if (T.onSave) {
       buttons = '<button class="btn btn-primary" data-save-score="1">✅ Save score</button>' +
-        '<button class="btn btn-ghost" data-undo-last="1">↩️ Undo last point</button>';
+        '<button class="btn btn-ghost" data-undo-last="1">↩️ Undo last ' + (T.unit === 'games' ? 'game' : 'point') + '</button>';
     } else if (T.saved) {
       // show everyone's new points
       buttons = '<div class="card" style="width:100%;max-width:320px;text-align:left;margin:0">' +
@@ -1439,8 +1457,11 @@
           var tier = PadPal.tierOf(c.points);
           return '<div class="lb-row"><span>' + (c.won ? '🏆 ' : '') + (p ? shortName(p).replace(/</g, '&lt;') : '?') + '</span>' +
             '<small>' + tier.icon + ' ' + PadPal.fmt(c.points) + '</small>' +
-            '<span class="pts ' + (c.change >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(c.change) + '</span></div>';
-        }).join('') + '</div>' +
+            '<span class="pts ' + (c.change >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(c.change) + (c.capped ? ' 🧢' : '') + '</span></div>';
+        }).join('') +
+        (T.saved.changes.some(function (c) { return c.capped; })
+          ? '<p class="note" style="margin:8px 0 0">🧢 Daily cap reached: wins in normal matches give at most +10 a day. Resets at midnight. (Sessions have no cap!)</p>' : '') +
+        '</div>' +
         '<button class="btn btn-accent" data-rate="' + T.players.a.concat(T.players.b).join(',') + '">🎯 Rate their shots</button>' +
         '<button class="btn btn-primary" data-close-tracker="1">Done</button>';
     } else if (T.players) {
@@ -1451,8 +1472,9 @@
         '<button class="btn btn-primary" data-close-tracker="1">Done</button>' +
         '<button class="btn btn-ghost" data-undo-last="1">↩️ Undo last point</button>';
     }
+    var draw = T.mode === 'points' && T.pts[0] === T.pts[1];   // e.g. 2-2 with fixed games, 12-12 with 24 points
     $('doneScreen').innerHTML =
-      '<div class="big">🏆</div><h3>' + T.names[win] + ' win!</h3>' +
+      (draw ? '<div class="big">🤝</div><h3>It\'s a draw!</h3>' : '<div class="big">🏆</div><h3>' + T.names[win] + ' win!</h3>') +
       '<div class="final">' + final + '</div>' + buttons;
     $('doneScreen').classList.add('open');
   }
@@ -1572,7 +1594,8 @@
         });
       } else {
         openTracker({
-          mode: 'points', inSession: true, title: title, names: names, target: session.target, pts: [0, 0], over: false,
+          mode: 'points', inSession: true, title: title, names: names, target: perGame(session), unit: session.scoring === 'fixed' ? 'games' : 'pts',
+          pts: [0, 0], over: false,
           onSave: function () { done(T.pts[0], T.pts[1]); }
         });
       }

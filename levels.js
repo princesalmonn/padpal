@@ -18,9 +18,9 @@
     'Beginner': { title: 'Bandeja in training', emojis: ['🔥', '🎾'], frame: null, rules: [COSTS] },
     'Amateur':  { title: 'Dangerous on a good day', emojis: ['⚡', '💪'], frame: null, rules: [COSTS] },
     'Junior':   { title: 'Club regular', emojis: ['🦾', '🚀'], frame: null,
-      rules: [COSTS, '🛑 Normal games stop giving points at 500'] },
+      rules: [COSTS, '🛑 Normal games stop giving points at 500', '🏆 At 500 points: official tournaments unlock (your way to 🥈 Pro)'] },
     'Pro':      { title: 'The real deal', emojis: ['🥷', '🎯'], frame: 'frame-pro',
-      rules: [COSTS, '🏆 Official tournaments unlocked: the only way up from here', '🎯 Friends rate your shots 1–10 (instead of 1–7)', '🖼️ Silver profile frame'] },
+      rules: [COSTS, '🏆 Official tournaments are the only way up from here', '🎯 Friends rate your shots 1–10 (instead of 1–7)', '🖼️ Silver profile frame'] },
     'Pro-Star': { title: 'Shining', emojis: ['💎', '🦅'], frame: 'frame-prostar',
       rules: [COSTS, '🏆 Climb with official tournaments', '🖼️ Glowing orange frame'] },
     'Star':     { title: 'Crowd favourite', emojis: ['⭐', '🌟'], frame: 'frame-star',
@@ -47,16 +47,27 @@
   function nextStep(profile) {
     var pts = Number(profile.points) || 0;
     var next = PadPal.nextTier(pts);
-    if (!next) return { next: null, text: '👑 Top of the ladder!' };
+    if (!next) return { next: null, text: '👑 Top of the ladder!', short: '👑 Top of the ladder!' };
     var gap = Math.max(0.5, Math.round((next.min - pts) * 10) / 10);
-    if (pts >= 500) return { next: next, gap: gap, text: 'Next: ' + next.icon + ' ' + next.name + ', ' + PadPal.fmt(gap) + ' pts away · via 🏆 official tournaments' };
+    if (pts >= 500) return { next: next, gap: gap, text: 'Next: ' + next.icon + ' ' + next.name + ', ' + PadPal.fmt(gap) + ' pts away · via 🏆 official tournaments',
+                             short: '🏆 From here you climb with official tournaments' };
     var perWin = (Number(profile.match_days) || 0) < 10 ? 5 : 2.5;
     var casualGap = Math.min(next.min, 500) - pts;
     var wins = Math.max(1, Math.ceil(casualGap / perWin));
+    var winsText = 'about ' + wins + ' win' + (wins === 1 ? '' : 's') + ' at your level' + (next.min > 500 ? ', then 🏆 tournaments' : '');
     return { next: next, gap: gap, wins: wins,
-      text: 'Next: ' + next.icon + ' ' + next.name + ', ' + PadPal.fmt(gap) + ' pts away · about ' + wins + ' win' + (wins === 1 ? '' : 's') + ' at your level' +
-        (next.min > 500 ? ', then 🏆 tournaments' : '') };
+      text: 'Next: ' + next.icon + ' ' + next.name + ', ' + PadPal.fmt(gap) + ' pts away · ' + winsText,
+      short: '🎯 That\'s ' + winsText };
   }
+  // How far you are inside your level, 0–100 (same bar on Profile and Road)
+  function progress(points) {
+    var pts = Number(points) || 0;
+    var t = PadPal.tierOf(pts), next = PadPal.nextTier(pts);
+    if (!next || pts >= 500 && t.name === 'Junior') return 100;
+    return Math.max(2, Math.min(100, Math.round((pts - t.min) / (next.min - t.min) * 100)));
+  }
+  // The rule behind "about N wins", written once
+  var WINS_NOTE = 'Counted as +2 for a win against your level and +0.5 for showing up, doubled in your first 10 match days.';
 
   // ===== Rings, frames and gold names =====
   var pointsOf = {};   // member id → points
@@ -183,6 +194,6 @@
     });
   });
 
-  PadPal.levels = { INFO: INFO, COSTS: COSTS, info: info, emojiList: emojiList, nextStep: nextStep,
+  PadPal.levels = { INFO: INFO, COSTS: COSTS, WINS_NOTE: WINS_NOTE, info: info, emojiList: emojiList, nextStep: nextStep, progress: progress,
                     setPoints: setPoints, paint: paint, celebrate: celebrate, shareCard: shareCard };
 })();

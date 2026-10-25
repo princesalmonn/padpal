@@ -8,11 +8,11 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=18">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="auth.js"></script>
-<script src="levels.js"></script>
+<script src="config.js?v=18"></script>
+<script src="auth.js?v=18"></script>
+<script src="levels.js?v=18"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Road-only styles ===== */
@@ -118,12 +118,12 @@
           ' in about <b>' + weeks + ' week' + (weeks > 1 ? 's' : '') + '</b>'
         : '📈 Play a few games this month and we\'ll guess when you reach ' + step.next.icon + ' ' + step.next.name + '.';
     }
-    var nx = PadPal.nextTier(pts);
-    var pct = nx ? Math.round((pts - mine.min) / (nx.min - mine.min) * 100) : 100;
+    var pct = PadPal.levels.progress(pts);   // same bar as the Profile
     $('you').innerHTML = '<div class="you-card">' + face(me) +
       '<div><h1 data-uid="' + me.id + '">' + mine.icon + ' ' + mine.name + ' · ' + PadPal.fmt(pts) + ' pts</h1><div class="t">"' + PadPal.levels.info(mine).title + '"</div></div></div>' +
-      '<div class="progress"><i style="width:' + Math.max(2, Math.min(100, pct)) + '%"></i></div>' +
-      '<div class="next">' + step.text.replace(/^Next:/, '<b>Next:</b>') + (pace ? '<br>' + pace : '') + '</div>';
+      '<div class="progress"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="next">' + step.text.replace(/^Next:/, '<b>Next:</b>') + (pace ? '<br>' + pace : '') + '</div>' +
+      (step.wins ? '<p class="meta" style="margin:6px 0 0;font-size:11px">' + PadPal.levels.WINS_NOTE + '</p>' : '');
 
     // ===== When you reached each level =====
     var reached = {};

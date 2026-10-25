@@ -8,11 +8,11 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=18">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="auth.js"></script>
-<script src="levels.js"></script>
+<script src="config.js?v=18"></script>
+<script src="auth.js?v=18"></script>
+<script src="levels.js?v=18"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Chat-only styles ===== */
@@ -421,7 +421,7 @@
     await signPhotos(msgs);
     renderMsgs();
     renderPinBar();
-    db.rpc('mark_read', { p_chat: id });
+    markRead(id);
     current.unread = 0;
     listenLive(id);
   }
@@ -528,7 +528,15 @@
       renderPinBar();
     }
     renderMsgs();
-    db.rpc('mark_read', { p_chat: current.id });
+    markRead(current.id);
+  }
+
+  // "I've read everything in this chat". Supabase only sends a request when we wait for
+  // its answer (.then), so without it the chat stayed bold with its old unread number.
+  var reading = Promise.resolve();
+  function markRead(id) {
+    reading = db.rpc('mark_read', { p_chat: id }).then(function () {}, function () {});
+    return reading;
   }
   function updateMessages(list) {
     if (!current) return;
@@ -543,7 +551,7 @@
     stopLive();
     $('convo').classList.remove('open');
     current = null;
-    loadChats();
+    reading.then(loadChats);   // refresh the list once "read" is saved, so it isn't bold any more
   }
   $('back').addEventListener('click', closeChat);
   $('cWho').addEventListener('click', function () {

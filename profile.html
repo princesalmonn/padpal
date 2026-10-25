@@ -8,13 +8,13 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=18">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="auth.js"></script>
-<script src="rate.js"></script>
-<script src="sessions.js"></script>
-<script src="levels.js"></script>
+<script src="config.js?v=18"></script>
+<script src="auth.js?v=18"></script>
+<script src="rate.js?v=18"></script>
+<script src="sessions.js?v=18"></script>
+<script src="levels.js?v=18"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Profile-only styles ===== */
@@ -410,6 +410,7 @@
   var myExits = [];       // sessions you had to stop: { reason, when }
   var mySessions = [];    // finished sessions: { game, row (your result), n, change, when }
   var myTourneys = [];    // tournament teams you were in
+  var tourneyGames = [];  // their matches (count in W-L like every other match)
   var pals = null;        // PadPals: [{ user_id, games }]
   var histFilter = 'all';
 
@@ -529,7 +530,8 @@
     var ms = myMatches.filter(function (m) { return new Date(m.when).getTime() >= since; });   // newest first
     var ch = myChanges.filter(function (c) { return new Date(c.created_at).getTime() >= since; });
     var wins = ms.filter(function (m) { return m.won; }).length;
-    var losses = ms.length - wins;
+    var losses = ms.filter(function (m) { return m.lost; }).length;
+    var draws = ms.length - wins - losses;
     var rate = ms.length ? Math.round(wins / ms.length * 100) : 0;
     var gained = ch.reduce(function (a, c) { return a + Number(c.change); }, 0);
     // longest run of wins, oldest → newest
@@ -540,17 +542,17 @@
     var nSessions = Object.keys(sessions).length;
 
     $('tiles').innerHTML =
-      '<div class="tile"><small>Matches</small><strong>' + ms.length + '</strong><div class="meta">' + wins + 'W · ' + losses + 'L' + (nSessions ? ' · ' + nSessions + ' session' + (nSessions > 1 ? 's' : '') : '') + '</div></div>' +
+      '<div class="tile"><small>Matches</small><strong>' + ms.length + '</strong><div class="meta">' + wins + 'W · ' + losses + 'L' + (draws ? ' · ' + draws + 'D' : '') + '</div></div>' +
       '<div class="tile"><small>Win rate</small><strong>' + (ms.length ? rate + '%' : '–') + '</strong><div class="wl"' + (ms.length ? '' : ' style="background:var(--card-2)"') + '><i style="width:' + rate + '%"></i></div></div>' +
       '<div class="tile"><small>Points</small><strong class="' + (gained >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(gained) + '</strong><div class="meta">all games, ratings & more</div></div>' +
       '<div class="tile"><small>Best streak</small><strong>🔥 ' + best + '</strong><div class="meta">wins in a row</div></div>';
 
     // partners and opponents
     var stat = {};
-    function s(id) { return stat[id] = stat[id] || { with: 0, withWins: 0, vs: 0, vsWins: 0 }; }
+    function s(id) { return stat[id] = stat[id] || { with: 0, withWins: 0, withLost: 0, vs: 0, vsWins: 0, vsLost: 0 }; }
     ms.forEach(function (m) {
-      var p = s(m.partner); p.with++; if (m.won) p.withWins++;
-      m.opp.forEach(function (o) { var x = s(o); x.vs++; if (m.won) x.vsWins++; });
+      var p = s(m.partner); p.with++; if (m.won) p.withWins++; if (m.lost) p.withLost++;
+      m.opp.forEach(function (o) { var x = s(o); x.vs++; if (m.won) x.vsWins++; if (m.lost) x.vsLost++; });
     });
     var ids = Object.keys(stat);
     var partner = ids.filter(function (id) { return stat[id].with > 0; }).sort(function (a, b) {
@@ -558,14 +560,14 @@
       var ra = A.withWins / A.with - (A.with < 2 ? 1 : 0), rb = B.withWins / B.with - (B.with < 2 ? 1 : 0);
       return rb - ra || B.with - A.with;
     })[0];
-    var nemesis = ids.filter(function (id) { return stat[id].vs > 0 && stat[id].vs - stat[id].vsWins > 0; }).sort(function (a, b) {
+    var nemesis = ids.filter(function (id) { return stat[id].vsLost > 0 && stat[id].vsLost >= stat[id].vsWins; }).sort(function (a, b) {   // they beat you at least as often
       var A = stat[a], B = stat[b];
-      return ((B.vs - B.vsWins) - B.vsWins) - ((A.vs - A.vsWins) - A.vsWins) || B.vs - A.vs;
+      return (B.vsLost - B.vsWins) - (A.vsLost - A.vsWins) || B.vs - A.vs;
     })[0];
     var most = ids.sort(function (a, b) { return (stat[b].with + stat[b].vs) - (stat[a].with + stat[a].vs); })[0];
     $('people').innerHTML = ms.length
-      ? (partner ? person('🤝', 'Best partner', partner, stat[partner].withWins + '-' + (stat[partner].with - stat[partner].withWins), 'together') : '') +
-        (nemesis ? person('😈', 'Nemesis', nemesis, stat[nemesis].vsWins + '-' + (stat[nemesis].vs - stat[nemesis].vsWins), 'vs them') : '') +
+      ? (partner ? person('🤝', 'Best partner', partner, stat[partner].withWins + '-' + stat[partner].withLost, 'together') : '') +
+        (nemesis ? person('😈', 'Nemesis', nemesis, stat[nemesis].vsWins + '-' + stat[nemesis].vsLost, 'vs them') : '') +
         (most ? person('👥', 'Most played with', most, stat[most].with + stat[most].vs, 'games') : '')
       : '<p class="meta" style="margin:0">No matches in this period yet. 🎾</p>';
 
@@ -586,27 +588,28 @@
     if (nSessions) facts.push('🔄 You played <b>' + nSessions + '</b> Americano/Mexicano session' + (nSessions > 1 ? 's' : ''));
     // best day of the week
     var days = {};
-    ms.forEach(function (m) { var d = new Date(m.when).getDay(); days[d] = days[d] || [0, 0]; days[d][m.won ? 0 : 1]++; });
+    ms.forEach(function (m) { var d = new Date(m.when).getDay(); days[d] = days[d] || [0, 0]; if (m.won) days[d][0]++; else if (m.lost) days[d][1]++; });
     var bestDay = Object.keys(days).filter(function (d) { return days[d][0] + days[d][1] >= 2; })
       .sort(function (a, b) { return (days[b][0] - days[b][1]) - (days[a][0] - days[a][1]); })[0];
     if (bestDay !== undefined) facts.push('📅 Your best day is <b>' + DAY_NAMES[bestDay] + '</b> (' + days[bestDay][0] + '-' + days[bestDay][1] + ')');
     // biggest win
+    var tennis = ms.filter(function (m) { return !m.session; });   // set facts: normal matches only (session games aren't sets)
     var big = null;
-    ms.forEach(function (m) {
+    tennis.forEach(function (m) {
       if (!m.won) return;
       var diff = m.sets.reduce(function (a, st) { return a + st[0] - st[1]; }, 0);
       if (!big || diff > big.diff) big = { diff: diff, m: m };
     });
     if (big && big.diff >= 6) facts.push('💥 Biggest win: <b>' + big.m.score + '</b> with ' + pname(big.m.partner));
     // comebacks and tiebreaks
-    var comebacks = ms.filter(function (m) { return m.won && m.sets.length > 1 && m.sets[0][0] < m.sets[0][1]; }).length;
+    var comebacks = tennis.filter(function (m) { return m.won && m.sets.length > 1 && m.sets[0][0] < m.sets[0][1]; }).length;
     if (comebacks) facts.push('💪 You came back after losing the first set <b>' + comebacks + '×</b>');
     var tbWon = 0, tbAll = 0;
-    ms.forEach(function (m) { m.sets.forEach(function (st) { if (Math.max(st[0], st[1]) === 7 && Math.min(st[0], st[1]) === 6) { tbAll++; if (st[0] > st[1]) tbWon++; } }); });
+    tennis.forEach(function (m) { m.sets.forEach(function (st) { if (Math.max(st[0], st[1]) === 7 && Math.min(st[0], st[1]) === 6) { tbAll++; if (st[0] > st[1]) tbWon++; } }); });
     if (tbAll) facts.push('🧊 Tiebreak sets: you won <b>' + tbWon + ' of ' + tbAll + '</b>');
     // most common set score you won
     var scores = {};
-    ms.forEach(function (m) { m.sets.forEach(function (st) { if (st[0] > st[1]) { var k = st[0] + '-' + st[1]; scores[k] = (scores[k] || 0) + 1; } }); });
+    tennis.forEach(function (m) { m.sets.forEach(function (st) { if (st[0] > st[1]) { var k = st[0] + '-' + st[1]; scores[k] = (scores[k] || 0) + 1; } }); });
     var top = Object.keys(scores).sort(function (a, b) { return scores[b] - scores[a]; })[0];
     if (top && scores[top] >= 2) facts.push('🎾 Your favourite winning set score: <b>' + top + '</b> (' + scores[top] + '×)');
     // points from ratings and from not playing
@@ -673,9 +676,28 @@
       });
     }
     // tournaments played
-    var tr = await db.from('tournament_teams').select('place, p1, p2, tournaments(id, name, kind, status, scheduled_at)')
+    var tr = await db.from('tournament_teams').select('id, place, p1, p2, tournaments(id, name, kind, status, scheduled_at)')
       .or('p1.eq.' + id + ',p2.eq.' + id);
     myTourneys = (tr.data || []).filter(function (t) { return t.tournaments && t.tournaments.status !== 'cancelled'; });
+    // tournament matches count in W-L too
+    tourneyGames = [];
+    var tIds = myTourneys.map(function (t) { return t.tournaments.id; });
+    if (tIds.length) {
+      var tt = await db.from('tournament_teams').select('id, p1, p2').in('tournament_id', tIds);
+      var tm = await db.from('tournament_matches').select('team_a, team_b, sets, winner, played_at').in('tournament_id', tIds).not('winner', 'is', null);
+      var teamOf = {};
+      (tt.data || []).forEach(function (t) { teamOf[t.id] = t; });
+      var mine = myTourneys.map(function (t) { return t.id; });
+      (tm.data || []).forEach(function (m) {
+        var side = mine.indexOf(m.team_a) > -1 ? 'a' : mine.indexOf(m.team_b) > -1 ? 'b' : null;
+        if (!side) return;
+        var us = teamOf[side === 'a' ? m.team_a : m.team_b], them = teamOf[side === 'a' ? m.team_b : m.team_a];
+        if (!us || !them) return;
+        var sets = (m.sets || []).map(function (s) { return side === 'a' ? [s[0], s[1]] : [s[1], s[0]]; });
+        tourneyGames.push({ won: m.winner === side, lost: m.winner !== side, draw: false, partner: us.p1 === id ? us.p2 : us.p1, opp: [them.p1, them.p2],
+                            score: sets.map(function (s) { return s[0] + '-' + s[1]; }).join(' '), sets: sets, change: undefined, when: m.played_at, tourney: true });
+      });
+    }
     // PadPals: everyone they played at least one game with
     db.rpc('padpals', { p_user: id }).then(function (pr) {
       pals = pr.error ? null : pr.data;
@@ -689,6 +711,8 @@
       var mine = team === 'a' ? [m.a1, m.a2] : [m.b1, m.b2];
       return {
         won: m.winner === team,
+        lost: m.winner !== team,
+        draw: false,
         partner: mine[0] === id ? mine[1] : mine[0],
         opp: team === 'a' ? [m.b1, m.b2] : [m.a1, m.a2],
         score: m.sets.map(function (s) { return team === 'a' ? s[0] + '-' + s[1] : s[1] + '-' + s[0]; }).join(' '),
@@ -697,6 +721,15 @@
         when: m.played_at
       };
     });
+    // every game inside a session is a match too (W-L, streaks, partners); only the final place gave ranking points
+    mySessions.forEach(function (s) {
+      PadPal.sessions.gamesOf(s.game, id).forEach(function (g) {
+        myMatches.push({ won: g.won, lost: g.lost, draw: g.draw, partner: g.partner, opp: g.opp,
+                         score: g.score[0] + '-' + g.score[1], sets: [g.score], change: undefined, when: g.when, session: true });
+      });
+    });
+    myMatches = myMatches.concat(tourneyGames);
+    myMatches.sort(function (a, b) { return new Date(b.when) - new Date(a.when); });
     try { urls = await PadPal.photoUrls(list.map(function (m) { return m.avatar_url; })); } catch (err) {}
     renderRank(list);
     renderHistory();
@@ -721,19 +754,20 @@
     $('rTier').textContent = t.name;
     $('rPts').textContent = PadPal.fmt(pts);
     $('rMixed').textContent = '🔀 Mixed: ' + PadPal.fmt(profile.mixed_points) + ' pts (from games with men and women)';
-    var ladder = list.filter(function (m) { return m.gender === profile.gender; });
-    var pos = ladder.map(function (m) { return m.id; }).indexOf(profile.id) + 1;
-    $('rPos').textContent = pos ? '#' + pos + ' in ' + (profile.gender === 'f' ? "Women's" : "Men's") + ' ladder' : '';
-    var span = next ? next.min - t.min : 1;
-    var pct = next ? Math.round((pts - t.min) / span * 100) : 100;
-    if (pts >= 500 && t.name === 'Junior') pct = 100;
-    $('rBar').style.width = Math.max(2, Math.min(100, pct)) + '%';
+    // same ranking rule as the Ranks page (equal points share a place)
+    var ladder = PadPal.rankPlayers(list.filter(function (m) { return m.gender === profile.gender; }), function (m) { return m.points; });
+    var row = ladder.filter(function (x) { return x.p.id === profile.id; })[0];
+    $('rPos').textContent = row && (profile.gender === 'm' || profile.gender === 'f')
+      ? '#' + row.rank + ' in ' + (profile.gender === 'f' ? "Women's" : "Men's") + ' ladder' + (row.tied > 1 ? ' · tied with ' + (row.tied - 1) + ' other' + (row.tied > 2 ? 's' : '') : '')
+      : '';
+    $('rBar').style.width = PadPal.levels.progress(pts) + '%';   // same bar as the Road page
     $('rFrom').textContent = t.icon + ' ' + t.name + ' · ' + t.min;
     $('rTo').textContent = !next ? 'Top tier! 👑'
-      : pts >= 500 ? '🏆 Tournaments unlock ' + next.icon + ' ' + next.name
+      : pts >= 500 ? '🏆 Official tournaments → ' + next.icon + ' ' + next.name
       : PadPal.fmt(next.min - pts) + ' pts to ' + next.icon + ' ' + next.name;
-    if (isMe) {   // "Next: ⚡ Amateur, 90 pts away · about 36 wins at your level"
-      $('rNext').textContent = PadPal.levels.nextStep(profile).text;
+    if (isMe) {   // the line above already says "90 pts to ⚡ Amateur", so only add the wins here
+      $('rNext').textContent = PadPal.levels.nextStep(profile).short;
+      $('rNext').title = PadPal.levels.WINS_NOTE;
       $('rNext').hidden = false;
     }
     if (!isMe) {   // someone else's inactivity is their business
@@ -764,7 +798,7 @@
   function renderH2H(id) {
     var games = myMatches.filter(function (m) { return m.opp.indexOf(id) > -1; });
     var you = games.filter(function (m) { return m.won; }).length;
-    var them = games.length - you;
+    var them = games.filter(function (m) { return m.lost; }).length;   // draws count for nobody
     var foes = [];
     myMatches.forEach(function (m) { m.opp.forEach(function (o) { if (foes.indexOf(o) < 0) foes.push(o); }); });
     $('h2hPick').innerHTML = foes.map(function (f) {
@@ -785,7 +819,8 @@
 
   function renderHistory() {
     var items = [];
-    if (histFilter === 'all' || histFilter === 'match') myMatches.forEach(function (m) {
+    // session and tournament games live inside their own row (tap it to see each game)
+    if (histFilter === 'all' || histFilter === 'match') myMatches.filter(function (m) { return !m.session && !m.tourney; }).forEach(function (m) {
       items.push({ when: m.when, html: '<div class="match-row">' +
         '<div class="wlb ' + (m.won ? 'w' : 'l') + '">' + (m.won ? 'W' : 'L') + '</div>' +
         '<div class="who">with <b>' + pname(m.partner) + '</b> vs ' + pname(m.opp[0]) + ' & ' + pname(m.opp[1]) +
@@ -799,7 +834,7 @@
       items.push({ when: g.scheduled_at, html: '<button class="match-row" data-session="' + i + '">' +
         '<div class="kind-ico">' + kind[0] + '</div>' +
         '<div class="who"><b>' + kind.slice(1).join(' ') + '</b>' + (g.host_id === profile.id ? ' 👑' : '') + ' · ' +
-          (r ? (r.place <= 3 ? PadPal.sessions.medal(r.place) + ' ' : '') + PadPal.sessions.ordinal(r.place) + ' of ' + s.n + ' · ' + r.w + 'W ' + r.l + 'L' : s.n + ' players') +
+          (r ? (r.place <= 3 ? PadPal.sessions.medal(r.place) + ' ' : '') + PadPal.sessions.ordinal(r.place) + ' of ' + s.n + ' · ' + PadPal.sessions.wlText(r) : s.n + ' players') +
         '<small>' + dateText(g.scheduled_at) + (g.place ? ' · ' + esc(g.place) : '') + out + '</small></div>' +
         '<div class="score">' + (r ? r.total + ' pts' : '') + changeHtml(s.change) + '</div></button>' });
     });
@@ -855,7 +890,7 @@
       var p = people[x.user_id], t = PadPal.tierOf(p.points);
       return '<a class="pal-row" href="profile.html' + (x.user_id === viewer.id ? '' : '?id=' + x.user_id) + '"><div class="avatar" data-uid="' + x.user_id + '">' + avatarOf(x.user_id) + '</div>' +
         '<div><div class="name" data-uid="' + x.user_id + '">' + pname(x.user_id) + (x.user_id === viewer.id ? ' (you)' : '') + '</div><div class="meta">' + t.icon + ' ' + t.name + '</div></div>' +
-        '<div class="n">' + x.games + '<small>game' + (x.games === 1 ? '' : 's') + ' together</small></div></a>';
+        '<div class="n">' + x.games + '×<small>played together</small></div></a>';
     }).join('') : '<p class="meta">' + (pals.length ? 'Nobody found.' : 'No PadPals yet. Play a game to get some! 🎾') + '</p>';
   }
 
@@ -865,14 +900,17 @@
     var together = myMatches.filter(function (m) { return m.partner === viewer.id; });
     var against = myMatches.filter(function (m) { return m.opp.indexOf(viewer.id) > -1; });
     var tw = together.filter(function (m) { return m.won; }).length;
-    var youWin = against.filter(function (m) { return !m.won; }).length;   // their match lost = you won
+    var tl = together.filter(function (m) { return m.lost; }).length;
+    var youWin = against.filter(function (m) { return m.lost; }).length;   // they lost = you won
+    var youLose = against.filter(function (m) { return m.won; }).length;
     var both = pals && pals.filter(function (x) { return x.user_id === viewer.id; })[0];
     $('vsName').textContent = profile.display_name || profile.username;
     $('vsCard').innerHTML = '<div class="vs-grid">' +
-      '<div><strong>' + tw + '–' + (together.length - tw) + '</strong><small>🤝 as partners</small></div>' +
-      '<div><strong><span class="' + (youWin >= against.length - youWin ? 'plus' : 'minus') + '">' + youWin + '</span>–' + (against.length - youWin) + '</strong><small>⚔️ you vs them</small></div>' +
-      '</div><p class="h2h-note">' + (both ? '🎾 ' + both.games + ' game' + (both.games === 1 ? '' : 's') + ' played together (matches, sessions & tournaments)'
-        : 'You haven\'t played together yet. Invite them to a game! 🎾') + '</p>';
+      '<div><strong>' + tw + '–' + tl + '</strong><small>🤝 as partners</small></div>' +
+      '<div><strong><span class="' + (youWin >= youLose ? 'plus' : 'minus') + '">' + youWin + '</span>–' + youLose + '</strong><small>⚔️ you vs them</small></div>' +
+      '</div><p class="h2h-note">' + (together.length + against.length
+        ? '🎾 ' + (together.length + against.length) + ' match' + (together.length + against.length === 1 ? '' : 'es') + ' on court together (incl. session & tournament games)'
+        : both ? '🎾 You were in the same session or tournament' : 'You haven\'t played together yet. Invite them to a game! 🎾') + '</p>';
     $('vsBox').hidden = false;
   }
 

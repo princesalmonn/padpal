@@ -191,6 +191,18 @@
     return TIERS.filter(function (x) { return x.min > (points || 0); })[0] || null;
   }
 
+  // ONE ranking rule for the whole app (Ranks, Profile, …):
+  // most points first; equal points share the same place (1, 1, 1, 4 …); equal points are listed A–Z
+  function rankPlayers(list, valueOf) {
+    var rows = list.map(function (p) { return { p: p, value: Math.round((Number(valueOf(p)) || 0) * 10) / 10 }; });
+    rows.sort(function (a, b) {
+      return b.value - a.value || (a.p.display_name || a.p.username || '').localeCompare(b.p.display_name || b.p.username || '');
+    });
+    rows.forEach(function (x, i) { x.rank = i > 0 && x.value === rows[i - 1].value ? rows[i - 1].rank : i + 1; });
+    rows.forEach(function (x) { x.tied = rows.filter(function (y) { return y.rank === x.rank; }).length; });
+    return rows;
+  }
+
   // All approved members (small friends group, so we load them all at once)
   async function members() {
     var r = await db.from('profiles')
@@ -258,7 +270,7 @@
     createInvite: createInvite, shareInvite: shareInvite, friendlyError: friendlyError,
     uploadPhoto: uploadPhoto, photoUrls: photoUrls,
     remembered: remembered, setRemember: setRemember,
-    TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, fmt: fmt, fmtChange: fmtChange,
+    TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, rankPlayers: rankPlayers, fmt: fmt, fmtChange: fmtChange,
     inactivity: inactivity, refreshBell: refreshBell, mountBell: mountBell
   };
 })();
