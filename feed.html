@@ -8,16 +8,34 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=18">
+<link rel="stylesheet" href="styles.css?v=20">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js?v=18"></script>
-<script src="auth.js?v=18"></script>
-<script src="levels.js?v=18"></script>
-<script src="rate.js?v=18"></script>
-<script src="sessions.js?v=18"></script>
+<script src="config.js?v=20"></script>
+<script src="auth.js?v=20"></script>
+<script src="levels.js?v=20"></script>
+<script src="rate.js?v=20"></script>
+<script src="sessions.js?v=20"></script>
+<script src="share.js?v=20"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Feed-only styles ===== */
+
+  /* 🏷️ Tags */
+  .tag-line { font-size: 13px; color: var(--text-2); margin: 10px 0 0; line-height: 26px; }
+  .tag-line a { color: var(--text); font-weight: 700; text-decoration: none; }
+  .tag-line .untag { float: right; border: 1px solid var(--line); background: var(--card-2); border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--text-2); }
+  .tag-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .tag-chips:empty { display: none; }
+  .tag-chip { border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--text); border-radius: 999px; padding: 5px 10px; font-size: 13px; font-weight: 600; }
+  .tag-list { max-height: 240px; overflow-y: auto; }
+  .tag-row { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 7px 0; text-align: left; color: var(--text); }
+  .tag-row .avatar { width: 34px; height: 34px; font-size: 14px; overflow: hidden; }
+  .tag-row .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .tag-row span { flex: 1; min-width: 0; }
+  .tag-row small { display: block; color: var(--text-2); font-size: 11px; }
+  .tag-row i { font-style: normal; color: var(--accent); font-weight: 800; font-size: 18px; }
+  article.flash { animation: postFlash 1.6s ease; }
+  @keyframes postFlash { 0%, 50% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: none; } }
 
   /* 24h photo row (like Instagram Stories) */
   .stories { display: flex; gap: 14px; overflow-x: auto; padding: 6px 0 14px; scrollbar-width: none; }
@@ -176,6 +194,14 @@
       <textarea class="input" id="composeText" rows="3" maxlength="500"></textarea>
       <small><span id="composeCount">0</span> / 500</small>
     </div>
+    <div class="field">
+      <div class="tag-chips" id="tagChips"></div>
+      <button type="button" class="btn btn-ghost" id="tagOpen" style="width:100%;padding:9px;font-size:14px">👥 Tag PadPals</button>
+      <div id="tagPanel" hidden>
+        <input class="input" id="tagSearch" placeholder="🔍 Search your PadPals" autocomplete="off" style="margin:8px 0">
+        <div class="tag-list" id="tagList"></div>
+      </div>
+    </div>
     <p class="meta" id="composeNote" style="margin:0 0 12px" hidden>⏳ This photo disappears after 24 hours. You can pin it to your profile to keep it.</p>
     <button class="btn btn-primary" id="composeBtn" style="width:100%">Post</button>
   </form>
@@ -231,6 +257,7 @@
   var seen = {};        // stories already opened
   var commentsFor = null;
   var compose = null;   // { kind, file }
+  var tagsOf = {};      // post id → tagged member ids
   var viewing = null;
   var matches = {};     // match id → match (with points changes)
   var sessions = {};    // game id → finished Americano/Mexicano (with points changes)
@@ -288,7 +315,7 @@
       $('idleWarn').hidden = false;
     });
     await cleanupMyExpired();
-    load();
+    load().then(jumpToPost);
   });
 
   // Refresh when you come back to the app
@@ -330,8 +357,14 @@
       var tr = await db.from('tournaments').select('id, name, kind, division, tournament_teams(id, p1, p2, place)').in('id', tIds);
       (tr.data || []).forEach(function (t) { tourneys[t.id] = t; });
     }
-    if (matchIds.length || gameIds.length || tIds.length) {
+    if (!Object.keys(people).length) {   // names for results, tags and the tag picker
       try { (await PadPal.members()).forEach(function (m) { people[m.id] = m; }); } catch (err) {}
+    }
+    // 🏷️ who is tagged in which post (works even before 19_tags.sql: then simply no tags)
+    tagsOf = {};
+    if (posts.length) {
+      var tg = await db.from('post_tags').select('post_id, user_id').in('post_id', posts.map(function (p) { return p.id; }));
+      (tg.data || []).forEach(function (t) { (tagsOf[t.post_id] = tagsOf[t.post_id] || []).push(t.user_id); });
     }
 
     var pr = await db.from('pinned_photos').select('path').eq('user_id', profile.id);
@@ -402,8 +435,30 @@
       '<div class="actions">' +
         '<button class="' + (liked ? 'liked' : '') + '" data-like="' + p.id + '"><span class="heart">' + (liked ? '❤️' : '🤍') + '</span>' + p.likes.length + '</button>' +
         '<button data-comments="' + p.id + '">💬 ' + nComments + '</button>' +
+        (p.kind === 'rankup' ? '<button data-share="' + p.id + '">📤 Share</button>' : '') +
         (profile.is_admin ? '<button data-delete="' + p.id + '">🗑️</button>' : '') +
       '</div></article>';
+  }
+
+  // Opened from a 🔔 (feed.html#post-<id>): scroll to that post and highlight it
+  function jumpToPost() {
+    var m = /^#post-(.+)$/.exec(location.hash);
+    if (!m) return;
+    var el = document.getElementById('post-' + m[1]);
+    if (!el) return toast('That post is gone (photos disappear after 24h)');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('flash');
+    history.replaceState(null, '', 'feed.html');
+  }
+
+  // "👥 with Budi, Rina and Eko" (tap a name → profile) + "Remove me" if you're tagged
+  function tagLine(p) {
+    var ids = (tagsOf[p.id] || []).filter(function (id) { return people[id]; });
+    if (!ids.length) return '';
+    var links = ids.map(function (id) { return '<a href="' + profileLink(id) + '" data-uid="' + id + '">' + esc(fullName(id).split(' ')[0]) + '</a>'; });
+    var text = links.length === 1 ? links[0] : links.slice(0, -1).join(', ') + ' and ' + links[links.length - 1];
+    return '<div class="tag-line">👥 with ' + text +
+      (ids.indexOf(profile.id) > -1 ? ' <button class="untag" data-untagme="' + p.id + '">Remove me</button>' : '') + '</div>';
   }
 
   function renderPost(p) {
@@ -412,7 +467,7 @@
     var mine = p.author_id === profile.id;
     var liked = p.likes.some(function (l) { return l.user_id === profile.id; });
     var nComments = p.comments && p.comments[0] ? p.comments[0].count : 0;
-    var html = '<article class="card">' +
+    var html = '<article class="card" id="post-' + p.id + '">' +
       '<div class="post-head"><a class="user" href="' + profileLink(p.author_id) + '" style="text-decoration:none;color:var(--text)"><div class="avatar" data-uid="' + p.author_id + '">' + avatarHtml(a) + '</div>' +
       '<div style="min-width:0"><div class="name" data-uid="' + p.author_id + '">' + esc(nameOf(a)) + '</div>' +
       '<div class="meta">@' + esc(a.username) + ' · ' + ago(p.created_at) + '</div></div></a>' +
@@ -429,9 +484,11 @@
         (pinned ? '<span class="timer pinned">📌 Pinned</span>' : '<span class="timer">⏳ ' + hoursLeft(p.expires_at) + 'h left</span>') +
         '</button>';
     }
+    html += tagLine(p);
     html += '<div class="actions">' +
       '<button class="' + (liked ? 'liked' : '') + '" data-like="' + p.id + '"><span class="heart">' + (liked ? '❤️' : '🤍') + '</span>' + p.likes.length + '</button>' +
       '<button data-comments="' + p.id + '">💬 ' + nComments + '</button>' +
+      '<button data-share="' + p.id + '">📤</button>' +
       (mine && p.kind === 'photo' && !myPins[p.photo_path] ? '<button data-pin="' + p.id + '">📌 Pin to profile</button>' : '') +
       (p.kind === 'match' && canReport(matches[p.match_id]) ? '<button data-rate="' + matchPlayers(matches[p.match_id]) + '">🎯 Rate shots</button>' : '') +
       (p.kind === 'session' && canReportSession(sessions[p.game_id]) ? '<button data-rate="' + Object.keys(sessions[p.game_id].changes).join(',') + '">🎯 Rate shots</button>' : '') +
@@ -520,6 +577,40 @@
       '<button class="btn btn-ghost" style="width:100%;margin-top:8px;padding:8px;font-size:13px" data-sdetail="' + g.id + '">📋 See all rounds</button>';
   }
 
+  // 📤 Share any post as a story picture (full names, PadPal logo, "Exclusive Club")
+  function fullName(id) { var p = people[id]; return p ? (p.display_name || p.username) : '?'; }
+  async function sharePost(p) {
+    if (!p) return;
+    toast('📸 Making your picture…');
+    var a = p.author || {};
+    if (p.kind === 'match' && matches[p.match_id]) {
+      var m = matches[p.match_id];
+      return PadPal.share.match({ a: [fullName(m.a1), fullName(m.a2)], b: [fullName(m.b1), fullName(m.b2)], sets: m.sets, winner: m.winner, when: m.played_at,
+        changes: Object.keys(m.changes).map(function (id) { return [fullName(id), m.changes[id].change]; }) });
+    }
+    if (p.kind === 'session' && sessions[p.game_id]) {
+      var g = sessions[p.game_id], ch = {};
+      Object.keys(g.changes).forEach(function (id) { ch[id] = g.changes[id].change; });
+      var rows = PadPal.sessions.rows(g.session_state, ch);
+      var mine = rows.filter(function (x) { return x.id === profile.id; })[0];
+      return PadPal.share.session({ title: PadPal.sessions.KINDS[g.kind] || '🔄 Session', when: g.scheduled_at, place: g.place,
+        top: rows.slice(0, 3).map(function (x) { return { name: fullName(x.id), total: x.total, place: x.place }; }),
+        me: mine ? { name: fullName(mine.id), place: mine.place, n: rows.length, total: mine.total, w: mine.w, l: mine.l, d: mine.d } : null });
+    }
+    if (p.kind === 'tournament' && tourneys[p.tournament_id]) {
+      var t = tourneys[p.tournament_id];
+      var top = t.tournament_teams.filter(function (tm) { return tm.place && tm.place <= 3; }).sort(function (x, y) { return x.place - y.place; });
+      return PadPal.share.session({ title: '🏆 ' + t.name, when: p.created_at,
+        top: top.map(function (tm) { return { name: fullName(tm.p1).split(' ')[0] + ' & ' + fullName(tm.p2).split(' ')[0], total: '', place: tm.place }; }), me: null });
+    }
+    if (p.kind === 'rankup') {
+      var to = tierByName((p.body || '').split('|')[1]);
+      var who = Object.assign({}, people[p.author_id] || a);
+      return PadPal.levels.shareCard(to, who);
+    }
+    return PadPal.share.post({ name: nameOf(a), text: p.body, photoUrl: p.photo_path ? urls[p.photo_path] : null, when: p.created_at });
+  }
+
   function profileLink(id) { return id === profile.id ? 'profile.html' : 'profile.html?id=' + id; }
 
   // All posts, or only from your PadPals (people you played with) and you
@@ -597,8 +688,66 @@
   });
 
   // ===== New posts =====
+  // ===== 🏷️ Tag PadPals (people you played with), max 10 =====
+  var tags = [];        // ids you're tagging in the post you're writing
+  var myPalList = null; // [{ user_id, games }] most games first
+  var myStars = {};     // ⭐ favourites
+  async function loadTagOptions() {
+    if (myPalList) return;
+    var r = await db.rpc('padpals', { p_user: profile.id });
+    myPalList = r.error ? [] : r.data;
+    var f = await db.from('favourites').select('fav_id');
+    (f.data || []).forEach(function (x) { myStars[x.fav_id] = true; });
+  }
+  function renderTagChips() {
+    $('tagChips').innerHTML = tags.map(function (id) {
+      return '<button type="button" class="tag-chip" data-untagpick="' + id + '">' + esc(fullName(id)) + ' ✕</button>';
+    }).join('');
+    $('tagOpen').textContent = tags.length ? '👥 Tag more (' + tags.length + '/10)' : '👥 Tag PadPals';
+  }
+  function renderTagList() {
+    var q = $('tagSearch').value.trim().toLowerCase();
+    var list = (myPalList || []).filter(function (x) { return people[x.user_id] && tags.indexOf(x.user_id) < 0; })
+      .sort(function (a, b) { return (myStars[b.user_id] ? 1 : 0) - (myStars[a.user_id] ? 1 : 0) || b.games - a.games; });
+    if (q) list = list.filter(function (x) {
+      var p = people[x.user_id];
+      return (p.display_name || '').toLowerCase().indexOf(q) > -1 || (p.username || '').toLowerCase().indexOf(q) > -1;
+    });
+    $('tagList').innerHTML = !(myPalList || []).length
+      ? '<p class="meta" style="margin:0">No PadPals yet. Play a game with friends, then you can tag them 🎾</p>'
+      : list.length ? list.slice(0, 30).map(function (x) {
+          var p = people[x.user_id];
+          return '<button type="button" class="tag-row" data-tagpick="' + x.user_id + '"><div class="avatar" data-uid="' + x.user_id + '">' + avatarHtml(p) + '</div>' +
+            '<span><b>' + (myStars[x.user_id] ? '⭐ ' : '') + esc(nameOf(p)) + '</b><small>@' + esc(p.username) + ' · played together ' + x.games + '×</small></span><i>＋</i></button>';
+        }).join('')
+      : '<p class="meta" style="margin:0">No PadPal called "' + esc(q) + '" 🤷</p>';
+  }
+  $('tagOpen').addEventListener('click', async function () {
+    $('tagPanel').hidden = false;
+    await loadTagOptions();
+    renderTagList();
+    $('tagSearch').focus();
+  });
+  $('tagSearch').addEventListener('input', renderTagList);
+  $('composeSheet').addEventListener('click', function (e) {
+    var add = e.target.closest('[data-tagpick]'), rm = e.target.closest('[data-untagpick]');
+    if (add) {
+      if (tags.length >= 10) return toast('Max 10 tags per post');
+      tags.push(add.dataset.tagpick);
+      $('tagSearch').value = '';
+      renderTagChips(); renderTagList();
+    } else if (rm) {
+      tags = tags.filter(function (id) { return id !== rm.dataset.untagpick; });
+      renderTagChips(); if (!$('tagPanel').hidden) renderTagList();
+    }
+  });
+
   function startCompose(kind, file) {
     compose = { kind: kind, file: file };
+    tags = [];
+    renderTagChips();
+    $('tagPanel').hidden = true;
+    $('tagSearch').value = '';
     $('composeTitle').textContent = kind === 'photo' ? 'New photo' : 'New post';
     $('composeLabel').textContent = kind === 'photo' ? 'Caption (optional)' : "What's up?";
     $('composeText').value = '';
@@ -624,13 +773,19 @@
     try {
       var row = { kind: compose.kind, body: $('composeText').value.trim() || null };
       if (compose.kind === 'photo') row.photo_path = await PadPal.uploadPhoto(compose.file, 'post');
-      var r = await db.from('posts').insert(row);
+      var r = await db.from('posts').insert(row).select('id').single();
       if (r.error) {
         if (row.photo_path) db.storage.from('photos').remove([row.photo_path]);
         throw r.error;
       }
+      var tagged = 0;
+      if (tags.length) {   // 🏷️ tagged friends get a 🔔
+        var t = await db.rpc('tag_post', { p_post: r.data.id, p_users: tags });
+        if (t.error) toast(/tag_post/.test(t.error.message) ? 'Posted, but tags need 19_tags.sql in Supabase' : PadPal.friendlyError(t.error));
+        else tagged = t.data;
+      }
       closeSheets();
-      toast(compose.kind === 'photo' ? '📷 Posted! Visible for 24 hours' : '✅ Posted!');
+      if (!tags.length || tagged) toast((compose.kind === 'photo' ? '📷 Posted! Visible for 24 hours' : '✅ Posted!') + (tagged ? ' · 🏷️ ' + tagged + ' tagged' : ''));
       await load();
       window.scrollTo(0, 0);
     } catch (err) {
@@ -703,10 +858,19 @@
 
   // ===== One click handler for the feed =====
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-report],[data-report-session],[data-rate],[data-ffilter],[data-sdetail],[data-soon]');
+    var el = e.target.closest('[data-untagme],[data-share],[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-report],[data-report-session],[data-rate],[data-ffilter],[data-sdetail],[data-soon]');
     if (!el) return;
     var d = el.dataset;
-    if (d.ffilter) setFeedFilter(d.ffilter);
+    if (d.untagme) {
+      if (!tapTwice('untag' + d.untagme, 'Tap again to remove your tag from this post')) return;
+      db.rpc('untag_me', { p_post: d.untagme }).then(function (r) {
+        if (r.error) return toast(PadPal.friendlyError(r.error));
+        tagsOf[d.untagme] = (tagsOf[d.untagme] || []).filter(function (id) { return id !== profile.id; });
+        renderFeed(); toast('🏷️ Tag removed');
+      });
+    }
+    else if (d.share) sharePost(findPost(d.share));
+    else if (d.ffilter) setFeedFilter(d.ffilter);
     else if (d.sdetail) {
       var g = sessions[d.sdetail], ch = {};
       Object.keys(g.changes).forEach(function (id) { ch[id] = g.changes[id].change; });

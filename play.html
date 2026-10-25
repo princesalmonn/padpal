@@ -8,13 +8,14 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=18">
+<link rel="stylesheet" href="styles.css?v=20">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js?v=18"></script>
-<script src="auth.js?v=18"></script>
-<script src="levels.js?v=18"></script>
-<script src="rate.js?v=18"></script>
-<script src="sessions.js?v=18"></script>
+<script src="config.js?v=20"></script>
+<script src="auth.js?v=20"></script>
+<script src="levels.js?v=20"></script>
+<script src="rate.js?v=20"></script>
+<script src="sessions.js?v=20"></script>
+<script src="share.js?v=20"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Play-only styles ===== */
@@ -87,6 +88,24 @@
   .r-dots { display: flex; justify-content: center; gap: 6px; margin: 2px 0 12px; }
   .r-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); transition: all .2s; }
   .r-dots i.on { width: 18px; border-radius: 4px; background: var(--accent); }
+  .r-dots i.later { background: transparent; border: 1px dashed var(--text-2); }
+  .r-dots i.later.on { background: var(--text-2); border: 0; }
+  .rounds button.later { border-style: dashed; }
+  .rounds .add-round { flex-shrink: 0; border: 1px dashed var(--accent); background: none; color: var(--accent); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
+  .plan-note { font-size: 12px; color: var(--text-2); background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; }
+  /* court card: two teams of player chips, score in the middle */
+  .court.later { border-style: dashed; }
+  .pteam { display: flex; gap: 8px; }
+  .pchip { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; background: var(--card-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px 4px 4px; color: var(--text); font: inherit; text-align: left; }
+  button.pchip:active { border-color: var(--accent); }
+  .pchip .pav { width: 30px; height: 30px; font-size: 13px; border-width: 2px; overflow: hidden; flex-shrink: 0; }
+  .pchip .pav img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+  .pchip .pnm { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pchip .pswap { font-size: 12px; color: var(--text-2); }
+  .pscore { text-align: center; font-size: 13px; color: var(--text-2); margin: 6px 0; font-weight: 700; }
+  .pscore b { font-size: 26px; color: var(--text); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .court-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .court-btns .btn { padding: 9px; font-size: 14px; }
   .type-row { display: grid; grid-template-columns: 1fr 90px; gap: 10px; align-items: center; margin-bottom: 10px; font-weight: 600; font-size: 14px; }
   .type-row input { text-align: center; font-size: 22px; font-weight: 800; }
   .lb-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
@@ -122,6 +141,11 @@
   .zone:active { transform: scale(.98); }
   .zone.a { background: linear-gradient(160deg, #D6F04A, #9DB816); color: #0F1E3C; }
   .zone.b { background: linear-gradient(160deg, #1F3566, #0F1E3C); border: 2px solid #C9E52C; }
+  /* ✨ Gold theme: champagne vs. black-brown */
+  :root[data-theme="gold"] .zone.a { background: linear-gradient(160deg, #EBD39A, #C79A4B); color: #1A1408; }
+  :root[data-theme="gold"] .zone.b { background: linear-gradient(160deg, #2A2219, #120F0B); border-color: #D4AF6A; color: #F3EBDD; }
+  :root[data-theme="gold"] .quick-row [data-match] { background: linear-gradient(150deg, #2A2219, #120F0B) !important; border-color: #3A3023 !important; }
+  :root[data-theme="gold"] .quick-row [data-setup] { background: linear-gradient(150deg, #EBD39A, #C79A4B) !important; color: #1A1408 !important; }
   .zone .nm { font-size: 16px; font-weight: 600; opacity: .9; }
   .zone .pt { font-size: 96px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; margin: 6px 0; }
   .zone .gm { font-size: 14px; opacity: .85; font-variant-numeric: tabular-nums; }
@@ -286,6 +310,9 @@
       $('tBar').style.width = Math.max(2, Math.min(100, pts / 500 * 100)) + '%';
       $('tPts').textContent = 'You: ' + PadPal.fmt(pts) + ' / 500 points';
       people = await PadPal.members();
+      if (!Object.keys(avatarUrls).length) {   // profile pictures for the court cards
+        try { avatarUrls = await PadPal.photoUrls(people.map(function (p) { return p.avatar_url; })); } catch (e) {}
+      }
       var r = await db.from('games')
         .select('id, host_id, kind, scheduled_at, place, size, is_open, status, join_code, settings, session_state, game_players(user_id, status)')
         .eq('status', 'open').order('scheduled_at').limit(50);
@@ -297,6 +324,40 @@
     }
     renderGames();
     if (lobbyId && lobbyView === 'lobby') renderLobby();
+    if (lobbyId && lobbyView === 'live') renderLive();
+  }
+
+  // One tap on a game: host of a running session → the courts; player → the live view; not started → the lobby
+  function playGame(id) {
+    var g = gameById(id);
+    if (!g) return;
+    if (g.session_state && g.kind !== 'match') {
+      if (g.host_id === me.id) return startSessionFromLobby(g);
+      return openLive(id);
+    }
+    openLobby(id);
+  }
+
+  // 🔴 Live view for players: this round's courts and the leaderboard (updates by itself)
+  function openLive(id) {
+    lobbyId = id;
+    renderLive();
+    clearInterval(lobbyTimer);
+    lobbyTimer = setInterval(function () { if (lobbyId && $('sheet').classList.contains('open')) loadGames(); else stopLobby(); }, 6000);
+  }
+  function renderLive() {
+    lobbyView = 'live';
+    var g = gameById(lobbyId);
+    if (!g || !g.session_state) { closeSheet(); stopLobby(); toast('This session is finished 🏁'); return; }
+    var s = g.session_state, r = s.rounds[s.rounds.length - 1];
+    openSheet('<h3>🔴 ' + kindLabel(g).split(' · ')[0] + ' · live</h3>' +
+      '<p class="meta" style="margin:-6px 0 12px">Round ' + s.rounds.length + (s.totalRounds ? ' of ' + s.totalRounds : '') + (g.place ? ' · 📍 ' + escH(g.place) : '') + ' · updates by itself</p>' +
+      '<div class="card" style="padding:4px 12px">' + r.matches.map(function (m, i) {
+        return '<div class="lb-row"><span><b>Court ' + (i + 1) + '</b> · ' + teamName(m.a) + ' <small>vs</small> ' + teamName(m.b) + '</span>' +
+          '<span class="pts">' + (m.score ? m.score[0] + '–' + m.score[1] : '⏳') + '</span></div>';
+      }).join('') + (r.resting.length ? '<div class="lb-row"><small>🪑 Resting: ' + r.resting.map(nameOfId).join(', ') + '</small></div>' : '') + '</div>' +
+      '<div class="label">Leaderboard</div>' + standingsHtml(s) +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:10px" data-gopen="' + g.id + '">👥 Lobby</button>');
   }
 
   function kindLabel(g) {
@@ -304,13 +365,13 @@
     return names[g.kind] ? names[g.kind] + ' · up to ' + g.size : '🎾 Match · 2 vs 2';
   }
 
-  function gameCard(g, buttons) {
+  function gameCard(g, buttons, tap) {
     var joined = joinedOf(g);
     var free = g.size - joined.length;
-    var faces = joined.slice(0, 4).map(function (id) { return '<div class="avatar">' + nameOfId(id)[0] + '</div>'; }).join('');
+    var faces = joined.slice(0, 4).map(function (id) { return '<div class="avatar" data-uid="' + id + '">' + nameOfId(id)[0] + '</div>'; }).join('');
     var empties = '';
     for (var k = 0; k < Math.min(free, 2); k++) empties += '<div class="free">+</div>';
-    return '<article class="card game">' +
+    return '<article class="card game"' + (tap ? ' data-gplay="' + g.id + '" role="button" style="cursor:pointer"' : '') + '>' +
       '<div class="when">' + whenText(g.scheduled_at) + '</div>' +
       '<div class="where">' + (g.place ? '📍 ' + escH(g.place) + ' · ' : '') + 'host: ' + nameOfId(g.host_id) + '</div>' +
       '<div class="tags"><span class="tag">' + kindLabel(g) + '</span>' + (g.is_open ? '<span class="tag">📣 Open</span>' : '<span class="tag">🔒 Invite only</span>') +
@@ -332,8 +393,11 @@
         return gameCard(g, '<button class="btn btn-ghost" data-gleave="' + g.id + '">No</button><button class="btn btn-primary" data-gjoin="' + g.id + '">Join</button>');
       }).join('');
     }
+    // tap your game → where the action is: the running session, or the lobby before it starts
     html += '<h2>🎾 Your games</h2>' + (mine.length ? mine.map(function (g) {
-      return gameCard(g, '<button class="btn btn-primary" data-gopen="' + g.id + '">' + (g.host_id === me.id ? 'Open lobby' : 'View') + '</button>');
+      var host = g.host_id === me.id, live = !!g.session_state;
+      var label = live ? (host ? '▶️ Open session' : '🔴 Watch live') : (host ? 'Open lobby' : 'View');
+      return gameCard(g, '<button class="btn btn-primary" data-gplay="' + g.id + '">' + label + '</button>', true);
     }).join('') : '<p class="meta">No games yet. Create one, or join an open game below!</p>');
     html += '<h2>📣 Open games</h2>' + (open.length ? open.map(function (g) {
       return gameCard(g, '<button class="btn btn-primary" data-gjoin="' + g.id + '">Join</button>');
@@ -353,7 +417,7 @@
     return '🎾 ' + rounds + ' rounds on ' + courts + ' court' + (courts > 1 ? 's' : '') + ' · everyone plays about <b>' + each + '</b> game' + (each === 1 ? '' : 's') + '.';
   }
 
-  function openCreate(kind) {
+  function openCreate(kind, prefill) {
     kind = kind || 'match';
     var d = new Date(Date.now() + 3600000);
     d.setMinutes(0, 0, 0);
@@ -418,6 +482,21 @@
       $('cDeuceBox').hidden = k !== 'match' && sc === 'points';
     }
     document.querySelectorAll('input[name=cKind], input[name=cScoring]').forEach(function (r) { r.addEventListener('change', refresh); });
+    // 🔁 Play again: same format, settings, place and group size as last time
+    if (prefill) {
+      var st = prefill.settings || {};
+      function radio(name, value) { var el = document.querySelector('input[name=' + name + '][value="' + value + '"]'); if (el) el.checked = true; }
+      if (prefill.size) $('cSize').value = String(Math.max(5, Math.min(64, prefill.size)));
+      if (st.courts) $('cCourts').value = String(st.courts);
+      if (st.rounds) $('cRounds').value = String(st.rounds);
+      if (st.scoring) radio('cScoring', st.scoring);
+      if (st.target) radio('cTarget', st.target);
+      if (st.games) radio('cGames', st.games);
+      if (st.fixed) radio('cFixed', st.fixed);
+      if (st.golden === false) radio('cDeuce', 'advantage');
+      if (prefill.place) $('cPlace').value = prefill.place;
+      refresh();
+    }
     $('createForm').addEventListener('submit', async function (e) {
       e.preventDefault();
       $('cBtn').disabled = true;
@@ -441,9 +520,9 @@
             }
       });
       if (r.error) { $('cBtn').disabled = false; return toast(PadPal.friendlyError(r.error)); }
-      if (pendingInvite) {   // came from "🎾 Invite" on someone's profile
-        await db.rpc('invite_players', { p_game: r.data.id, p_users: [pendingInvite] });
-        toast('📨 ' + nameOfId(pendingInvite) + ' is invited');
+      if (pendingInvite && pendingInvite.length) {   // from "🎾 Invite" on a profile, or 🔁 Play again
+        await db.rpc('invite_players', { p_game: r.data.id, p_users: pendingInvite });
+        toast('📨 ' + (pendingInvite.length === 1 ? nameOfId(pendingInvite[0]) + ' is' : pendingInvite.length + ' friends are') + ' invited');
         pendingInvite = null;
       }
       await loadGames();
@@ -516,20 +595,55 @@
 
   // Invite picker
   var invitePick = [];
+  // 🔍 search + ⭐ favourites + 🎾 the 5 people you played with most, then everyone A–Z
+  var myPals = null;   // [{ user_id, games }] from padpals(), most games first
+  async function loadMyPals() {
+    if (myPals) return;
+    var r = await db.rpc('padpals', { p_user: me.id });
+    myPals = r.error ? [] : r.data;
+  }
   function renderInvite() {
     lobbyView = 'invite';
+    openSheet('<h3>👥 Invite friends</h3>' +
+      '<input class="input" id="invSearch" placeholder="🔍 Search by name or @username" autocomplete="off" style="margin-bottom:10px">' +
+      '<div id="invList"></div>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:14px" data-ginvsend="1" id="invSend"></button>' +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-gopen="' + lobbyId + '">Back to lobby</button>');
+    $('invSearch').addEventListener('input', refreshInvite);
+    refreshInvite();
+  }
+  function refreshInvite() {
     var g = gameById(lobbyId);
     var inGame = g.game_players.filter(function (p) { return p.status !== 'declined'; }).map(function (p) { return p.user_id; });
-    // ⭐ favourites first
-    var others = people.filter(function (p) { return inGame.indexOf(p.id) < 0; })
-      .sort(function (a, b) { return (favs[b.id] ? 1 : 0) - (favs[a.id] ? 1 : 0); });
-    openSheet('<h3>👥 Invite friends</h3>' +
-      (Object.keys(favs).length ? '' : '<p class="meta" style="margin:-6px 0 10px">Tip: tap ☆ on someone\'s profile to put them first here.</p>') +
-      (others.length ? '<div class="pick">' + others.map(function (p) {
-        return '<button class="' + (invitePick.indexOf(p.id) > -1 ? 'on' : '') + '" data-ginvpick="' + p.id + '">' + (favs[p.id] ? '⭐ ' : '') + (p.gender === 'f' ? '👩 ' : '👨 ') + escH(shortName(p)) + ' <small>' + PadPal.tierOf(p.points).icon + '</small></button>';
-      }).join('') + '</div>' : '<p class="meta">Everyone is already invited. Share the join link, or invite new friends to PadPal from your profile.</p>') +
-      '<button class="btn btn-primary" style="width:100%;margin-top:14px" data-ginvsend="1"' + (invitePick.length ? '' : ' disabled') + '>Send ' + (invitePick.length || '') + ' invite' + (invitePick.length === 1 ? '' : 's') + '</button>' +
-      '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-gopen="' + lobbyId + '">Back to lobby</button>');
+    var q = ($('invSearch') ? $('invSearch').value : '').trim().toLowerCase();
+    var others = people.filter(function (p) { return inGame.indexOf(p.id) < 0 && p.id !== me.id; });
+    function btn(p, extra) {
+      return '<button class="' + (invitePick.indexOf(p.id) > -1 ? 'on' : '') + '" data-ginvpick="' + p.id + '">' + (favs[p.id] ? '⭐ ' : '') +
+        (p.gender === 'f' ? '👩 ' : '👨 ') + escH(shortName(p)) + ' <small>' + (extra || PadPal.tierOf(p.points).icon) + '</small></button>';
+    }
+    var html = '';
+    if (q) {
+      var found = others.filter(function (p) { return (shortName(p) || '').toLowerCase().indexOf(q) > -1 || (p.username || '').toLowerCase().indexOf(q) > -1; });
+      html = found.length ? '<div class="pick">' + found.map(function (p) { return btn(p); }).join('') + '</div>' : '<p class="meta">Nobody called "' + escH(q) + '" 🤷</p>';
+    } else {
+      var byId = {};
+      others.forEach(function (p) { byId[p.id] = p; });
+      var stars = others.filter(function (p) { return favs[p.id]; });
+      var played = (myPals || []).filter(function (x) { return byId[x.user_id] && !favs[x.user_id]; }).slice(0, 5);
+      var shown = {};
+      stars.forEach(function (p) { shown[p.id] = 1; });
+      played.forEach(function (x) { shown[x.user_id] = 1; });
+      if (stars.length) html += '<div class="label">⭐ Favourites</div><div class="pick">' + stars.map(function (p) { return btn(p); }).join('') + '</div>';
+      if (played.length) html += '<div class="label" style="margin-top:10px">🎾 You played with them before</div><div class="pick">' +
+        played.map(function (x) { return btn(byId[x.user_id], x.games + '×'); }).join('') + '</div>';
+      var rest = others.filter(function (p) { return !shown[p.id]; }).sort(function (a, b) { return shortName(a).localeCompare(shortName(b)); });
+      if (rest.length) html += '<div class="label" style="margin-top:10px">Everyone (A–Z)</div><div class="pick">' + rest.map(function (p) { return btn(p); }).join('') + '</div>';
+      if (!others.length) html = '<p class="meta">Everyone is already invited. Share the join link, or invite new friends to PadPal from your profile.</p>';
+      else if (!stars.length) html = '<p class="meta" style="margin:0 0 8px">Tip: tap ☆ on someone\'s profile to put them first here.</p>' + html;
+    }
+    $('invList').innerHTML = html;
+    $('invSend').disabled = !invitePick.length;
+    $('invSend').textContent = 'Send ' + (invitePick.length || '') + ' invite' + (invitePick.length === 1 ? '' : 's');
   }
 
   async function shareJoinLink() {
@@ -555,7 +669,35 @@
 
   // ⭐ Favourite players (private), shown first in the invite picker
   var favs = {};
-  var pendingInvite = null;   // invite this member to the game you're creating
+  var pendingInvite = null;   // invite these members to the game you're creating: [id, …]
+
+  // 🔁 Play again with the same group: play.html?again=<game id> (or ?again=match&players=a,b,c)
+  async function playAgainFromLink() {
+    var q = new URLSearchParams(location.search);
+    var again = q.get('again');
+    if (!again) return;
+    history.replaceState(null, '', 'play.html');
+    var kind = again, players = (q.get('players') || '').split(',').filter(Boolean), prefill = {};
+    if (/^[0-9a-f-]{36}$/i.test(again)) {   // a game id: copy its format, settings, place and players
+      var r = await db.from('games').select('id, kind, place, settings, session_state, game_players(user_id, status)').eq('id', again).maybeSingle();
+      if (!r.data) return toast('That game was not found');
+      var g = r.data;
+      kind = g.kind;
+      players = g.session_state && g.session_state.players ? g.session_state.players
+        : (g.game_players || []).filter(function (p) { return p.status === 'joined'; }).map(function (p) { return p.user_id; });
+      prefill = { settings: g.settings, place: g.place };
+    }
+    players = players.filter(function (id) { return id !== me.id && personById(id); });
+    prefill.size = players.length + 1;
+    startPlayAgain(kind, players, prefill);
+  }
+  function startPlayAgain(kind, players, prefill) {
+    pendingInvite = players;
+    openCreate(kind, prefill);
+    var form = $('createForm');
+    if (form) form.insertAdjacentHTML('afterbegin', '<p class="note" style="margin:-4px 0 12px">🔁 Same group again: <b>' +
+      players.map(function (id) { return nameOfId(id).split(' ')[0]; }).join(', ') + '</b> get an invite when you tap Create lobby.</p>');
+  }
   async function loadFavs() {
     var r = await db.from('favourites').select('fav_id');
     favs = {};
@@ -584,13 +726,32 @@
 
   // Your finished games (newest first): tap to see the result again
   var finishedGames = [];
+  var againPlayers = {};   // match game id → its 4 players (for 🔁 Play again)
+  function againBtn(id) { return '<button class="btn btn-accent" style="width:100%;margin-top:12px" data-again="' + id + '">🔁 Play again with this group</button>'; }
   async function loadFinished() {
     var mine = await db.from('game_players').select('game_id').eq('user_id', me.id).eq('status', 'joined');
     var ids = (mine.data || []).map(function (x) { return x.game_id; });
     if (!ids.length) { $('finished').innerHTML = ''; return; }
-    var r = await db.from('games').select('id, host_id, kind, scheduled_at, place, session_state').in('id', ids.slice(-300))
+    var r = await db.from('games').select('id, host_id, kind, scheduled_at, place, settings, session_state').in('id', ids.slice(-300))
       .eq('status', 'done').order('scheduled_at', { ascending: false }).limit(10);
     finishedGames = r.data || [];
+    // when each one ended + who played (for 🎯 Rate shots, open for 24 hours, same rule as the database)
+    var fids = finishedGames.map(function (g) { return g.id; });
+    var ended = {}, players = {};
+    if (fids.length) {
+      var pc = await db.from('point_changes').select('game_id, created_at').eq('user_id', me.id).eq('reason', 'session').in('game_id', fids);
+      (pc.data || []).forEach(function (c) { ended[c.game_id] = c.created_at; });
+      var mm = await db.from('matches').select('game_id, a1, a2, b1, b2, played_at').in('game_id', fids);
+      (mm.data || []).forEach(function (m) { ended[m.game_id] = m.played_at; players[m.game_id] = [m.a1, m.a2, m.b1, m.b2]; });
+    }
+    againPlayers = players;
+    function rateFor(g) {
+      var at = ended[g.id];
+      if (!at || Date.now() - new Date(at) > 24 * 3600000) return '';
+      var ids = players[g.id] || (g.session_state && g.session_state.players) || [];
+      var hours = Math.max(1, Math.ceil((24 * 3600000 - (Date.now() - new Date(at))) / 3600000));
+      return '<button class="btn btn-accent" style="width:100%;margin:-4px 0 10px;padding:8px;font-size:13px" data-rate="' + ids.join(',') + '">🎯 Rate their shots · ' + hours + 'h left</button>';
+    }
     $('finished').innerHTML = finishedGames.length ? '<h2>✅ Finished</h2>' + finishedGames.map(function (g) {
       var label = PadPal.sessions.KINDS[g.kind] || '🎾 Match';
       var res = '';
@@ -601,7 +762,7 @@
       return '<button class="card" style="width:100%;text-align:left;margin-bottom:8px;color:var(--text);display:flex;align-items:center;gap:10px" data-gdone="' + g.id + '">' +
         '<div style="flex:1;min-width:0"><b>' + label + '</b>' + (g.host_id === me.id ? ' <small class="meta">👑 you hosted</small>' : '') +
         '<div class="meta">' + whenText(g.scheduled_at) + (g.place ? ' · 📍 ' + escH(g.place) : '') + '</div></div>' +
-        '<span style="font-weight:700;white-space:nowrap">' + res + '</span><span class="meta">›</span></button>';
+        '<span style="font-weight:700;white-space:nowrap">' + res + '</span><span class="meta">›</span></button>' + rateFor(g);
     }).join('') : '';
   }
   async function openFinished(id) {
@@ -614,12 +775,13 @@
       var team = function (t) { return nameOfId(x[t + '1']) + ' & ' + nameOfId(x[t + '2']); };
       return openSheet('<h3>🎾 Match</h3><p class="meta" style="margin:-6px 0 12px">' + whenText(g.scheduled_at) + (g.place ? ' · 📍 ' + escH(g.place) : '') + '</p>' +
         '<div class="card"><div class="lb-row"><span>' + (x.winner === 'a' ? '🏆 ' : '') + team('a') + '</span><span class="pts">' + x.sets.map(function (s) { return s[0]; }).join(' ') + '</span></div>' +
-        '<div class="lb-row"><span>' + (x.winner === 'b' ? '🏆 ' : '') + team('b') + '</span><span class="pts">' + x.sets.map(function (s) { return s[1]; }).join(' ') + '</span></div></div>');
+        '<div class="lb-row"><span>' + (x.winner === 'b' ? '🏆 ' : '') + team('b') + '</span><span class="pts">' + x.sets.map(function (s) { return s[1]; }).join(' ') + '</span></div></div>' +
+        againBtn(id));
     }
     var r = await db.from('point_changes').select('user_id, change').eq('game_id', id).eq('reason', 'session');
     var ch = {};
     (r.data || []).forEach(function (c) { ch[c.user_id] = c.change; });
-    openSheet(PadPal.sessions.detail(g, ch, nameOfId, avatarOfId, me.id));
+    openSheet(PadPal.sessions.detail(g, ch, nameOfId, avatarOfId, me.id) + againBtn(id));
   }
   function avatarOfId(id) { return nameOfId(id)[0]; }
 
@@ -725,16 +887,146 @@
 
   // Make the next round: who plays, who rests, who partners whom
   function makeRound() {
-    var f = session.format;
-    if (f === 'team_americano' || f === 'round_robin') return session.plan[session.rounds.length];
+    var s = session, f = s.format;
+    if (f === 'team_americano' || f === 'round_robin') {
+      if (!s.plan[s.rounds.length]) addTeamRound(s);
+      return s.plan[s.rounds.length];
+    }
     if (f === 'king') return kingRound();
-    var busy = busyOf(session);
+    var busy = busyOf(s);
+    if (f === 'americano') {
+      // use the planned round, unless someone in it is still on court or was taken out
+      if (!s.plan) replan(s);
+      var next = s.plan[s.rounds.length];
+      var clash = !next || next.matches.some(function (m) { return m.a.concat(m.b).some(function (id) { return busy[id] || (s.out && s.out[id]); }); });
+      if (!clash) { next.busy = []; return next; }
+    }
     var r = f === 'mixicano' ? mixicanoRound() : americanoRound();
-    r.busy = activeOf(session).filter(function (id) { return busy[id]; });   // still on court in an earlier round
+    r.busy = activeOf(s).filter(function (id) { return busy[id]; });   // still on court in an earlier round
+    r.fresh = f === 'americano';   // the plan after this round gets re-made around it
     return r;
   }
+
+  // ===== The plan: rounds you can see before they start =====
+  // Americano and the fixed-pair formats are planned ahead (who plays doesn't depend on scores).
+  // Mexicano, Mixicano and King depend on the scores, so you only get a preview of the next round.
+  function isPlanned(s) { return s.format === 'americano' || s.format === 'team_americano' || s.format === 'round_robin'; }
+
+  // One rotation round: fewest games plays first, then partners you haven't had yet
+  function rotationRound(pool, played, partners, courts) {
+    var courtsNow = Math.max(1, Math.min(courts, Math.floor(pool.length / 4)));
+    var order = pool.slice().sort(function () { return Math.random() - 0.5; })
+      .sort(function (a, b) { return (played[a] || 0) - (played[b] || 0); });
+    var playing = order.slice(0, courtsNow * 4), ms = [];
+    for (var k = 0; k < courtsNow; k++) {
+      var q = playing.slice(k * 4, k * 4 + 4);
+      var options = [[[q[0], q[1]], [q[2], q[3]]], [[q[0], q[2]], [q[1], q[3]]], [[q[0], q[3]], [q[1], q[2]]]];
+      options.sort(function (x, y) {
+        function cost(o) { return (partners[partnerKey(o[0][0], o[0][1])] || 0) + (partners[partnerKey(o[1][0], o[1][1])] || 0); }
+        return cost(x) - cost(y);
+      });
+      ms.push({ a: options[0][0], b: options[0][1], score: null });
+    }
+    return { matches: ms, resting: order.slice(courtsNow * 4) };
+  }
+
+  // Plan `n` more Americano rounds after the ones already started or planned (`ahead`)
+  function planAmericano(s, n, ahead) {
+    var played = Object.assign({}, s.played), partners = Object.assign({}, s.partners);
+    function count(r) {
+      r.matches.forEach(function (m) {
+        if (m.score) return;   // scored games are already in played/partners
+        m.a.concat(m.b).forEach(function (id) { played[id] = (played[id] || 0) + 1; });
+        [m.a, m.b].forEach(function (t) { var k = partnerKey(t[0], t[1]); partners[k] = (partners[k] || 0) + 1; });
+      });
+    }
+    s.rounds.forEach(count);
+    (ahead || []).forEach(count);
+    var out = [];
+    for (var i = 0; i < n; i++) { var r = rotationRound(activeOf(s), played, partners, s.courts); count(r); out.push(r); }
+    return out;
+  }
+
+  // Make the rest of the Americano plan again (after players changed, or a round had to be re-made)
+  function replan(s) {
+    if (s.format !== 'americano') return;
+    var future = Math.max(0, (s.plan ? s.plan.length : s.totalRounds) - s.rounds.length);
+    s.plan = s.rounds.slice().concat(planAmericano(s, future));
+    s.totalRounds = s.plan.length;
+  }
+
+  // Fixed pairs: when everyone has played everyone, a new rotation starts
+  function teamsOf(s) {
+    if (s.teams) return s.teams;
+    var seen = {}, teams = [];
+    (s.plan || []).concat(s.rounds).forEach(function (r) {
+      r.matches.forEach(function (m) { [m.a, m.b].forEach(function (t) { var k = t.slice().sort().join('|'); if (!seen[k]) { seen[k] = 1; teams.push(t.slice()); } }); });
+    });
+    return teams;
+  }
+  function addTeamRound(s) {
+    s.teams = teamsOf(s);
+    if (!s.cycle || !s.cycle.length) s.cycle = teamPlan(s.teams.filter(function (t) { return !t.some(function (id) { return s.out && s.out[id]; }); }), s.courts, 99);
+    if (s.cycle.length) s.plan.push(s.cycle.shift());
+    s.totalRounds = s.plan.length;
+  }
+
+  // ➕ One more round, no limit
+  function extendPlan(s) {
+    if (s.format === 'americano') { if (!s.plan) replan(s); s.plan = s.plan.concat(planAmericano(s, 1, s.plan.slice(s.rounds.length))); s.totalRounds = s.plan.length; }
+    else if (isTeamFormat(s)) addTeamRound(s);
+    else s.totalRounds++;
+  }
+  function addRound() {
+    var s = session;
+    extendPlan(s);
+    renderSession(); persistSession();
+    toast('➕ Round ' + s.totalRounds + ' added');
+  }
+
+  // ⏭️ Skip a round that hasn't started yet
+  function skipRound(i) {
+    var s = session;
+    if (i < s.rounds.length) return;
+    if (isPlanned(s)) s.plan.splice(i, 1);
+    s.totalRounds = Math.max(s.rounds.length, s.totalRounds - 1);
+    if (isPlanned(s)) s.totalRounds = s.plan.length;
+    s.view = Math.min(s.view, s.totalRounds - 1);
+    renderSession(); persistSession();
+    toast('⏭️ Round skipped');
+  }
+
+  // ⏭️ Skip the round that just started (no scores yet): drop it and start the next one
+  function skipCurrent() {
+    var s = session, i = s.rounds.length - 1;
+    if (s.rounds[i].matches.some(function (m) { return m.score; })) return toast('This round already has a score');
+    s.rounds.pop();
+    if (isPlanned(s)) { s.plan.splice(i, 1); s.totalRounds = s.plan.length; }
+    else s.totalRounds = Math.max(1, s.totalRounds - 1);
+    if (s.rounds.length >= s.totalRounds) extendPlan(s);   // it was the last round: plan one more
+    s.rounds.push(makeRound());                               // the next round starts right away
+    s.view = s.rounds.length - 1;
+    renderSession(); persistSession();
+    toast('⏭️ Round skipped');
+  }
+
+  // The rounds you can look at but that haven't started: planned ones, or a preview of the next one
+  function futureRounds(s) {
+    if (isPlanned(s)) {
+      if (s.format === 'americano' && !s.plan) replan(s);
+      return (s.plan || []).slice(s.rounds.length).map(function (r) { return { r: r, kind: 'planned' }; });
+    }
+    if (s.rounds.length >= s.totalRounds) return [];
+    previewing = true;
+    try { var p = s.format === 'king' ? kingRound() : s.format === 'mixicano' ? mixicanoRound() : americanoRound(); }
+    finally { previewing = false; }
+    if (!p.matches.every(function (m) { return m.a.concat(m.b).every(function (id) { return id; }); })) return [];
+    return [{ r: p, kind: 'preview' }];
+  }
   // Players who can play the next round: not taken out, not still on court
+  var previewing = false;   // a preview imagines the games on court are finished
   function freeOf(s) {
+    if (previewing) return activeOf(s);
     var busy = busyOf(s);
     return activeOf(s).filter(function (id) { return !busy[id]; });
   }
@@ -871,27 +1163,14 @@
       return { matches: matches, resting: resting };
     }
     // Americano (and Mexicano round 1): fewest games first, then avoid repeat partners
-    var shuffled = free.sort(function () { return Math.random() - 0.5; });
-    order = shuffled.sort(function (a, b) { return s.played[a] - s.played[b]; });
-    var playing2 = order.slice(0, courtsNeeded);
-    var resting2 = order.slice(courtsNeeded);
-    var ms = [];
-    for (var k = 0; k < courtsNow; k++) {
-      var q = playing2.slice(k * 4, k * 4 + 4);
-      var options = [[[q[0], q[1]], [q[2], q[3]]], [[q[0], q[2]], [q[1], q[3]]], [[q[0], q[3]], [q[1], q[2]]]];
-      options.sort(function (x, y) {
-        function cost(o) { return (s.partners[partnerKey(o[0][0], o[0][1])] || 0) + (s.partners[partnerKey(o[1][0], o[1][1])] || 0); }
-        return cost(x) - cost(y);
-      });
-      ms.push({ a: options[0][0], b: options[0][1], score: null });
-    }
-    return { matches: ms, resting: resting2 };
+    return rotationRound(free, s.played, s.partners, s.courts);
   }
 
   // Start (or continue) the session of a lobby game
   async function startSessionFromLobby(g) {
     if (g.session_state) {
       session = g.session_state;
+      session.view = session.rounds.length - 1;   // back in: show the round being played now
     } else {
       var players = joinedOf(g);
       var st = g.settings || {};
@@ -910,6 +1189,7 @@
         if (players.length % 2) problem = 'This format has fixed pairs: you need an even number of players';
         else {
           var teams = makeTeams(players);
+          var fixedTeams = teams;
           courts = Math.max(1, Math.min(courts, Math.floor(teams.length / 2)));
           plan = teamPlan(teams, courts, chosen || (g.kind === 'round_robin' ? 99 : 7));
           totalRounds = plan.length;
@@ -931,11 +1211,13 @@
         courts: courts,
         totalRounds: totalRounds,
         plan: plan,
+        teams: fixedTeams || null,
         out: {},              // players taken out: id → { reason, round, sub }
         rounds: [], view: 0,
         points: {}, played: {}, partners: {}
       };
       players.forEach(function (p) { session.points[p] = 0; session.played[p] = 0; });
+      if (g.kind === 'americano') replan(session);   // the whole schedule, ready to look at
       session.rounds.push(makeRound());
     }
     sessionGame = g.id;
@@ -1008,17 +1290,19 @@
       if (s.players.indexOf(sub) < 0) { s.players.push(sub); s.points[sub] = 0; s.played[sub] = 0; }
       if (s.out[sub]) delete s.out[sub];
       // the substitute takes the leaver's place in every round that hasn't started yet
-      (s.plan || []).forEach(function (r, i) {
-        if (i < s.rounds.length) return;
+      (s.plan || []).concat(s.cycle || []).forEach(function (r, i) {
+        if (s.plan && i < s.rounds.length) return;
         r.matches.forEach(function (m) { m.a = m.a.map(swap); m.b = m.b.map(swap); });
         r.resting = r.resting.map(swap);
       });
+      if (s.teams) s.teams = s.teams.map(function (t) { return t.map(swap); });
     }
     function swap(x) { return x === id ? sub : x; }
     afterChange((sub ? '🔄 ' + nameOfId(sub) + ' replaces ' : REASONS[reason][0] + ' ') + nameOfId(id) + (sub ? '' : ' is out'));
   }
 
   function afterChange(msg) {
+    replan(session);   // Americano: the planned rounds now fit the new group
     renderSession();
     persistSession();
     openPlayers();
@@ -1035,11 +1319,13 @@
     var changes = {};
     res.forEach(function (x) { changes[x.user_id] = x.change; });
     var list = PadPal.sessions.rows(session, changes);
+    lastFinished = { title: (PadPal.sessions.KINDS[session.format] || '🔄 Session'), list: list, when: new Date().toISOString(), place: (gameById(sessionGame) || {}).place };
     openSheet('<h3>🏁 Session finished!</h3>' +
       PadPal.sessions.podium(list, nameOfId, avatarOfId) +
       '<div class="card" style="padding:4px 12px">' + PadPal.sessions.table(list, nameOfId, me.id) + '</div>' +
       '<p class="note">Posted to the Feed 📣 Points are on everyone\'s profile.</p>' +
       '<button class="btn btn-accent" style="width:100%;margin-top:12px" data-rate="' + res.map(function (x) { return x.user_id; }).join(',') + '">🎯 Rate their shots</button>' +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-sharesession="1">📤 Share the podium</button>' +
       '<button class="btn btn-primary" style="width:100%;margin-top:8px" data-close-sheet="1">Done</button>');
     session = null; sessionGame = null;
     renderSession();
@@ -1089,52 +1375,52 @@
     var last = s.rounds[s.rounds.length - 1];
     var open = openGames(s);
     var anyScore = s.rounds.some(function (r) { return r.matches.some(function (m) { return m.score; }); });
+    var future = futureRounds(s);
+    var slides = s.rounds.map(function (r) { return { r: r, kind: 'started' }; }).concat(future);
     var allPlanned = s.rounds.length >= s.totalRounds;
-    var lastStarted = last.matches.some(function (m) { return m.score; });
+    var lastOpen = last.matches.filter(function (m) { return !m.score && !m.skipped; }).length;
+    if (s.view >= slides.length) s.view = slides.length - 1;
 
     var html = '<div class="session-top"><h3>' + f.icon + ' ' + f.name + '</h3>' +
       '<div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-pplayers="1">👥 Players</button>' +
       '<button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" data-end="1">Cancel</button></div></div>' +
       '<p class="meta" style="margin:0 0 10px">' + s.players.length + ' players · ' + s.courts + ' court' + (s.courts > 1 ? 's' : '') + ' · ' + scoringText(s) + '</p>' +
       '<div class="rounds" id="roundTabs">';
-    for (var i = 0; i < s.totalRounds; i++) {
-      var exists = i < s.rounds.length;
-      html += '<button class="' + (i === s.view ? 'on ' : '') + (exists && roundDone(s.rounds[i]) ? 'done' : '') + '"' +
-        (exists ? ' data-view="' + i + '"' : ' disabled style="opacity:.4"') + '>Round ' + (i + 1) + '</button>';
+    for (var i = 0; i < Math.max(s.totalRounds, slides.length); i++) {
+      var sl = slides[i];
+      html += '<button class="' + (i === s.view ? 'on ' : '') + (sl && sl.kind === 'started' && roundDone(sl.r) ? 'done' : '') + (sl && sl.kind !== 'started' ? ' later' : '') + '"' +
+        (sl ? ' data-view="' + i + '"' : ' disabled style="opacity:.4"') + '>' + (sl && sl.kind === 'planned' ? '📅 ' : sl && sl.kind === 'preview' ? '📝 ' : '') + 'Round ' + (i + 1) + '</button>';
     }
-    html += '</div>';
+    html += '<button class="add-round" data-addround="1">➕ Round</button></div>';
 
-    // every round is a slide: swipe left / right
-    html += '<div class="r-track" id="roundTrack">' + s.rounds.map(function (r, ri) {
-      var h = '<div class="r-slide">';
-      r.matches.forEach(function (m, mi) {
-        h += '<div class="card court" data-score="' + ri + ':' + mi + '" role="button">' +
-          '<div class="ct"><span>Court ' + (mi + 1) + '</span><span>' + (m.score ? '✅ Done' : ri < s.rounds.length - 1 ? '⏳ Still playing' : '⏳ Playing') + '</span></div>' +
-          '<div class="vs"><div class="tm">' + teamName(m.a) + '</div>' +
-          '<div class="sc">' + (m.score ? m.score[0] + ' – ' + m.score[1] : 'vs') + '</div>' +
-          '<div class="tm">' + teamName(m.b) + '</div></div>' +
-          '<div class="tap">' + (m.score ? 'Tap to fix score' : '👆 Tap to keep score') + '<button class="type-btn" data-typescore="' + ri + ':' + mi + '">⌨️ Type score</button></div></div>';
-      });
+    // every round is a slide: swipe left / right (started rounds, then the planned / preview ones)
+    html += '<div class="r-track" id="roundTrack">' + slides.map(function (sl, ri) {
+      var r = sl.r, h = '<div class="r-slide">';
+      if (sl.kind === 'planned') h += '<div class="plan-note">📅 <b>Planned round</b> · starts when you tap <b>Next round</b>. Tap a name to swap a player.</div>';
+      if (sl.kind === 'preview') h += '<div class="plan-note">📝 <b>Preview</b> · ' + f.name + ' pairs players by the scores, so this can still change.</div>';
+      r.matches.forEach(function (m, mi) { h += courtCard(m, ri, mi, sl.kind); });
       if (r.busy && r.busy.length) h += '<div class="rest">⏳ Still playing an earlier round: <b>' + r.busy.map(nameOfId).join(', ') + '</b></div>';
       if (r.resting.length) h += '<div class="rest">🪑 Resting this round: <b>' + r.resting.map(nameOfId).join(', ') + '</b></div>';
+      if (sl.kind === 'planned') h += '<button class="btn btn-ghost" style="width:100%;margin-bottom:10px" data-skipround="' + ri + '">⏭️ Skip this round</button>';
+      if (sl.kind === 'started' && ri === s.rounds.length - 1 && !r.matches.some(function (m) { return m.score; }))
+        h += '<button class="btn btn-ghost" style="width:100%;margin-bottom:10px" data-skipcurrent="1">⏭️ Skip this round (nobody has a score yet)</button>';
       return h + '</div>';
     }).join('') + '</div>';
-    if (s.rounds.length > 1) {
-      html += '<div class="r-dots" id="roundDots">' + s.rounds.map(function (r, ri) { return '<i class="' + (ri === s.view ? 'on' : '') + '"></i>'; }).join('') + '</div>';
+    if (slides.length > 1) {
+      html += '<div class="r-dots" id="roundDots">' + slides.map(function (sl, ri) { return '<i class="' + (ri === s.view ? 'on' : '') + (sl.kind !== 'started' ? ' later' : '') + '"></i>'; }).join('') + '</div>';
     }
 
-    // next round / finish
+    // next round (any time: unfinished games stay open) / add a round / finish
     if (!allPlanned) {
-      if (roundDone(last)) {
-        html += '<button class="btn btn-primary big-btn" data-next="1">Next round ➡️</button>';
-      } else if (lastStarted && canOverlap(s)) {
-        var still = last.matches.filter(function (m) { return !m.score; }).length;
+      if (!lastOpen || canOverlap(s)) {
         html += '<button class="btn btn-primary big-btn" data-next="1">Next round ➡️</button>' +
-          '<p class="note" style="text-align:center;margin-top:-4px">⏳ ' + still + ' court' + (still > 1 ? 's are' : ' is') + ' still playing. They rest next round, and you can add their score later.</p>';
-      } else if (lastStarted) {
+          (lastOpen ? '<p class="note" style="text-align:center;margin-top:-4px">⏳ ' + lastOpen + ' court' + (lastOpen > 1 ? 's are' : ' is') + ' still playing. Those players rest next round, and you can add their score later.</p>' : '');
+      } else {
         html += '<button class="btn btn-ghost big-btn" data-skipnext="1">⏭️ Skip unfinished games & next round</button>' +
           '<p class="note" style="text-align:center;margin-top:-4px">' + f.name + ' needs every result before the next round. Skipped games give no points.</p>';
       }
+    } else {
+      html += '<button class="btn btn-ghost big-btn" data-addround="1">➕ Add another round</button>';
     }
     if (allPlanned && !open.length) {
       html += '<button class="btn btn-accent big-btn" data-finish="1">🏁 Finish & give points</button>';
@@ -1154,22 +1440,109 @@
       clearTimeout(swipeTimer);
       swipeTimer = setTimeout(function () {
         var v = Math.round(track.scrollLeft / track.clientWidth);
-        if (v !== s.view && v >= 0 && v < s.rounds.length) { s.view = v; markRound(); }
+        if (v !== s.view && v >= 0 && v < slides.length) { s.view = v; markRound(); }
       }, 80);
     }, { passive: true });
+  }
+
+  // ===== Court card: players as chips (tap to swap), score in the middle =====
+  var avatarUrls = {};
+  function chip(id, swapKey) {
+    var p = personById(id);
+    var url = p && p.avatar_url && avatarUrls[p.avatar_url];
+    var first = nameOfId(id).split(' ')[0];
+    var inner = '<span class="pav avatar" data-uid="' + id + '">' + (url ? '<img src="' + url + '" alt="">' : first[0]) + '</span><span class="pnm">' + first + '</span>';
+    return swapKey ? '<button class="pchip" data-swap="' + swapKey + '">' + inner + '<span class="pswap">⇄</span></button>' : '<span class="pchip">' + inner + '</span>';
+  }
+  function courtCard(m, ri, mi, kind) {
+    var s = session;
+    var canSwap = kind === 'planned' || (kind === 'started' && !m.score);
+    function team(t, side) { return '<div class="pteam">' + t.map(function (id, k) { return chip(id, canSwap ? ri + ':' + mi + ':' + side + ':' + k : null); }).join('') + '</div>'; }
+    var status = kind === 'planned' ? '📅 Planned' : kind === 'preview' ? '📝 Preview'
+      : m.score ? '✅ Done' : m.skipped ? '⏭️ Skipped' : ri < s.rounds.length - 1 ? '⏳ Still playing' : '⏳ Playing';
+    return '<div class="card court' + (kind !== 'started' ? ' later' : '') + '">' +
+      '<div class="ct"><span>Court ' + (mi + 1) + '</span><span>' + status + '</span></div>' +
+      team(m.a, 'a') +
+      '<div class="pscore">' + (m.score ? '<b>' + m.score[0] + '</b> – <b>' + m.score[1] + '</b>' : '<span>vs</span>') + '</div>' +
+      team(m.b, 'b') +
+      (kind === 'started'
+        ? '<div class="court-btns"><button class="btn btn-primary" data-score="' + ri + ':' + mi + '">' + (m.score ? '✏️ Fix score' : '👆 Keep score') + '</button>' +
+          '<button class="btn btn-ghost" data-typescore="' + ri + ':' + mi + '">⌨️ Type score</button></div>'
+        : '') +
+      '</div>';
+  }
+
+  // 🔄 Swap one player in one game (that game only; the rest of the session stays the same)
+  function roundAt(i) { return i < session.rounds.length ? session.rounds[i] : session.plan[i]; }
+  function openSwap(key) {
+    var k = key.split(':'), ri = +k[0], mi = +k[1], side = k[2], idx = +k[3];
+    var s = session, r = roundAt(ri), m = r.matches[mi], who = m[side][idx];
+    var inGame = m.a.concat(m.b);
+    var resting = r.resting.filter(function (id) { return !(s.out && s.out[id]); });
+    var others = [];
+    r.matches.forEach(function (x, xi) { if (xi !== mi && !x.score) x.a.concat(x.b).forEach(function (id) { others.push({ id: id, court: xi + 1 }); }); });
+    var busy = ri < s.rounds.length ? {} : busyOf(s);
+    var rest = activeOf(s).filter(function (id) {
+      return inGame.indexOf(id) < 0 && resting.indexOf(id) < 0 && !others.some(function (o) { return o.id === id; }) &&
+        !r.matches.some(function (x) { return x.a.concat(x.b).indexOf(id) > -1; });
+    });
+    function btn(id, label) { return '<button data-swapto="' + key + '|' + id + '">' + nameOfId(id) + (label ? ' <small>' + label + '</small>' : '') + '</button>'; }
+    openSheet('<h3>🔄 Swap ' + nameOfId(who) + '</h3>' +
+      '<p class="meta" style="margin:-6px 0 12px">Round ' + (ri + 1) + ' · Court ' + (mi + 1) + ' only. Everyone keeps their points.</p>' +
+      (resting.length ? '<div class="label">🪑 Resting this round</div><div class="pick">' + resting.map(function (id) { return btn(id, busy[id] ? '⏳' : ''); }).join('') + '</div>' : '') +
+      (others.length ? '<div class="label" style="margin-top:12px">🔁 Trade places with someone on another court</div><div class="pick">' + others.map(function (o) { return btn(o.id, 'court ' + o.court); }).join('') + '</div>' : '') +
+      (rest.length ? '<div class="label" style="margin-top:12px">👥 Others in the session</div><div class="pick">' + rest.map(function (id) { return btn(id); }).join('') + '</div>' : '') +
+      (!resting.length && !others.length && !rest.length ? '<p class="meta">Nobody else is free. Add someone with 👥 Players first.</p>' : '') +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:14px" data-close-sheet="1">Cancel</button>');
+  }
+  function doSwap(key, to) {
+    var k = key.split(':'), ri = +k[0], mi = +k[1], side = k[2], idx = +k[3];
+    var s = session, r = roundAt(ri), m = r.matches[mi], who = m[side][idx];
+    var placed = false;
+    r.matches.forEach(function (x, xi) {   // the other player is on another court: trade places
+      if (xi === mi || placed) return;
+      ['a', 'b'].forEach(function (sd) { var j = x[sd].indexOf(to); if (j > -1 && !placed) { x[sd][j] = who; placed = true; } });
+    });
+    if (!placed) {                         // resting / not in this round: the swapped-out player rests
+      r.resting = r.resting.filter(function (id) { return id !== to; });
+      if (!(s.out && s.out[who])) r.resting.push(who);
+    }
+    m[side][idx] = to;
+    if (r.busy) r.busy = r.busy.filter(function (id) { return id !== to; });
+    closeSheet(); renderSession(); persistSession();
+    toast('🔄 ' + nameOfId(to) + ' plays instead of ' + nameOfId(who));
   }
 
   function nextRound() {
     var r = makeRound();
     var ok = r && r.matches.length && r.matches.every(function (m) { return m.a.concat(m.b).every(function (id) { return id; }); });
-    if (!ok) return toast('⏳ Not enough free players yet. Wait for a court to finish.');
+    if (!ok) return toast('⏳ Everyone is still on court. Enter a score first, or skip this round.');
     session.rounds.push(r);
+    if (r.fresh) { delete r.fresh; replan(session); }   // this round was re-made: plan the rest around it
     session.view = session.rounds.length - 1;
     renderSession();
     persistSession();
     window.scrollTo(0, 0);
   }
   var T_ri = 0, T_mi = 0;   // the court the score screen is open for
+
+  // 📤 Share pictures (full names)
+  var lastFinished = null;
+  function fullNameOf(id) { var p = personById(id); return p ? shortName(p) : '?'; }
+  function shareSessionResult() {
+    var f = lastFinished;
+    if (!f) return;
+    var mine = f.list.filter(function (x) { return x.id === me.id; })[0];
+    PadPal.share.session({ title: f.title, when: f.when, place: f.place,
+      top: f.list.slice(0, 3).map(function (x) { return { name: fullNameOf(x.id), total: x.total, place: x.place }; }),
+      me: mine ? { name: fullNameOf(mine.id), place: mine.place, n: f.list.length, total: mine.total, w: mine.w, l: mine.l, d: mine.d } : null });
+  }
+  function shareMatchResult() {
+    if (!T || !T.saved) return;
+    PadPal.share.match({ a: T.players.a.map(fullNameOf), b: T.players.b.map(fullNameOf), sets: T.sets,
+      winner: T.setsWon[0] > T.setsWon[1] ? 'a' : 'b', when: new Date().toISOString(),
+      changes: T.saved.changes.map(function (c) { return [fullNameOf(c.user_id), c.change]; }) });
+  }
 
   // Update the Round tabs and dots after a swipe (no full redraw)
   // the carousel is as tall as the round you're looking at
@@ -1463,6 +1836,7 @@
           ? '<p class="note" style="margin:8px 0 0">🧢 Daily cap reached: wins in normal matches give at most +10 a day. Resets at midnight. (Sessions have no cap!)</p>' : '') +
         '</div>' +
         '<button class="btn btn-accent" data-rate="' + T.players.a.concat(T.players.b).join(',') + '">🎯 Rate their shots</button>' +
+        '<button class="btn btn-ghost" data-sharematch="1">📤 Share result</button>' +
         '<button class="btn btn-primary" data-close-tracker="1">Done</button>';
     } else if (T.players) {
       buttons = '<button class="btn btn-primary" data-save-match="1">💾 Save match</button>' +
@@ -1506,7 +1880,7 @@
   // CLICKS
   // =====================================================
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-typescore],[data-typeinstead],[data-finishearly],[data-skipnext],[data-invto],[data-invnew],[data-gdone],[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-gsession],[data-pplayers],[data-pout],[data-pback],[data-padd],[data-preason],[data-psub],[data-pshare],[data-close-sheet],[data-rate],[data-guide],[data-open-guide],[data-setup],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
+    var el = e.target.closest('[data-again],[data-gplay],[data-sharematch],[data-sharesession],[data-skipcurrent],[data-swap],[data-swapto],[data-addround],[data-skipround],[data-typescore],[data-typeinstead],[data-finishearly],[data-skipnext],[data-invto],[data-invnew],[data-gdone],[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-gsession],[data-pplayers],[data-pout],[data-pback],[data-padd],[data-preason],[data-psub],[data-pshare],[data-close-sheet],[data-rate],[data-guide],[data-open-guide],[data-setup],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
     if (!el) return;
     var d = el.dataset;
 
@@ -1521,17 +1895,23 @@
       gameAction('join_game', { p_game: d.gjoin, p_code: null }, '🎾 You joined!').then(function (r) { if (r) openLobby(d.gjoin); });
     }
     else if (d.gleave) { closeSheet(); stopLobby(); gameAction('leave_game', { p_game: d.gleave }, 'OK, you\'re out of that game'); }
+    else if (d.gplay) playGame(d.gplay);
     else if (d.gopen) openLobby(d.gopen);
-    else if (d.ginvite) { invitePick = []; loadFavs().then(renderInvite); }
+    else if (d.ginvite) { invitePick = []; Promise.all([loadFavs(), loadMyPals()]).then(renderInvite); }
     else if (d.invto) {
       gameAction('invite_players', { p_game: d.invto, p_users: [d.invwho] }, '📨 Invite sent to ' + nameOfId(d.invwho) + '!').then(function (r) { if (r) closeSheet(); });
     }
-    else if (d.invnew) { pendingInvite = d.invnew; openCreate(); }
+    else if (d.invnew) { var who = d.invnew; openCreate(); pendingInvite = [who]; }
+    else if (d.again) {
+      var ag = finishedGames.filter(function (x) { return x.id === d.again; })[0];
+      var agPlayers = (ag && (ag.session_state && ag.session_state.players || againPlayers[ag.id]) || []).filter(function (id) { return id !== me.id; });
+      if (ag) startPlayAgain(ag.kind, agPlayers, { settings: ag.settings, place: ag.place, size: agPlayers.length + 1 });
+    }
     else if (d.gdone) openFinished(d.gdone);
     else if (d.ginvpick) {
       var ii = invitePick.indexOf(d.ginvpick);
       if (ii > -1) invitePick.splice(ii, 1); else invitePick.push(d.ginvpick);
-      renderInvite();
+      refreshInvite();   // keeps what you typed in the search box
     }
     else if (d.ginvsend) {
       el.disabled = true;
@@ -1565,6 +1945,15 @@
     else if (d.rate) { closeSheet(); PadPal.openRating(d.rate.split(',')); }
     else if (d.closeSheet) closeSheet();
     else if (d.view !== undefined) showRound(+d.view);
+    else if (d.swap) openSwap(d.swap);
+    else if (d.swapto) { var sw = d.swapto.split('|'); doSwap(sw[0], sw[1]); }
+    else if (d.addround) addRound();
+    else if (d.sharematch) shareMatchResult();
+    else if (d.sharesession) shareSessionResult();
+    else if (d.skipcurrent) { if (tapTwice('skipcurrent', 'Tap again to skip this round and start the next one')) skipCurrent(); }
+    else if (d.skipround !== undefined) {
+      if (tapTwice('skipround' + d.skipround, 'Tap again to skip round ' + (+d.skipround + 1))) skipRound(+d.skipround);
+    }
     else if (d.typescore) { var tsp = d.typescore.split(':'); openTypeScore(+tsp[0], +tsp[1]); }
     else if (d.typeinstead) { closeTracker(); openTypeScore(T_ri, T_mi); }
     else if (d.finishearly) openFinishEarly();
@@ -1629,7 +2018,7 @@
     }
   });
 
-  loadGames().then(joinFromLink).then(inviteFromProfile).then(loadFinished).then(loadTourneys);
+  loadGames().then(joinFromLink).then(inviteFromProfile).then(playAgainFromLink).then(loadFinished).then(loadTourneys);
 
   // =====================================================
   // 5. TOURNAMENTS list (details live on tourney.html)

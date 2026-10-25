@@ -8,13 +8,14 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=18">
+<link rel="stylesheet" href="styles.css?v=20">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js?v=18"></script>
-<script src="auth.js?v=18"></script>
-<script src="rate.js?v=18"></script>
-<script src="sessions.js?v=18"></script>
-<script src="levels.js?v=18"></script>
+<script src="config.js?v=20"></script>
+<script src="auth.js?v=20"></script>
+<script src="rate.js?v=20"></script>
+<script src="sessions.js?v=20"></script>
+<script src="levels.js?v=20"></script>
+<script src="share.js?v=20"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Profile-only styles ===== */
@@ -155,12 +156,18 @@
   .vs-grid strong { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
   .vs-grid small { color: var(--text-2); font-size: 11px; }
   button.match-row { width: 100%; text-align: left; color: var(--text); font: inherit; }
+  .rate-mini { width: 100%; padding: 8px; font-size: 13px; margin: -4px 0 10px; border-radius: 0 0 14px 14px; }
+  .rate-mini small { font-weight: 500; opacity: .8; }
   .kind-ico { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 16px; flex-shrink: 0; background: var(--card-2); }
   .pal-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--text); }
   .pal-row .avatar { width: 38px; height: 38px; font-size: 15px; }
   .pal-row .n { margin-left: auto; text-align: right; font-weight: 700; font-size: 14px; }
   .pal-row .n small { display: block; font-weight: 500; font-size: 11px; color: var(--text-2); }
   .icon-btn.back { font-size: 26px; }
+  .theme-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+  .theme-pick button { border: 1px solid var(--line); background: var(--card-2); border-radius: 14px; padding: 8px 4px; font-size: 12px; font-weight: 600; display: grid; justify-items: center; gap: 6px; }
+  .theme-pick button i { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(128,128,128,.4); display: block; }
+  .theme-pick button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 </style>
 </head>
 <body>
@@ -186,6 +193,7 @@
     <p class="bio" id="heroBio"></p>
     <div class="chips" id="heroChips"></div>
     <button class="pals-btn" id="palsBtn">👥 <b id="palsN">…</b> PadPals</button>
+    <button class="pals-btn" id="shareCardBtn">📤 Share card</button>
   </section>
 
   <div style="height:14px"></div>
@@ -243,6 +251,7 @@
     <div class="card">
       <svg class="radar" id="radar" viewBox="0 0 320 290"></svg>
       <div class="shots-note" id="shotsNote">Loading…</div>
+      <button class="btn btn-ghost" id="shareShotsBtn" style="width:100%;margin-top:10px;padding:8px;font-size:13px">📤 Share shots</button>
     </div>
 
     <h2>Badges</h2>
@@ -301,6 +310,13 @@
 <div class="sheet" id="settingsSheet">
   <div class="grab"></div>
   <h3>Settings</h3>
+  <div class="label" style="font-size:13px;color:var(--text-2);font-weight:600;margin-bottom:8px">🎨 Theme</div>
+  <div class="theme-pick" id="themePick">
+    <button data-theme-pick="auto"><i style="background:linear-gradient(135deg,#EEF2F7 50%,#0B1426 50%)"></i>📱 Auto</button>
+    <button data-theme-pick="dark"><i style="background:linear-gradient(135deg,#0B1426 60%,#C9E52C 60%)"></i>🌙 Dark</button>
+    <button data-theme-pick="light"><i style="background:linear-gradient(135deg,#EEF2F7 60%,#0F1E3C 60%)"></i>☀️ Light</button>
+    <button data-theme-pick="gold"><i style="background:linear-gradient(135deg,#0E0C09 55%,#D4AF6A 55%,#EBD39A)"></i>✨ Gold</button>
+  </div>
   <div style="display:grid;gap:10px">
     <a class="btn btn-accent" id="adminLink" href="admin.html" style="text-align:center;text-decoration:none" hidden>👑 Admin panel</a>
     <button class="btn btn-ghost" data-edit>✏️ Edit profile</button>
@@ -515,6 +531,7 @@
     if (Number(profile.mixed_points) >= 20) list.push(['🔀', 'Mixed master', PadPal.fmt(profile.mixed_points) + ' mixed pts']);
     var t = PadPal.tierOf(profile.points);
     if (t.min >= 100) list.push([t.icon, t.name + ' reached', PadPal.fmt(profile.points) + ' pts']);
+    badgeList = list;
     $('awards').innerHTML = list.length
       ? list.map(function (b) { return '<div class="award"><span>' + b[0] + '</span><strong>' + esc(b[1]) + '</strong><small>' + esc(b[2]) + '</small></div>'; }).join('')
       : '<p class="meta" style="margin:0">No badges yet. Play, win and get rated to earn them! 🏅</p>';
@@ -817,15 +834,22 @@
   function dateText(iso) { return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }); }
   function changeHtml(c) { return c == null || isNaN(c) ? '' : '<small class="' + (c >= 0 ? 'plus' : 'minus') + '">' + PadPal.fmtChange(c) + '</small>'; }
 
+  // 🎯 Rate shots: only on your own History, only for 24 hours (same rule as the database)
+  function rateBtn(ids, when) {
+    if (!isMe || Date.now() - new Date(when) > 24 * 3600000) return '';
+    var hours = Math.max(1, Math.ceil((24 * 3600000 - (Date.now() - new Date(when))) / 3600000));
+    return '<button class="btn btn-accent rate-mini" data-rate="' + ids.join(',') + '">🎯 Rate their shots <small>· ' + hours + 'h left</small></button>';
+  }
+
   function renderHistory() {
     var items = [];
     // session and tournament games live inside their own row (tap it to see each game)
     if (histFilter === 'all' || histFilter === 'match') myMatches.filter(function (m) { return !m.session && !m.tourney; }).forEach(function (m) {
-      items.push({ when: m.when, html: '<div class="match-row">' +
+      items.push({ when: m.when, html: '<div class="match-row"' + (isMe ? ' data-matchrow="' + [m.partner].concat(m.opp).join(',') + '" role="button" style="cursor:pointer"' : '') + '>' +
         '<div class="wlb ' + (m.won ? 'w' : 'l') + '">' + (m.won ? 'W' : 'L') + '</div>' +
         '<div class="who">with <b>' + pname(m.partner) + '</b> vs ' + pname(m.opp[0]) + ' & ' + pname(m.opp[1]) +
         '<small>🎾 Match · ' + dateText(m.when) + '</small></div>' +
-        '<div class="score">' + m.score + changeHtml(m.change) + '</div></div>' });
+        '<div class="score">' + m.score + changeHtml(m.change) + '</div></div>' + rateBtn([m.partner].concat(m.opp), m.when) });
     });
     if (histFilter === 'all' || histFilter === 'session') mySessions.forEach(function (s, i) {
       var g = s.game, r = s.row;
@@ -836,7 +860,7 @@
         '<div class="who"><b>' + kind.slice(1).join(' ') + '</b>' + (g.host_id === profile.id ? ' 👑' : '') + ' · ' +
           (r ? (r.place <= 3 ? PadPal.sessions.medal(r.place) + ' ' : '') + PadPal.sessions.ordinal(r.place) + ' of ' + s.n + ' · ' + PadPal.sessions.wlText(r) : s.n + ' players') +
         '<small>' + dateText(g.scheduled_at) + (g.place ? ' · ' + esc(g.place) : '') + out + '</small></div>' +
-        '<div class="score">' + (r ? r.total + ' pts' : '') + changeHtml(s.change) + '</div></button>' });
+        '<div class="score">' + (r ? r.total + ' pts' : '') + changeHtml(s.change) + '</div></button>' + rateBtn(g.session_state.players, s.when) });
     });
     if (histFilter === 'all' || histFilter === 'tourney') myTourneys.forEach(function (t) {
       var T = t.tournaments;
@@ -861,8 +885,40 @@
     var r = await db.from('point_changes').select('user_id, change').eq('game_id', s.game.id).eq('reason', 'session');
     var changes = {};
     (r.data || []).forEach(function (c) { changes[c.user_id] = c.change; });
-    $('infoBody').innerHTML = PadPal.sessions.detail(s.game, changes, pname, avatarOf, profile.id);
+    $('infoBody').innerHTML = PadPal.sessions.detail(s.game, changes, pname, avatarOf, profile.id) +
+      (isMe ? '<a class="btn btn-accent" style="display:block;text-align:center;text-decoration:none;margin-top:12px" href="play.html?again=' + s.game.id + '">🔁 Play again with this group</a>' : '') +
+      '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-sharesess="' + i + '">📤 Share this session</button>';
+    lastSessionChanges = changes;
   }
+
+  // ===== 📤 Share pictures =====
+  var badgeList = [], lastSessionChanges = {};
+  function fullName(id) { var p = people[id] || (id === profile.id ? profile : null); return p ? (p.display_name || p.username) : '?'; }
+  function shareCard() {
+    var t = PadPal.tierOf(profile.points);
+    var w = myMatches.filter(function (m) { return m.won; }).length, l = myMatches.filter(function (m) { return m.lost; }).length;
+    PadPal.share.profile({ name: profile.display_name || profile.username, handle: profile.username, tier: t, title: PadPal.levels.info(t).title,
+      points: profile.points, matches: myMatches.length, w: w, l: l, d: myMatches.length - w - l,
+      rate: myMatches.length ? Math.round(w / myMatches.length * 100) + '%' : '–', flair: profile.flair,
+      badges: badgeList.map(function (b) { return [b[0], b[1]]; }) });
+  }
+  function shareShots() {
+    var best = Object.keys(shotStats).filter(function (k) { return shotStats[k].count >= 1; })
+      .sort(function (a, b) { return shotStats[b].avg - shotStats[a].avg; })[0];
+    var n = Object.keys(shotStats).reduce(function (a, k) { return a + shotStats[k].count; }, 0);
+    if (!n) return toast('No shot ratings yet. Play and ask friends to rate you 🎯');
+    PadPal.share.radar({ name: (profile.display_name || profile.username).split(' ')[0], shots: shots, max: shotMax,
+      best: best ? [best, shotStats[best].avg] : null, ratings: n });
+  }
+  function shareSession(i) {
+    var s = mySessions[i], rows = PadPal.sessions.rows(s.game.session_state, lastSessionChanges);
+    var mine = rows.filter(function (x) { return x.id === profile.id; })[0];
+    PadPal.share.session({ title: PadPal.sessions.KINDS[s.game.kind] || '🔄 Session', when: s.game.scheduled_at, place: s.game.place,
+      top: rows.slice(0, 3).map(function (x) { return { name: fullName(x.id), total: x.total, place: x.place }; }),
+      me: mine ? { name: fullName(mine.id), place: mine.place, n: rows.length, total: mine.total, w: mine.w, l: mine.l, d: mine.d } : null });
+  }
+  $('shareCardBtn').addEventListener('click', shareCard);
+  $('shareShotsBtn').addEventListener('click', shareShots);
   function avatarOf(id) {
     var p = people[id];
     var url = p && p.avatar_url && urls[p.avatar_url];
@@ -933,9 +989,19 @@
 
   // ===== Clicks =====
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-panel],[data-period],[data-h2h],[data-hist],[data-session],[data-soon]');
+    var el = e.target.closest('[data-matchrow],[data-sharesess],[data-rate],[data-panel],[data-period],[data-h2h],[data-hist],[data-session],[data-soon]');
     if (!el) return;
-    if (el.dataset.hist) {
+    if (el.dataset.matchrow) {
+      // a normal match: play again with the same 3 people
+      var ids = el.dataset.matchrow.split(',');
+      $('infoBody').innerHTML = '<h3>🎾 Match</h3><p class="meta" style="margin:-6px 0 12px">with <b>' + pname(ids[0]) + '</b> vs ' + pname(ids[1]) + ' & ' + pname(ids[2]) + '</p>' +
+        '<a class="btn btn-accent" style="display:block;text-align:center;text-decoration:none" href="play.html?again=match&players=' + ids.join(',') + '">🔁 Play again with them</a>';
+      openSheet($('infoSheet'));
+    } else if (el.dataset.sharesess !== undefined) {
+      shareSession(+el.dataset.sharesess);
+    } else if (el.dataset.rate) {
+      PadPal.openRating(el.dataset.rate.split(','));
+    } else if (el.dataset.hist) {
       histFilter = el.dataset.hist;
       document.querySelectorAll('#histChips button').forEach(function (b) { b.classList.toggle('on', b === el); });
       renderHistory();
@@ -1240,7 +1306,21 @@
   });
 
   // Settings sheet
+  // 🎨 Theme picker: changes straight away, remembered on this phone
+  function markTheme() {
+    var t = PadPal.getTheme();
+    document.querySelectorAll('[data-theme-pick]').forEach(function (b) { b.classList.toggle('on', b.dataset.themePick === t); });
+  }
+  $('themePick').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-theme-pick]');
+    if (!b) return;
+    PadPal.setTheme(b.dataset.themePick);
+    markTheme();
+    toast({ auto: '📱 Follows your iPhone (dark at night, light by day)', dark: '🌙 Dark theme', light: '☀️ Light theme', gold: '✨ Gold theme: welcome to the lounge' }[b.dataset.themePick]);
+  });
+
   $('settingsBtn').addEventListener('click', function () {
+    markTheme();
     if (isMe) return openSheet($('settingsSheet'));
     if (history.length > 1) history.back(); else location.href = 'ranks.html';   // ‹ back from someone's profile
   });

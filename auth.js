@@ -3,6 +3,24 @@
 (function () {
   var cfg = window.PADPAL_CONFIG;
 
+  // ===== 🎨 Theme: auto (follows the iPhone), dark, light or gold — saved on this phone =====
+  // Runs right away (this file is in <head>), so the page never flashes the wrong colours.
+  var THEME_BG = { dark: '#0B1426', light: '#EEF2F7', gold: '#0E0C09' };
+  function getTheme() { try { return localStorage.getItem('padpal_theme') || 'auto'; } catch (e) { return 'auto'; } }
+  function applyTheme(t) {
+    var root = document.documentElement;
+    if (t === 'dark' || t === 'light' || t === 'gold') root.setAttribute('data-theme', t);
+    else root.removeAttribute('data-theme');
+    var shown = THEME_BG[t] ? t : (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', THEME_BG[shown]);   // the iPhone's top bar matches
+  }
+  function setTheme(t) {
+    try { localStorage.setItem('padpal_theme', t); } catch (e) {}
+    applyTheme(t);
+  }
+  applyTheme(getTheme());
+
   // "Remember me": ON = stay logged in (localStorage), OFF = logged out when the app/browser closes (sessionStorage)
   function remembered() {
     try { return localStorage.getItem('padpal_remember') !== 'no'; } catch (e) { return true; }
@@ -271,6 +289,7 @@
     uploadPhoto: uploadPhoto, photoUrls: photoUrls,
     remembered: remembered, setRemember: setRemember,
     TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, rankPlayers: rankPlayers, fmt: fmt, fmtChange: fmtChange,
-    inactivity: inactivity, refreshBell: refreshBell, mountBell: mountBell
+    inactivity: inactivity, refreshBell: refreshBell, mountBell: mountBell,
+    getTheme: getTheme, setTheme: setTheme
   };
 })();

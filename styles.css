@@ -21,7 +21,7 @@
 }
 /* Light version: soft grey-blue background, navy buttons, darker lime so it stays readable */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
+  :root:not([data-theme="dark"]):not([data-theme="gold"]) {
     color-scheme: light;
     --bg: #EEF2F7; --card: #FFFFFF; --card-2: #F3F6FA; --line: #D6DEE9;
     --text: #0F1E3C; --text-2: #5A6B86;
@@ -41,6 +41,18 @@
   --win: #1F8A4C; --loss: #C8372D;
   --metal: linear-gradient(135deg, #D6DEE9 0%, #FFFFFF 50%, #D6DEE9 100%);
   --shadow: 0 6px 18px rgba(15,30,60,.12);
+}
+/* ✨ Gold: black-brown "members' lounge", champagne gold used sparingly, warm ivory text */
+:root[data-theme="gold"] {
+  color-scheme: dark;
+  --bg: #0E0C09; --card: #1A1611; --card-2: #241E16; --line: #3A3023;
+  --text: #F3EBDD; --text-2: #A8997F;
+  --primary: #D4AF6A; --primary-text: #1A1408;
+  --accent: #D4AF6A; --accent-text: #1A1408; --gold: #E6C27A;
+  --win: #7BC79A; --loss: #E07A5F;
+  --metal: linear-gradient(135deg, #3A3023 0%, #1A1611 50%, #3A3023 100%);
+  --shadow: 0 6px 22px rgba(0,0,0,.55);
+  --shine: linear-gradient(135deg, #EBD39A 0%, #C79A4B 55%, #E9CD8C 100%);
 }
 
 /* Basics */
@@ -68,9 +80,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .logo-for-dark { display: block; }
 .logo-for-light { display: none !important; }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .logo-for-dark { display: none !important; }
-  :root:not([data-theme="dark"]) .logo-for-light { display: block !important; }
+  :root:not([data-theme="dark"]):not([data-theme="gold"]) .logo-for-dark { display: none !important; }
+  :root:not([data-theme="dark"]):not([data-theme="gold"]) .logo-for-light { display: block !important; }
 }
+/* Gold: the logo turns champagne gold */
+:root[data-theme="gold"] .logo-img { filter: sepia(1) saturate(1.6) hue-rotate(-8deg) brightness(.92); }
 :root[data-theme="light"] .logo-for-dark { display: none !important; }
 :root[data-theme="light"] .logo-for-light { display: block !important; }
 .logo span { color: var(--text); }
@@ -104,6 +118,10 @@ a.icon-btn { display: grid; place-items: center; text-decoration: none; color: v
 .btn-primary { background: var(--primary); color: var(--primary-text); }
 .btn-accent { background: var(--accent); color: var(--accent-text); }
 .btn-ghost { background: var(--card-2); color: var(--text); border: 1px solid var(--line); }
+/* Gold: a soft shine on the main buttons, thin gold edges */
+:root[data-theme="gold"] .btn-primary, :root[data-theme="gold"] .btn-accent { background: var(--shine); box-shadow: 0 0 0 1px rgba(235,211,154,.35), 0 6px 18px rgba(199,154,75,.22); }
+:root[data-theme="gold"] .card { border-color: #3A3023; box-shadow: inset 0 1px 0 rgba(212,175,106,.08); }
+:root[data-theme="gold"] .lvl-kicker, :root[data-theme="gold"] .lvl-unlocks b { color: #E6C27A; }
 
 /* "Sample data" label on screens that aren't real yet */
 .sample-note {

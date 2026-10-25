@@ -157,8 +157,8 @@
     x.fillText('"' + info(tier).title + '"', 540, 1390);
     x.fillStyle = '#FFFFFF'; x.font = '600 52px system-ui, -apple-system, sans-serif';
     x.fillText((profile.display_name || profile.username) + ' · ' + PadPal.fmt(profile.points) + ' pts', 540, 1620);
-    x.fillStyle = 'rgba(255,255,255,.6)'; x.font = '500 40px system-ui, -apple-system, sans-serif';
-    x.fillText('🎾 padel with friends', 540, 1700);
+    x.fillStyle = '#C9E52C'; x.font = '700 36px system-ui, -apple-system, sans-serif';
+    x.fillText('PadPal · Padel with friends · Exclusive Club', 540, 1793);
     c.toBlob(async function (blob) {
       var file = new File([blob], 'padpal-' + tier.name.toLowerCase().replace(/\W+/g, '-') + '.png', { type: 'image/png' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
