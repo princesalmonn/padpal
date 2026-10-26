@@ -275,7 +275,7 @@
       });
       var gameIds = mine.filter(function (x) { return x.chats.game_id; }).map(function (x) { return x.chats.game_id; });
       if (gameIds.length) {
-        var gr = await db.from('games').select('id, kind, scheduled_at, place, status').in('id', gameIds);
+        var gr = await db.from('games').select('id, kind, host_id, scheduled_at, place, status').in('id', gameIds);
         (gr.data || []).forEach(function (g) { games[g.id] = g; });
       }
     }
@@ -314,12 +314,19 @@
     return who + msgText(m);
   }
 
-  // Buttons behind a row: game chats can only be pinned or muted (you'd miss the court info)
+  // A game chat whose game is finished or cancelled: the host can end it, players can leave
+  function gameOver(c) { return c.kind === 'game' && c.game && (c.game.status === 'done' || c.game.status === 'cancelled'); }
+  function isGameHost(c) { return c.game && c.game.host_id === me.id; }
+
+  // Buttons behind a row: game chats can only be pinned or muted until the game is over (you'd miss the court info)
   function swipeButtons(c) {
     var b = '<button class="a-pin" data-cact="' + (c.pinned ? 'unpin' : 'pin') + '" data-cid="' + c.id + '"><span>📌</span>' + (c.pinned ? 'Unpin' : 'Pin') + '</button>' +
       '<button class="a-mute" data-cact="' + (c.muted ? 'unmute' : 'mute') + '" data-cid="' + c.id + '"><span>' + (c.muted ? '🔔' : '🔕') + '</span>' + (c.muted ? 'Unmute' : 'Mute') + '</button>';
     if (c.kind === 'dm') b += '<button class="a-del" data-cact="clear" data-cid="' + c.id + '"><span>🗑️</span>Delete</button>';
     if (c.kind === 'group') b += '<button class="a-del" data-cact="leave" data-cid="' + c.id + '"><span>🚪</span>Leave</button>';
+    if (gameOver(c)) b += isGameHost(c)
+      ? '<button class="a-del" data-cact="endgame" data-cid="' + c.id + '"><span>🗑️</span>End</button>'
+      : '<button class="a-del" data-cact="leavegame" data-cid="' + c.id + '"><span>🚪</span>Leave</button>';
     return b;
   }
 
@@ -330,7 +337,7 @@
       return;
     }
     $('list').innerHTML = shown.map(function (c) {
-      var sub = c.kind === 'game' ? 'Game chat · ' + c.members.length + ' players' + (c.game && c.game.place ? ' · ' + c.game.place : '')
+      var sub = c.kind === 'game' ? (gameOver(c) ? '✅ Finished · swipe to ' + (isGameHost(c) ? 'end' : 'leave') : 'Game chat · ' + c.members.length + ' player' + (c.members.length === 1 ? '' : 's') + (c.game && c.game.place ? ' · ' + c.game.place : ''))
         : c.kind === 'group' ? c.members.length + ' members' : '';
       var icons = (c.pinned ? '📌' : '') + (c.muted ? '🔕' : '');
       return '<div class="swipe"><div class="swipe-actions">' + swipeButtons(c) + '</div>' +
@@ -385,12 +392,18 @@
     var c = chats.filter(function (x) { return x.id === id; })[0];
     if (act === 'clear' && !tapTwice('clear' + id, 'Tap Delete again: the chat disappears until they message you again')) return;
     if (act === 'leave' && !tapTwice('leave' + id, 'Tap Leave again to leave this group')) return;
-    var r = act === 'leave' ? await db.rpc('leave_group', { p_chat: id }) : await db.rpc('chat_action', { p_chat: id, p_action: act });
-    if (r.error) return toast(PadPal.friendlyError(r.error));
+    if (act === 'endgame' && !tapTwice('endgame' + id, 'Tap End again: the chat and its messages are deleted for everyone')) return;
+    if (act === 'leavegame' && !tapTwice('leavegame' + id, 'Tap Leave again: the chat disappears from your list')) return;
+    var r = act === 'leave' ? await db.rpc('leave_group', { p_chat: id })
+      : act === 'endgame' ? await db.rpc('end_game_chat', { p_chat: id })
+      : act === 'leavegame' ? await db.rpc('leave_game_chat', { p_chat: id })
+      : await db.rpc('chat_action', { p_chat: id, p_action: act });
+    if (r.error) return toast(/end_game_chat|leave_game_chat/.test(r.error.message) ? 'Run 20_game_chat.sql in Supabase first' : PadPal.friendlyError(r.error));
     swiped = null;
     toast({ pin: '📌 Pinned to the top', unpin: 'Unpinned', mute: '🔕 Muted. No more alerts from this chat', unmute: '🔔 Alerts are back on',
-            clear: '🗑️ Chat deleted', leave: '🚪 You left ' + (c ? chatTitle(c) : 'the group') }[act]);
-    if (current && current.id === id && (act === 'clear' || act === 'leave')) { closeSheet(); closeChat(); return; }
+            clear: '🗑️ Chat deleted', leave: '🚪 You left ' + (c ? chatTitle(c) : 'the group'),
+            endgame: '🗑️ Game chat ended for everyone', leavegame: '🚪 You left the game chat' }[act]);
+    if (current && current.id === id && (act === 'clear' || act === 'leave' || act === 'endgame' || act === 'leavegame')) { closeSheet(); closeChat(); return; }
     if (current && current.id === id) { current.muted = act === 'mute' ? true : act === 'unmute' ? false : current.muted; }
     await loadChats();
   }
@@ -712,8 +725,14 @@
         '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-cact="leave" data-cid="' + c.id + '">🚪 Leave group</button>';
     } else if (c.kind === 'dm') {
       html += '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-cact="clear" data-cid="' + c.id + '">🗑️ Delete chat</button>';
+    } else if (c.kind === 'game' && gameOver(c)) {
+      html += isGameHost(c)
+        ? '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-cact="endgame" data-cid="' + c.id + '">🗑️ End chat for everyone</button>' +
+          '<p class="note meta" style="margin-top:8px">The game is over, so you (the host) can delete this chat and its messages for everyone.</p>'
+        : '<button class="btn btn-ghost" style="width:100%;margin-top:8px" data-cact="leavegame" data-cid="' + c.id + '">🚪 Leave chat</button>' +
+          '<p class="note meta" style="margin-top:8px">The game is over, so you can leave. It also closes by itself 3 days after the game.</p>';
     } else if (c.kind === 'game') {
-      html += '<p class="note meta" style="margin-top:12px">Everyone who joins the game is in this chat, so you can\'t leave it, only mute it. It closes 3 days after the game.</p>';
+      html += '<p class="note meta" style="margin-top:12px">Everyone who joins the game is in this chat, so you can\'t leave it before the game is over, only mute it. After the game the host can end it, and players can leave.</p>';
     }
     openSheet(html);
   }
