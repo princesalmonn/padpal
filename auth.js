@@ -18,6 +18,7 @@
   function setTheme(t) {
     try { localStorage.setItem('padpal_theme', t); } catch (e) {}
     applyTheme(t);
+    document.dispatchEvent(new Event('padpal-theme'));   // e.g. the doodle background recolours
   }
   applyTheme(getTheme());
 

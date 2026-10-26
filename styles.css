@@ -55,6 +55,10 @@
   --shine: linear-gradient(135deg, #EBD39A 0%, #C79A4B 55%, #E9CD8C 100%);
 }
 
+/* 🎾 Doodle background (doodles.js): fixed, behind everything, never tappable */
+#padpalDoodles { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+#padpalDoodles svg { display: block; }
+
 /* Basics */
 [hidden] { display: none !important; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
