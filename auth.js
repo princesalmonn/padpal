@@ -137,17 +137,30 @@
   }
 
   // Make a new one-time invite and return its link
+  // Your personal invite link: works for anyone, any number of times (the admin still approves everyone).
+  // Before 21_invite_links.sql is run, it falls back to an old one-time link.
   async function createInvite() {
-    var me = await myProfile();
-    var r = await db.from('invites').insert({ created_by: me.session.user.id }).select('code').single();
+    var r = await db.rpc('my_invite_link');
+    var code = r.data;
+    if (r.error) {
+      var me = await myProfile();
+      var old = await db.from('invites').insert({ created_by: me.session.user.id }).select('code').single();
+      if (old.error) throw old.error;
+      code = old.data.code;
+    }
+    return new URL('login.html?invite=' + code, location.href).href;
+  }
+  // 🔄 A new personal link: the old one stops working
+  async function newInviteLink() {
+    var r = await db.rpc('new_invite_link');
     if (r.error) throw r.error;
-    return new URL('login.html?invite=' + r.data.code, location.href).href;
+    return new URL('login.html?invite=' + r.data, location.href).href;
   }
 
   // Share the link with the phone's share sheet, or copy it
   async function shareInvite() {
     var link = await createInvite();
-    var text = 'Join me on PadPal 🎾 (this link works once)';
+    var text = 'Join me on PadPal 🎾 Padel with friends · Exclusive Club';
     if (navigator.share) {
       try { await navigator.share({ title: 'PadPal invite', text: text, url: link }); return 'shared'; }
       catch (e) { if (e.name === 'AbortError') return 'cancelled'; }
@@ -354,7 +367,7 @@
     if (/same.*password|different from the old/i.test(m))
       return 'That is your current password. Choose a new one.';
     if (/saving new user|invite-only/i.test(m))
-      return "PadPal is invite-only 🎟️ This invite link isn't valid or was already used. Ask a member for a new one.";
+      return "PadPal is invite-only 🎟️ This invite link doesn't work (anymore). Ask a member for their current link.";
     if (/rate limit|too many/i.test(m))
       return 'Too many emails right now. The free email service only sends a few per hour, so try again a bit later.';
     if (/expired|invalid.*(otp|token)|token.*(expired|invalid)/i.test(m))
@@ -376,7 +389,7 @@
 
   window.PadPal = {
     db: db, myProfile: myProfile, guard: guard, signOut: signOut,
-    createInvite: createInvite, shareInvite: shareInvite, friendlyError: friendlyError,
+    createInvite: createInvite, newInviteLink: newInviteLink, shareInvite: shareInvite, friendlyError: friendlyError,
     uploadPhoto: uploadPhoto, photoUrls: photoUrls,
     remembered: remembered, setRemember: setRemember,
     TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, forgetMembers: forgetMembers, rankPlayers: rankPlayers, snap: snap, fmt: fmt, fmtChange: fmtChange,

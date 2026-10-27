@@ -8,16 +8,16 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="styles.css?v=25">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=24"></script>
-<script src="auth.js?v=24"></script>
-<script src="doodles.js?v=24"></script>
-<script src="rate.js?v=24"></script>
-<script src="sessions.js?v=24"></script>
-<script src="levels.js?v=24"></script>
-<script src="share.js?v=24"></script>
+<script src="config.js?v=25"></script>
+<script src="auth.js?v=25"></script>
+<script src="doodles.js?v=25"></script>
+<script src="rate.js?v=25"></script>
+<script src="sessions.js?v=25"></script>
+<script src="levels.js?v=25"></script>
+<script src="share.js?v=25"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Profile-only styles ===== */
@@ -323,6 +323,7 @@
   <div style="display:grid;gap:10px">
     <a class="btn btn-accent" id="adminLink" href="admin.html" style="text-align:center;text-decoration:none" hidden>👑 Admin panel</a>
     <button class="btn btn-ghost" data-edit>✏️ Edit profile</button>
+    <button class="btn btn-ghost" id="newLinkBtn">🔄 New invite link (old one stops working)</button>
     <button class="btn btn-ghost" id="pwBtn">🔑 Set or change password</button>
     <button class="btn btn-ghost" id="logoutBtn">🚪 Log out</button>
   </div>
@@ -1338,6 +1339,16 @@
     toast({ auto: '📱 Follows your iPhone (dark at night, light by day)', dark: '🌙 Dark theme', light: '☀️ Light theme', gold: '✨ Gold theme: welcome to the lounge', glass: '💧 Liquid Glass: dark at night, bright by day' }[b.dataset.themePick]);
   });
 
+  // 🔄 Your invite link ended up in the wrong place? Make a new one; the old one stops working
+  $('newLinkBtn').addEventListener('click', async function () {
+    if (!tapTwice('newlink', 'Tap again: your old invite link stops working')) return;
+    try {
+      var link = await PadPal.newInviteLink();
+      try { await navigator.clipboard.writeText(link); toast('🔄 New link copied. The old one no longer works'); }
+      catch (e) { toast('🔄 New link: ' + link); }
+    } catch (err) { toast(/new_invite_link/.test(err.message || '') ? 'Run 21_invite_links.sql in Supabase first' : PadPal.friendlyError(err)); }
+  });
+
   $('settingsBtn').addEventListener('click', function () {
     markTheme();
     if (isMe) return openSheet($('settingsSheet'));
@@ -1383,7 +1394,7 @@
     btn.disabled = true;
     try {
       var result = await PadPal.shareInvite();
-      if (result === 'copied') toast('📋 Invite link copied! Send it to your friend');
+      if (result === 'copied') toast('📋 Your invite link is copied! It works for any friend (you approve them)');
       else if (result === 'shared') toast('🎟️ Invite sent!');
       else if (result !== 'cancelled') toast('Invite link: ' + result);
     } catch (err) {

@@ -8,14 +8,14 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="styles.css?v=25">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=24"></script>
-<script src="auth.js?v=24"></script>
-<script src="doodles.js?v=24"></script>
-<script src="levels.js?v=24"></script>
-<script src="sessions.js?v=24"></script>
+<script src="config.js?v=25"></script>
+<script src="auth.js?v=25"></script>
+<script src="doodles.js?v=25"></script>
+<script src="levels.js?v=25"></script>
+<script src="sessions.js?v=25"></script>
 <style>
   /* ===== Admin-only styles ===== */
   .back { text-decoration: none; color: var(--accent); font-weight: 600; font-size: 15px; }
@@ -56,12 +56,13 @@
 
   <h2>Invite someone</h2>
   <div class="card">
-    <p class="meta" style="margin:0 0 12px">Each link works for one person. They still need your approval after signing up.</p>
-    <button class="btn btn-primary" style="width:100%" id="makeInvite">🎟️ Create invite link</button>
+    <p class="meta" style="margin:0 0 12px">Your personal link works for <b>anyone, any number of times</b> (e.g. in a WhatsApp group). Everyone who signs up still needs your approval here.</p>
+    <button class="btn btn-primary" style="width:100%" id="makeInvite">🎟️ Show my invite link</button>
     <div class="link-box" id="linkBox" hidden>
       <input class="input" id="linkText" readonly aria-label="Invite link">
       <button class="btn btn-ghost" id="copyLink">Copy</button>
     </div>
+    <button class="btn btn-ghost" style="width:100%;margin-top:8px" id="resetLink" hidden>🔄 New link (the old one stops working)</button>
   </div>
 
   <h2>Members <span class="count" id="memberCount">0</span></h2>
@@ -316,9 +317,17 @@
       var link = await PadPal.createInvite();
       $('linkText').value = link;
       $('linkBox').hidden = false;
-      toast('🎟️ Invite link ready');
+      $('resetLink').hidden = false;
+      toast('🎟️ Your invite link');
     } catch (err) { showError(err); }
     this.disabled = false;
+  });
+  $('resetLink').addEventListener('click', async function () {
+    if (!tapTwice('resetlink', 'Tap again: your old link stops working and you get a new one')) return;
+    try {
+      $('linkText').value = await PadPal.newInviteLink();
+      toast('🔄 New link ready. The old one no longer works');
+    } catch (err) { showError(/new_invite_link/.test(err.message || '') ? 'Run 21_invite_links.sql in Supabase first' : err); }
   });
   $('copyLink').addEventListener('click', async function () {
     try { await navigator.clipboard.writeText($('linkText').value); toast('📋 Copied!'); }
