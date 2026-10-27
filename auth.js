@@ -24,6 +24,11 @@
   }
   applyTheme(getTheme());
 
+  // 📦 Offline app cache: after the first visit, PadPal's files load from the phone (see sw.js)
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  }
+
   // "Remember me": ON = stay logged in (localStorage), OFF = logged out when the app/browser closes (sessionStorage)
   function remembered() {
     try { return localStorage.getItem('padpal_remember') !== 'no'; } catch (e) { return true; }
@@ -127,6 +132,7 @@
   }
 
   async function signOut() {
+    try { Object.keys(localStorage).forEach(function (k) { if (/^padpal_snap_/.test(k)) localStorage.removeItem(k); }); sessionStorage.removeItem('padpal_members'); } catch (e) {}
     await db.auth.signOut();
   }
 
@@ -268,6 +274,38 @@
     try { sessionStorage.removeItem('padpal_members'); } catch (e) {}
   }
 
+  // 🗂️ "Last seen" screens: a page shows what you saw last time IMMEDIATELY, then swaps in fresh data
+  // (like Instagram). Saved per person on this phone; never shown to someone else who logs in here.
+  function storedUserId() {
+    try {
+      var stores = [localStorage, sessionStorage];
+      for (var s = 0; s < stores.length; s++) {
+        for (var i = 0; i < stores[s].length; i++) {
+          var k = stores[s].key(i);
+          if (/^sb-.*-auth-token$/.test(k)) { var v = JSON.parse(stores[s].getItem(k)); return v && v.user && v.user.id; }
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+  var snap = {
+    // put back the saved HTML of these elements (if it's yours and less than 2 days old)
+    show: function (key, els) {
+      try {
+        var uid = storedUserId(), s = JSON.parse(localStorage.getItem('padpal_snap_' + key) || 'null');
+        if (!uid || !s || s.uid !== uid || Date.now() - s.at > 2 * 86400000) return false;
+        els.forEach(function (el, i) { if (el && s.html[i] != null) el.innerHTML = s.html[i]; });
+        return true;
+      } catch (e) { return false; }
+    },
+    save: function (key, els) {
+      try {
+        var uid = storedUserId();
+        if (uid) localStorage.setItem('padpal_snap_' + key, JSON.stringify({ uid: uid, at: Date.now(), html: els.map(function (el) { return el ? el.innerHTML : null; }) }));
+      } catch (e) {}
+    }
+  };
+
   // ⚡ Start loading a page as soon as your finger touches its link, so it opens instantly
   var prefetched = {};
   function prefetch(href) {
@@ -341,8 +379,8 @@
     createInvite: createInvite, shareInvite: shareInvite, friendlyError: friendlyError,
     uploadPhoto: uploadPhoto, photoUrls: photoUrls,
     remembered: remembered, setRemember: setRemember,
-    TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, forgetMembers: forgetMembers, rankPlayers: rankPlayers, fmt: fmt, fmtChange: fmtChange,
+    TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, forgetMembers: forgetMembers, rankPlayers: rankPlayers, snap: snap, fmt: fmt, fmtChange: fmtChange,
     inactivity: inactivity, refreshBell: refreshBell, mountBell: mountBell,
-    getTheme: getTheme, setTheme: setTheme
+    getTheme: getTheme, setTheme: setTheme, hasStoredLogin: hasStoredLogin
   };
 })();

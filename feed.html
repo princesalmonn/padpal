@@ -8,15 +8,16 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=23">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js?v=23"></script>
-<script src="auth.js?v=23"></script>
-<script src="doodles.js?v=23"></script>
-<script src="levels.js?v=23"></script>
-<script src="rate.js?v=23"></script>
-<script src="sessions.js?v=23"></script>
-<script src="share.js?v=23"></script>
+<link rel="stylesheet" href="styles.css?v=24">
+<link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
+<script src="supabase-2.45.4.js"></script>
+<script src="config.js?v=24"></script>
+<script src="auth.js?v=24"></script>
+<script src="doodles.js?v=24"></script>
+<script src="levels.js?v=24"></script>
+<script src="rate.js?v=24"></script>
+<script src="sessions.js?v=24"></script>
+<script src="share.js?v=24"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Feed-only styles ===== */
@@ -305,6 +306,7 @@
   }
 
   // ===== Load =====
+  PadPal.snap.show('feed', [$('stories'), $('feed')]);   // 🗂️ what you saw last time, straight away
   PadPal.me.then(async function (me) {
     if (!me) return;
     profile = me.profile;
@@ -315,8 +317,8 @@
         PadPal.fmt(inact.amount) + ' point' + (inact.amount === 1 ? '' : 's') + '. Tap to find a game 🎾';
       $('idleWarn').hidden = false;
     });
-    await cleanupMyExpired();
     load().then(jumpToPost);
+    cleanupMyExpired();   // tidy-up runs alongside, it doesn't make you wait
   });
 
   // Refresh when you come back to the app
@@ -338,39 +340,31 @@
     $('feedError').hidden = true;
     posts = r.data.filter(function (p) { return !p.expires_at || new Date(p.expires_at) > Date.now(); });
 
-    // Match results: load the matches, the points and the players' names
+    // ⚡ Everything the posts need, asked all at the same time (not one after another)
     var matchIds = posts.filter(function (p) { return p.match_id; }).map(function (p) { return p.match_id; });
     var gameIds = posts.filter(function (p) { return p.kind === 'session'; }).map(function (p) { return p.game_id; });
-    if (matchIds.length) {
-      var mr = await db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at').in('id', matchIds);
-      var cr = await db.from('point_changes').select('match_id, user_id, change, points_after').in('match_id', matchIds);
-      (mr.data || []).forEach(function (m) { matches[m.id] = m; m.changes = {}; });
-      (cr.data || []).forEach(function (c) { if (matches[c.match_id]) matches[c.match_id].changes[c.user_id] = c; });
-    }
-    if (gameIds.length) {
-      var gr = await db.from('games').select('id, kind, place, scheduled_at, session_state').in('id', gameIds);
-      var gc = await db.from('point_changes').select('game_id, user_id, change, created_at').in('game_id', gameIds);
-      (gr.data || []).forEach(function (g) { sessions[g.id] = g; g.changes = {}; });
-      (gc.data || []).forEach(function (c) { var g = sessions[c.game_id]; if (g) { g.changes[c.user_id] = c; g.finished = c.created_at; } });
-    }
     var tIds = posts.filter(function (p) { return p.kind === 'tournament'; }).map(function (p) { return p.tournament_id; });
-    if (tIds.length) {
-      var tr = await db.from('tournaments').select('id, name, kind, division, tournament_teams(id, p1, p2, place)').in('id', tIds);
-      (tr.data || []).forEach(function (t) { tourneys[t.id] = t; });
-    }
-    if (!Object.keys(people).length) {   // names for results, tags and the tag picker
-      try { (await PadPal.members()).forEach(function (m) { people[m.id] = m; }); } catch (err) {}
-    }
-    // 🏷️ who is tagged in which post (works even before 19_tags.sql: then simply no tags)
+    var none = Promise.resolve({ data: [] });
+    var got = await Promise.all([
+      matchIds.length ? db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at').in('id', matchIds) : none,
+      matchIds.length ? db.from('point_changes').select('match_id, user_id, change, points_after').in('match_id', matchIds) : none,
+      gameIds.length ? db.from('games').select('id, kind, place, scheduled_at, session_state').in('id', gameIds) : none,
+      gameIds.length ? db.from('point_changes').select('game_id, user_id, change, created_at').in('game_id', gameIds) : none,
+      tIds.length ? db.from('tournaments').select('id, name, kind, division, tournament_teams(id, p1, p2, place)').in('id', tIds) : none,
+      posts.length ? db.from('post_tags').select('post_id, user_id').in('post_id', posts.map(function (p) { return p.id; })) : none,   // 🏷️ (no tags before 19_tags.sql)
+      db.from('pinned_photos').select('path').eq('user_id', profile.id),
+      PadPal.members().catch(function () { return []; })   // names for results, tags and the tag picker
+    ]);
+    (got[0].data || []).forEach(function (m) { matches[m.id] = m; m.changes = {}; });
+    (got[1].data || []).forEach(function (c) { if (matches[c.match_id]) matches[c.match_id].changes[c.user_id] = c; });
+    (got[2].data || []).forEach(function (g) { sessions[g.id] = g; g.changes = {}; });
+    (got[3].data || []).forEach(function (c) { var g = sessions[c.game_id]; if (g) { g.changes[c.user_id] = c; g.finished = c.created_at; } });
+    (got[4].data || []).forEach(function (t) { tourneys[t.id] = t; });
     tagsOf = {};
-    if (posts.length) {
-      var tg = await db.from('post_tags').select('post_id, user_id').in('post_id', posts.map(function (p) { return p.id; }));
-      (tg.data || []).forEach(function (t) { (tagsOf[t.post_id] = tagsOf[t.post_id] || []).push(t.user_id); });
-    }
-
-    var pr = await db.from('pinned_photos').select('path').eq('user_id', profile.id);
+    (got[5].data || []).forEach(function (t) { (tagsOf[t.post_id] = tagsOf[t.post_id] || []).push(t.user_id); });
     myPins = {};
-    (pr.data || []).forEach(function (p) { myPins[p.path] = true; });
+    (got[6].data || []).forEach(function (p) { myPins[p.path] = true; });
+    got[7].forEach(function (m) { people[m.id] = m; });
 
     var paths = [];
     if (profile.avatar_url) paths.push(profile.avatar_url);
@@ -383,6 +377,7 @@
 
     renderStories();
     renderFeed();
+    if (feedFilter === 'all') PadPal.snap.save('feed', [$('stories'), $('feed')]);   // 🗂️ shown instantly next time
   }
 
   // Photo posts older than 24h: delete them (and their file, unless pinned)

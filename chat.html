@@ -8,12 +8,13 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=23">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js?v=23"></script>
-<script src="auth.js?v=23"></script>
-<script src="doodles.js?v=23"></script>
-<script src="levels.js?v=23"></script>
+<link rel="stylesheet" href="styles.css?v=24">
+<link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
+<script src="supabase-2.45.4.js"></script>
+<script src="config.js?v=24"></script>
+<script src="auth.js?v=24"></script>
+<script src="doodles.js?v=24"></script>
+<script src="levels.js?v=24"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Chat-only styles ===== */
@@ -52,6 +53,24 @@
   .badge-n { background: var(--primary); color: var(--primary-text); font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; padding: 0 6px; flex-shrink: 0; }
   .badge-n.muted { background: var(--card-2); color: var(--text-2); }
   .swipe-hint { font-size: 11px; color: var(--text-2); text-align: center; margin-top: 12px; }
+  /* 💧 Liquid Glass: the list is one frosted glass card; rows are see-through,
+     and the Pin / Mute / Delete buttons only appear while you swipe */
+  :root[data-theme="glass"] #list:has(.swipe) {
+    background: var(--card); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; padding: 0 12px;
+    -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge), var(--shadow);
+  }
+  :root[data-theme="glass"] .swipe { border-bottom-color: rgba(255,255,255,.12); }
+  :root[data-theme="glass"] .swipe:last-of-type { border-bottom: 0; }
+  :root[data-theme="glass"] .chat-row { background: transparent; }
+  :root[data-theme="glass"] .swipe-actions { visibility: hidden; }
+  :root[data-theme="glass"] .swipe:has(.chat-row[style*="translateX"]) .swipe-actions { visibility: visible; }
+  :root[data-theme="glass"] .swipe:has(.chat-row[style*="translateX"]) .chat-row { background: color-mix(in srgb, var(--bg) 92%, transparent); }
+  :root[data-theme="glass"] .swipe-hint { margin: 10px 0 12px; }
+  :root[data-theme="glass"] .convo { background: var(--glass-sky); }
+  :root[data-theme="glass"] .c-head, :root[data-theme="glass"] .c-foot, :root[data-theme="glass"] .pin-bar, :root[data-theme="glass"] .reply-bar {
+    background: color-mix(in srgb, var(--bg) 35%, transparent); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  }
+  :root[data-theme="glass"] .msg.them .bubble { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); }
   .empty { text-align: center; color: var(--text-2); padding: 40px 16px; }
   .empty .big { font-size: 46px; }
 
@@ -235,12 +254,17 @@
   $('backdrop').addEventListener('click', closeSheet);
 
   // ===== Load my chats =====
+  PadPal.snap.show('chat', [$('list')]);   // 🗂️ your chat list from last time, straight away
   PadPal.me.then(async function (who) {
     if (!who) return;
     me = who.profile;
     (await PadPal.members()).forEach(function (m) { people[m.id] = m; });
-    try { urls = await PadPal.photoUrls(Object.keys(people).map(function (id) { return people[id].avatar_url; })); } catch (e) {}
+    // ⚡ the chat list and the profile pictures load at the same time; pictures pop in when ready
+    var listReady = false;
+    PadPal.photoUrls(Object.keys(people).map(function (id) { return people[id].avatar_url; }))
+      .then(function (u) { urls = u; if (listReady && !current) renderList(); }).catch(function () {});
     await loadChats();
+    listReady = true;
     cleanupMyOldPhotos();
     // opened with ?with=<member id> (e.g. from Ranks or a profile) → straight into the DM
     var withId = new URLSearchParams(location.search).get('with');
@@ -261,23 +285,24 @@
     var ids = mine.map(function (x) { return x.chat_id; });
     var members = {}, last = {}, unread = {}, games = {}, prefs = {};
     if (ids.length) {
-      var pr = await db.from('chat_prefs').select('chat_id, pinned_at, muted, cleared_at').eq('user_id', me.id);
+      // ⚡ all at the same time
+      var gameIds0 = mine.filter(function (x) { return x.chats.game_id; }).map(function (x) { return x.chats.game_id; });
+      var all = await Promise.all([
+        db.from('chat_prefs').select('chat_id, pinned_at, muted, cleared_at').eq('user_id', me.id),
+        db.from('chat_members').select('chat_id, user_id').in('chat_id', ids),
+        db.from('messages').select('chat_id, author_id, body, photo_path, deleted_at, created_at').in('chat_id', ids).order('created_at', { ascending: false }).limit(800),
+        gameIds0.length ? db.from('games').select('id, kind, host_id, scheduled_at, place, status').in('id', gameIds0) : Promise.resolve({ data: [] })
+      ]);
+      var pr = all[0], mr = all[1], lr = all[2];
       (pr.data || []).forEach(function (x) { prefs[x.chat_id] = x; });
-      var mr = await db.from('chat_members').select('chat_id, user_id').in('chat_id', ids);
       (mr.data || []).forEach(function (x) { (members[x.chat_id] = members[x.chat_id] || []).push(x.user_id); });
-      var lr = await db.from('messages').select('chat_id, author_id, body, photo_path, deleted_at, created_at').in('chat_id', ids)
-        .order('created_at', { ascending: false }).limit(800);
+      (all[3].data || []).forEach(function (g) { games[g.id] = g; });
       var readAt = {};
       mine.forEach(function (x) { readAt[x.chat_id] = new Date(x.last_read_at); });
       (lr.data || []).forEach(function (m) {
         if (!last[m.chat_id]) last[m.chat_id] = m;
         if (m.author_id && m.author_id !== me.id && !m.deleted_at && new Date(m.created_at) > readAt[m.chat_id]) unread[m.chat_id] = (unread[m.chat_id] || 0) + 1;
       });
-      var gameIds = mine.filter(function (x) { return x.chats.game_id; }).map(function (x) { return x.chats.game_id; });
-      if (gameIds.length) {
-        var gr = await db.from('games').select('id, kind, host_id, scheduled_at, place, status').in('id', gameIds);
-        (gr.data || []).forEach(function (g) { games[g.id] = g; });
-      }
     }
     chats = mine.map(function (x) {
       var c = x.chats, p = prefs[c.id] || {};
@@ -346,6 +371,7 @@
         '<div class="top"><div class="last">' + esc(lastText(c)) + '</div>' + (c.unread ? '<span class="badge-n' + (c.muted ? ' muted' : '') + '">' + c.unread + '</span>' : '') + '</div>' +
         (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') + '</div></button></div>';
     }).join('') + '<p class="swipe-hint">👈 Swipe a chat to the left to pin, mute or delete it</p>';
+    if (filter === 'all') PadPal.snap.save('chat', [$('list')]);
   }
 
   // ===== Swipe a chat row to the left =====

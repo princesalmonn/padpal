@@ -86,16 +86,27 @@
     var w = Math.max(screen.width || 0, innerWidth), h = Math.max(screen.height || 0, innerHeight);
     if (!layout || layout.w < w || layout.h < h) layout = makeLayout(w, h);
     var look = currentLook();
-    box.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" preserveAspectRatio="xMidYMin slice" viewBox="0 0 ' + layout.w + ' ' + layout.h + '">' +
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + layout.w + '" height="' + layout.h + '" viewBox="0 0 ' + layout.w + ' ' + layout.h + '">' +
       '<defs>' + DEFS + '</defs>' +
       '<g style="--dd-accent:' + look.accent + ';--dd-paper:' + look.paper + '" color="' + look.ink + '" opacity="' + look.opacity + '" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#ddHand)">' +
       layout.items.map(function (it) {
-        return '<use href="#dd-' + it.id + '" transform="translate(' + it.x.toFixed(1) + ' ' + it.y.toFixed(1) + ') rotate(' + it.rot.toFixed(1) + ') scale(' + it.s.toFixed(2) + ')"/>';
+        return '<use href="#dd-' + it.id + '" xlink:href="#dd-' + it.id + '" transform="translate(' + it.x.toFixed(1) + ' ' + it.y.toFixed(1) + ') rotate(' + it.rot.toFixed(1) + ') scale(' + it.s.toFixed(2) + ')"/>';
       }).join('') + '</g></svg>';
+    // ⚡ one flat picture (drawn once), not a live drawing the phone recalculates while you scroll
+    box.innerHTML = '<img alt="" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '">';
   }
 
   function start() {
-    draw();
+    // draw after the page has appeared, so it never slows down opening a page
+    var done = false;
+    var go = function () {
+      if (done) return;
+      done = true;
+      if (window.requestIdleCallback) requestIdleCallback(function () { draw(); }, { timeout: 800 });
+      else setTimeout(draw, 50);
+    };
+    if (document.readyState === 'complete') go();
+    else { window.addEventListener('load', go); setTimeout(go, 1200); }   // whichever comes first
     // new colours when the theme changes (Settings) or the iPhone switches day/night (Auto)
     document.addEventListener('padpal-theme', draw);
     if (window.matchMedia) {

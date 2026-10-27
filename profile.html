@@ -8,15 +8,16 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=23">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js?v=23"></script>
-<script src="auth.js?v=23"></script>
-<script src="doodles.js?v=23"></script>
-<script src="rate.js?v=23"></script>
-<script src="sessions.js?v=23"></script>
-<script src="levels.js?v=23"></script>
-<script src="share.js?v=23"></script>
+<link rel="stylesheet" href="styles.css?v=24">
+<link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
+<script src="supabase-2.45.4.js"></script>
+<script src="config.js?v=24"></script>
+<script src="auth.js?v=24"></script>
+<script src="doodles.js?v=24"></script>
+<script src="rate.js?v=24"></script>
+<script src="sessions.js?v=24"></script>
+<script src="levels.js?v=24"></script>
+<script src="share.js?v=24"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Profile-only styles ===== */
@@ -416,6 +417,12 @@
 <div class="toast" id="toast"></div>
 
 <script>
+  // 🗂️ Your own profile as you saw it last time, straight away (before any button is wired up,
+  // so everything still works). Fresh numbers replace it in a moment. Not for other people's profiles.
+  var OWN_PROFILE = !new URLSearchParams(location.search).get('id');
+  if (OWN_PROFILE) PadPal.snap.show('profile', [document.querySelector('main.wrap')]);
+  function saveProfileSnap() { if (OWN_PROFILE) PadPal.snap.save('profile', [document.querySelector('main.wrap')]); }
+
   // ===== Sample data (stats, history: becomes real in Stage 2) =====
 
   // Shot chart: your average rating per shot (real, filled in by loadShots)
@@ -668,23 +675,35 @@
   function pname(id) { var p = people[id]; return esc(p ? (p.display_name || p.username) : '?'); }
 
   async function loadGame() {
-    var list = [];
-    try { list = await PadPal.members(); } catch (err) {}
-    list.forEach(function (m) { people[m.id] = m; });
     var id = profile.id;
-    var r = await db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at')
-      .or('a1.eq.' + id + ',a2.eq.' + id + ',b1.eq.' + id + ',b2.eq.' + id)
-      .order('played_at', { ascending: false }).limit(200);
-    var cr = await db.from('point_changes').select('match_id, game_id, change, reason, created_at').eq('user_id', id);
+    // ⚡ round 1, all at the same time: members, matches, points history, tournaments
+    var first = await Promise.all([
+      PadPal.members().catch(function () { return []; }),
+      db.from('matches').select('id, a1, a2, b1, b2, sets, winner, played_at')
+        .or('a1.eq.' + id + ',a2.eq.' + id + ',b1.eq.' + id + ',b2.eq.' + id).order('played_at', { ascending: false }).limit(200),
+      db.from('point_changes').select('match_id, game_id, change, reason, created_at').eq('user_id', id),
+      db.from('tournament_teams').select('id, place, p1, p2, tournaments(id, name, kind, status, scheduled_at)').or('p1.eq.' + id + ',p2.eq.' + id)
+    ]);
+    var list = first[0], r = first[1], cr = first[2], tr = first[3];
+    list.forEach(function (m) { people[m.id] = m; });
     myChanges = cr.data || [];
+    myTourneys = (tr.data || []).filter(function (t) { return t.tournaments && t.tournaments.status !== 'cancelled'; });
+    var tIds = myTourneys.map(function (t) { return t.tournaments.id; });
     // sessions played (for History) and where the host took you out (injured, sick, tired…)
     myExits = [];
     mySessions = [];
     var sessionChange = {};
     myChanges.forEach(function (c) { if (c.reason === 'session' && c.game_id) sessionChange[c.game_id] = c; });
     var sessionIds = Object.keys(sessionChange);
+    // ⚡ round 2, at the same time: the sessions and the tournament matches
+    var none = Promise.resolve({ data: [] });
+    var second = await Promise.all([
+      sessionIds.length ? db.from('games').select('id, kind, host_id, place, session_state, scheduled_at').in('id', sessionIds) : none,
+      tIds.length ? db.from('tournament_teams').select('id, p1, p2').in('tournament_id', tIds) : none,
+      tIds.length ? db.from('tournament_matches').select('team_a, team_b, sets, winner, played_at').in('tournament_id', tIds).not('winner', 'is', null) : none
+    ]);
     if (sessionIds.length) {
-      var gs = await db.from('games').select('id, kind, host_id, place, session_state, scheduled_at').in('id', sessionIds);
+      var gs = second[0];
       (gs.data || []).forEach(function (g) {
         var o = g.session_state && g.session_state.out && g.session_state.out[id];
         if (o) myExits.push({ reason: o.reason, when: g.scheduled_at });
@@ -694,16 +713,10 @@
         mySessions.push({ game: g, row: mine, n: rows.length, change: Number(sessionChange[g.id].change), when: sessionChange[g.id].created_at });
       });
     }
-    // tournaments played
-    var tr = await db.from('tournament_teams').select('id, place, p1, p2, tournaments(id, name, kind, status, scheduled_at)')
-      .or('p1.eq.' + id + ',p2.eq.' + id);
-    myTourneys = (tr.data || []).filter(function (t) { return t.tournaments && t.tournaments.status !== 'cancelled'; });
     // tournament matches count in W-L too
     tourneyGames = [];
-    var tIds = myTourneys.map(function (t) { return t.tournaments.id; });
     if (tIds.length) {
-      var tt = await db.from('tournament_teams').select('id, p1, p2').in('tournament_id', tIds);
-      var tm = await db.from('tournament_matches').select('team_a, team_b, sets, winner, played_at').in('tournament_id', tIds).not('winner', 'is', null);
+      var tt = second[1], tm = second[2];
       var teamOf = {};
       (tt.data || []).forEach(function (t) { teamOf[t.id] = t; });
       var mine = myTourneys.map(function (t) { return t.id; });
@@ -749,7 +762,8 @@
     });
     myMatches = myMatches.concat(tourneyGames);
     myMatches.sort(function (a, b) { return new Date(b.when) - new Date(a.when); });
-    try { urls = await PadPal.photoUrls(list.map(function (m) { return m.avatar_url; })); } catch (err) {}
+    // friends' pictures pop in when ready (don't wait for them)
+    PadPal.photoUrls(list.map(function (m) { return m.avatar_url; })).then(function (u) { urls = u; renderStats(statsPeriod); }).catch(function () {});
     renderRank(list);
     renderHistory();
     renderStats(statsPeriod);
@@ -1056,8 +1070,9 @@
       setupVisit();
     }
     renderHero();
-    loadPins();
-    loadGame().then(loadShots).then(loadTrophies);
+    var loadPinsDone = loadPins();
+    var parts = [loadGame().then(renderBadges), loadShots(), loadTrophies(), loadPinsDone];   // ⚡ these load at the same time
+    Promise.all(parts).then(function () { setTimeout(saveProfileSnap, 300); }).catch(function () {});
   });
 
   // Looking at someone else: no editing, but Message / Invite / ⭐ buttons

@@ -131,7 +131,7 @@
 
 /* 🎾 Doodle background (doodles.js): fixed, behind everything, never tappable */
 #padpalDoodles { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
-#padpalDoodles svg { display: block; }
+#padpalDoodles img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
 
 /* Basics */
 [hidden] { display: none !important; }

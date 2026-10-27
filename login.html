@@ -8,11 +8,12 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=23">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js?v=23"></script>
-<script src="auth.js?v=23"></script>
-<script src="doodles.js?v=23"></script>
+<link rel="stylesheet" href="styles.css?v=24">
+<link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
+<script src="supabase-2.45.4.js"></script>
+<script src="config.js?v=24"></script>
+<script src="auth.js?v=24"></script>
+<script src="doodles.js?v=24"></script>
 <style>
   /* ===== Login-only styles ===== */
   .auth { max-width: 420px; margin: 0 auto; padding: calc(40px + env(safe-area-inset-top)) 16px 40px; }
@@ -292,8 +293,8 @@
       email: $('loginEmail').value.trim().toLowerCase(),
       password: $('loginPassword').value
     });
-    busy($('loginBtn'));
-    if (r.error) return showError(r.error);
+    if (r.error) { busy($('loginBtn')); return showError(r.error); }
+    $('loginBtn').textContent = 'Opening PadPal… 🎾';   // stays until the Feed opens
     route();
   });
 
@@ -386,7 +387,10 @@
     b.addEventListener('click', async function () { await PadPal.signOut(); show('stepLogin'); });
   });
 
-  route();
+  // Nobody logged in on this phone? Show the form straight away (no waiting for the server)
+  if (!recovering && !PadPal.hasStoredLogin()) show(invite ? 'stepSignup' : 'stepLogin');
+  else route();
+  (function () { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = 'feed.html'; document.head.appendChild(l); })();   // warm up the Feed while you type
 </script>
 </body>
 </html>
