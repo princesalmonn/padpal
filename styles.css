@@ -21,7 +21,7 @@
 }
 /* Light version: soft grey-blue background, navy buttons, darker lime so it stays readable */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]):not([data-theme="gold"]) {
+  :root:not([data-theme="dark"]):not([data-theme="gold"]):not([data-theme="glass"]) {
     color-scheme: light;
     --bg: #EEF2F7; --card: #FFFFFF; --card-2: #F3F6FA; --line: #D6DEE9;
     --text: #0F1E3C; --text-2: #5A6B86;
@@ -54,6 +54,80 @@
   --shadow: 0 6px 22px rgba(0,0,0,.55);
   --shine: linear-gradient(135deg, #EBD39A 0%, #C79A4B 55%, #E9CD8C 100%);
 }
+/* 💧 Liquid Glass (like iOS): see-through frosted cards over a colourful, blurred background.
+   Dark glass at night, bright glass by day (follows the iPhone). */
+:root[data-theme="glass"] {
+  color-scheme: dark;
+  --bg: #101C38;                                   /* solid fallback (things that must cover something) */
+  --card: rgba(255,255,255,.09); --card-2: rgba(255,255,255,.14); --line: rgba(255,255,255,.18);
+  --text: #FFFFFF; --text-2: rgba(235,240,255,.72);
+  --primary: rgba(201,229,44,.92); --primary-text: #0F1E3C;
+  --accent: #D7F05A; --accent-text: #0F1E3C; --gold: #FFD27A;
+  --win: #7EF0A6; --loss: #FF8A80;
+  --metal: linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,.06));
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+  --glass-blur: blur(22px) saturate(170%);
+  --glass-edge: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(255,255,255,.06);
+  --glass-sky: radial-gradient(60% 45% at 15% 10%, #3B6FD8 0%, transparent 70%),
+               radial-gradient(55% 40% at 90% 30%, #7E6AA8 0%, transparent 70%),
+               radial-gradient(60% 45% at 30% 95%, #2E8C7A 0%, transparent 70%),
+               radial-gradient(40% 30% at 85% 85%, rgba(201,229,44,.55) 0%, transparent 70%),
+               linear-gradient(160deg, #0B1426, #142A55);
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="glass"] {
+    color-scheme: light;
+    --bg: #E9EEF8;
+    --card: rgba(255,255,255,.55); --card-2: rgba(255,255,255,.72); --line: rgba(255,255,255,.85);
+    --text: #0F1E3C; --text-2: rgba(15,30,60,.66);
+    --primary: rgba(15,30,60,.88); --primary-text: #FFFFFF;
+    --accent: #4E6A00; --accent-text: #FFFFFF; --gold: #A8740A;
+    --win: #1F8A4C; --loss: #C8372D;
+    --shadow: 0 10px 30px rgba(15,30,60,.14);
+    --glass-edge: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(15,30,60,.05);
+    --glass-sky: radial-gradient(60% 45% at 15% 10%, #BFD3FF 0%, transparent 70%),
+                 radial-gradient(55% 40% at 90% 30%, #E3D5FF 0%, transparent 70%),
+                 radial-gradient(60% 45% at 30% 95%, #C8F1E4 0%, transparent 70%),
+                 radial-gradient(40% 30% at 85% 85%, #EAF7B0 0%, transparent 70%),
+                 linear-gradient(160deg, #F4F7FD, #E6ECF8);
+  }
+}
+:root[data-theme="glass"] body { background: var(--glass-sky); background-attachment: fixed; }
+:root[data-theme="glass"] .card,
+:root[data-theme="glass"] .sheet,
+:root[data-theme="glass"] .btn-ghost,
+:root[data-theme="glass"] .icon-btn,
+:root[data-theme="glass"] .input,
+:root[data-theme="glass"] .choices span,
+:root[data-theme="glass"] .chips-row button {
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-edge), var(--shadow);
+}
+:root[data-theme="glass"] .card { border-radius: 22px; }
+:root[data-theme="glass"] .sheet { background: color-mix(in srgb, var(--bg) 55%, transparent); border-radius: 28px 28px 0 0; }
+:root[data-theme="glass"] .topbar { background: color-mix(in srgb, var(--bg) 25%, transparent); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+/* the floating glass tab bar, like iOS 26 */
+:root[data-theme="glass"] nav.tabbar {
+  left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); padding-bottom: 6px; padding-top: 6px;
+  max-width: 416px; margin: 0 auto; border-radius: 30px; border: 1px solid var(--line);
+  background: var(--card); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-edge), 0 12px 34px rgba(0,0,0,.3);
+}
+:root[data-theme="glass"] nav.tabbar a.on { background: var(--card-2); border-radius: 22px; padding: 2px 10px; box-shadow: var(--glass-edge); }
+:root[data-theme="glass"] .fab { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge), var(--shadow); }
+:root[data-theme="glass"] .btn-primary, :root[data-theme="glass"] .btn-accent { box-shadow: inset 0 1px 0 rgba(255,255,255,.55), var(--shadow); }
+
+/* ✨ Smooth page changes (iPhone iOS 18.2+, Chrome, Edge): a quick fade instead of a hard cut,
+   while the top bar and the tab bar stay perfectly still. Older phones simply switch like before. */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .18s; animation-timing-function: ease-out; }
+.topbar { view-transition-name: padpal-topbar; }
+.tabbar { view-transition-name: padpal-tabbar; }
+#padpalDoodles { view-transition-name: padpal-doodles; }
+::view-transition-group(padpal-topbar), ::view-transition-group(padpal-tabbar) { animation: none; }
+::view-transition-old(padpal-tabbar), ::view-transition-old(padpal-topbar) { animation: none; opacity: 0; }
+::view-transition-new(padpal-tabbar), ::view-transition-new(padpal-topbar) { animation: none; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
 
 /* 🎾 Doodle background (doodles.js): fixed, behind everything, never tappable */
 #padpalDoodles { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }

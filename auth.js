@@ -5,15 +5,17 @@
 
   // ===== 🎨 Theme: auto (follows the iPhone), dark, light or gold — saved on this phone =====
   // Runs right away (this file is in <head>), so the page never flashes the wrong colours.
-  var THEME_BG = { dark: '#0B1426', light: '#EEF2F7', gold: '#0E0C09' };
+  var THEME_BG = { dark: '#0B1426', light: '#EEF2F7', gold: '#0E0C09', glass: '#101C38' };
   function getTheme() { try { return localStorage.getItem('padpal_theme') || 'auto'; } catch (e) { return 'auto'; } }
   function applyTheme(t) {
     var root = document.documentElement;
-    if (t === 'dark' || t === 'light' || t === 'gold') root.setAttribute('data-theme', t);
+    if (THEME_BG[t]) root.setAttribute('data-theme', t);
     else root.removeAttribute('data-theme');
-    var shown = THEME_BG[t] ? t : (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    var phoneLight = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches;
+    var shown = t === 'glass' ? (phoneLight ? '#E9EEF8' : THEME_BG.glass)   // glass follows day / night
+      : THEME_BG[t] || THEME_BG[phoneLight ? 'light' : 'dark'];
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', THEME_BG[shown]);   // the iPhone's top bar matches
+    if (meta) meta.setAttribute('content', shown);   // the iPhone's top bar matches
   }
   function setTheme(t) {
     try { localStorage.setItem('padpal_theme', t); } catch (e) {}
@@ -56,10 +58,24 @@
     return { session: session, profile: r.data };
   }
 
+  // Is there a saved login on this phone? (Supabase keeps it under "sb-…-auth-token")
+  function hasStoredLogin() {
+    try {
+      var stores = [localStorage, sessionStorage];
+      for (var s = 0; s < stores.length; s++) {
+        for (var i = 0; i < stores[s].length; i++) { if (/^sb-.*-auth-token$/.test(stores[s].key(i))) return true; }
+      }
+    } catch (e) {}
+    return false;
+  }
+
   // Members-only screens call this first. Everyone else goes to the login screen.
+  // Logged in already? The page shows straight away (no blank flash) while we double-check in the background.
   function guard(opts) {
     opts = opts || {};
-    document.documentElement.style.visibility = 'hidden';
+    var quick = hasStoredLogin() && !opts.admin;
+    if (!quick) document.documentElement.style.visibility = 'hidden';
+    else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountBell);
     return myProfile().then(function (me) {
       var p = me && me.profile;
       var ok = p && p.status === 'approved' && p.username && (!opts.admin || p.is_admin);
@@ -222,15 +238,51 @@
     return rows;
   }
 
-  // All approved members (small friends group, so we load them all at once)
-  async function members() {
-    var r = await db.from('profiles')
-      .select('id, username, display_name, gender, avatar_url, points, last_played')
-      .eq('status', 'approved').not('username', 'is', null)
-      .order('points', { ascending: false });
-    if (r.error) throw r.error;
-    return r.data;
+  // All approved members (small friends group, so we load them all at once).
+  // Loaded once per page (every caller shares it) and kept for 60 seconds between pages,
+  // so moving around the app doesn't download the same list again and again.
+  var membersPromise = null;
+  function members() {
+    if (!membersPromise) {
+      var cached = null;
+      try { cached = JSON.parse(sessionStorage.getItem('padpal_members') || 'null'); } catch (e) {}
+      if (cached && Date.now() - cached.at < 60000) {
+        membersPromise = Promise.resolve(cached.list);
+      } else {
+        membersPromise = db.from('profiles')
+          .select('id, username, display_name, gender, avatar_url, points, last_played')
+          .eq('status', 'approved').not('username', 'is', null)
+          .order('points', { ascending: false })
+          .then(function (r) {
+            if (r.error) { membersPromise = null; throw r.error; }
+            try { sessionStorage.setItem('padpal_members', JSON.stringify({ at: Date.now(), list: r.data })); } catch (e) {}
+            return r.data;
+          });
+      }
+    }
+    // a fresh copy for each caller, so one page changing a member doesn't change it for another
+    return membersPromise.then(function (list) { return list.map(function (m) { return Object.assign({}, m); }); });
   }
+  function forgetMembers() {   // after points change (match saved, session finished…)
+    membersPromise = null;
+    try { sessionStorage.removeItem('padpal_members'); } catch (e) {}
+  }
+
+  // ⚡ Start loading a page as soon as your finger touches its link, so it opens instantly
+  var prefetched = {};
+  function prefetch(href) {
+    if (!href || prefetched[href] || /^(https?:|mailto:|#)/.test(href)) return;
+    prefetched[href] = true;
+    var l = document.createElement('link');
+    l.rel = 'prefetch'; l.href = href.split('#')[0];
+    document.head.appendChild(l);
+  }
+  ['touchstart', 'mouseover'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      var a = e.target.closest && e.target.closest('a[href$=".html"], a[href*=".html?"]');
+      if (a) prefetch(a.getAttribute('href'));
+    }, { passive: true });
+  });
 
   // ===== Inactivity: when will you lose points if you don't play? =====
   // Returns null for First Timers or people who never played.
@@ -289,7 +341,7 @@
     createInvite: createInvite, shareInvite: shareInvite, friendlyError: friendlyError,
     uploadPhoto: uploadPhoto, photoUrls: photoUrls,
     remembered: remembered, setRemember: setRemember,
-    TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, rankPlayers: rankPlayers, fmt: fmt, fmtChange: fmtChange,
+    TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, forgetMembers: forgetMembers, rankPlayers: rankPlayers, fmt: fmt, fmtChange: fmtChange,
     inactivity: inactivity, refreshBell: refreshBell, mountBell: mountBell,
     getTheme: getTheme, setTheme: setTheme
   };

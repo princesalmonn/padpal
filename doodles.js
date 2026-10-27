@@ -39,11 +39,15 @@
   var LOOK = {
     dark:  { ink: '#FFFFFF', accent: '#C9E52C', paper: '#0B1426', opacity: 0.09 },
     light: { ink: '#0F1E3C', accent: '#AAB6EC', paper: '#EEF2F7', opacity: 0.08 },
-    gold:  { ink: '#D4AF6A', accent: '#D4AF6A', paper: '#0E0C09', opacity: 0.10 }
+    gold:  { ink: '#D4AF6A', accent: '#D4AF6A', paper: '#0E0C09', opacity: 0.10 },
+    glassDark:  { ink: '#FFFFFF', accent: '#D7F05A', paper: '#142A55', opacity: 0.12 },
+    glassLight: { ink: '#0F1E3C', accent: '#AAB6EC', paper: '#F4F7FD', opacity: 0.08 }
   };
   function currentLook() {
     var t = document.documentElement.getAttribute('data-theme');
-    if (!LOOK[t]) t = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    var light = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches;
+    if (t === 'glass') return LOOK[light ? 'glassLight' : 'glassDark'];   // glass follows day / night
+    if (!LOOK[t]) t = light ? 'light' : 'dark';
     return LOOK[t];
   }
 
