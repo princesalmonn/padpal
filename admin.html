@@ -6,16 +6,17 @@
 <title>PadPal Admin</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=25">
+<link rel="stylesheet" href="styles.css?v=26">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=25"></script>
-<script src="auth.js?v=25"></script>
-<script src="doodles.js?v=25"></script>
-<script src="levels.js?v=25"></script>
-<script src="sessions.js?v=25"></script>
+<script src="config.js?v=26"></script>
+<script src="auth.js?v=26"></script>
+<script src="doodles.js?v=26"></script>
+<script src="levels.js?v=26"></script>
+<script src="sessions.js?v=26"></script>
 <style>
   /* ===== Admin-only styles ===== */
   .back { text-decoration: none; color: var(--accent); font-weight: 600; font-size: 15px; }
@@ -35,6 +36,17 @@
   .link-box { margin-top: 12px; display: flex; gap: 8px; }
   .link-box input { flex: 1; min-width: 0; font-size: 13px; }
   .soon { opacity: .6; }
+  .kind { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 15px; cursor: pointer; }
+  .kind:first-of-type { border-top: 0; }
+  .kind span { flex: 1; }
+  .kind small { display: block; color: var(--text-2); font-size: 12px; }
+  .switch { appearance: none; -webkit-appearance: none; width: 46px; height: 28px; border-radius: 999px; background: var(--line); position: relative; flex: none; transition: background .2s; margin: 0; }
+  .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .2s; }
+  .switch:checked { background: var(--win); }
+  .switch:checked::after { transform: translateX(18px); }
+  .key-box { margin-top: 10px; }
+  .key-box label { font-size: 12px; color: var(--text-2); font-weight: 600; }
+  .key-box .link-box { margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -70,6 +82,11 @@
 
   <h2>Settings</h2>
   <div class="card" id="settingsCard"><div class="meta">Loading…</div></div>
+
+  <h2>📲 Phone pop-ups <span class="count" id="pushCount">0</span></h2>
+  <p class="meta" style="margin:-4px 0 10px">Which notifications pop up on everyone's phone, also when PadPal is closed. Switched off = still in the 🔔 list inside PadPal. The number = members who turned it on.</p>
+  <div class="card" id="pushKeys"><div class="meta">Loading…</div></div>
+  <div class="card" id="pushKinds"></div>
 
   <div class="error-box" id="error" role="alert" hidden></div>
 </main>
@@ -113,6 +130,7 @@
     loadReports();
     loadFlags();
     loadSettings();
+    loadPush();
   }
 
   async function loadSettings() {
@@ -125,6 +143,90 @@
       '<div class="meta">Most points a day from normal-match wins (new players ×2). Sessions have no cap.</div>' +
       '<div class="meta" style="margin-top:10px">To change a number, ask Claude for a small SQL line to run.</div>';
   }
+
+  // ===== 📲 Phone pop-ups: the messenger keys + which kinds pop up =====
+  var PUSH_KINDS = [
+    ['invite', '🎟️ Game invites'], ['join', '🎾 Someone joined your game'], ['message', '✉️ Direct messages'],
+    ['like', '❤️ Likes'], ['comment', '💬 Comments'], ['tag', '🏷️ Tagged in a post'],
+    ['points', '🏆 Match or session saved', 'with the points they got'], ['rating', '🎯 Shot ratings'], ['tier', '🎉 Level up / level down'],
+    ['warning', '⏳ "Play within 2 days" warning'], ['inactive', '🧊 Points lost for not playing'],
+    ['tournament', '🏆 Tournaments'], ['welcome', '✅ Welcome message', 'when you approve someone'],
+    ['approval', '👑 New member waiting', 'only admins get this'], ['report', '⚠️ Score reports', 'only admins get this']
+  ];
+  var pushOff = [];
+
+  async function loadPush() {
+    var r = await db.from('settings').select('push_key, push_off').eq('id', 1).maybeSingle();
+    if (r.error) {
+      $('pushKeys').innerHTML = '<div class="meta">Phone pop-ups appear here after you run <b>22_push.sql</b> in Supabase.</div>';
+      $('pushKinds').hidden = true;
+      return;
+    }
+    var s = r.data || {};
+    pushOff = s.push_off || [];
+    renderKeys(s.push_key);
+    $('pushKinds').hidden = false;
+    $('pushKinds').innerHTML = '<div class="name" style="margin-bottom:4px">What pops up</div>' + PUSH_KINDS.map(function (k) {
+      return '<label class="kind"><span>' + k[1] + (k[2] ? '<small>' + k[2] + '</small>' : '') + '</span>' +
+        '<input type="checkbox" class="switch" data-kind="' + k[0] + '"' + (pushOff.indexOf(k[0]) < 0 ? ' checked' : '') + ' aria-label="' + esc(k[1]) + '"></label>';
+    }).join('');
+    var c = await db.from('push_subscriptions').select('user_id');
+    $('pushCount').textContent = c.data ? c.data.map(function (x) { return x.user_id; }).filter(function (id, i, a) { return a.indexOf(id) === i; }).length : 0;
+  }
+
+  function keyBox(id, label, value) {
+    return '<div class="key-box"><label for="' + id + '">' + label + '</label><div class="link-box">' +
+      '<input class="input" id="' + id + '" readonly value="' + esc(value) + '"><button class="btn btn-ghost" data-copy="' + id + '">Copy</button></div></div>';
+  }
+  function renderKeys(publicKey, privateKey) {
+    if (privateKey) {
+      $('pushKeys').innerHTML = '<div class="name">🔑 Your new messenger keys</div>' +
+        '<div class="meta">Copy each one into Supabase → <b>Edge Functions → Secrets</b>, with exactly this name. ' +
+        '<b>The private key is shown only now</b> and is a secret: don\'t share it. Lost it? Just make new keys.</div>' +
+        keyBox('vapidPublic', 'Name: VAPID_PUBLIC_KEY', publicKey) + keyBox('vapidPrivate', 'Name: VAPID_PRIVATE_KEY (secret)', privateKey);
+    } else if (publicKey) {
+      $('pushKeys').innerHTML = '<div class="name">✅ Messenger keys are made</div>' +
+        '<div class="meta">Lost the private key, or pop-ups don\'t arrive? Make new keys and paste both into Supabase again. Phones switch to the new keys by themselves.</div>' +
+        keyBox('vapidPublic', 'VAPID_PUBLIC_KEY (not secret)', publicKey) +
+        '<button class="btn btn-ghost" style="width:100%;margin-top:10px" id="makeKeys">🔑 Make new keys</button>';
+    } else {
+      $('pushKeys').innerHTML = '<div class="name">🔑 First: make the messenger keys</div>' +
+        '<div class="meta">Two matching keys that prove the pop-ups really come from PadPal. Made here on your phone/PC, once.</div>' +
+        '<button class="btn btn-primary" style="width:100%;margin-top:10px" id="makeKeys">🔑 Make messenger keys</button>';
+    }
+  }
+  function b64u(buf) {
+    var b = new Uint8Array(buf), s = '';
+    for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  async function makeKeys(btn) {
+    btn.disabled = true;
+    try {
+      var kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+      var jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+      var pub = b64u(await crypto.subtle.exportKey('raw', kp.publicKey));
+      var r = await db.from('settings').update({ push_key: pub }).eq('id', 1).select('push_key');
+      if (r.error) throw r.error;
+      if (!r.data || !r.data.length) throw new Error('Only the admin can do this');
+      renderKeys(pub, jwk.d);
+      toast('🔑 Keys made. Now copy them into Supabase');
+    } catch (err) { btn.disabled = false; showError(err); }
+  }
+
+  document.addEventListener('change', async function (e) {
+    var sw = e.target.closest('.switch[data-kind]');
+    if (!sw) return;
+    var kind = sw.dataset.kind;
+    var next = pushOff.filter(function (k) { return k !== kind; });
+    if (!sw.checked) next.push(kind);
+    sw.disabled = true;
+    var r = await db.from('settings').update({ push_off: next }).eq('id', 1).select('push_off');
+    sw.disabled = false;
+    if (r.error || !r.data || !r.data.length) { sw.checked = !sw.checked; return showError(r.error || new Error('Only the admin can do this')); }
+    pushOff = next;
+    toast((sw.checked ? '🔔 Pops up: ' : '🔕 Only in the 🔔 list: ') + sw.closest('.kind').querySelector('span').firstChild.textContent);
+  });
 
   // ===== 👀 Worth a look: patterns that might be point farming or typed-in scores =====
   function dayOf(iso) { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }); }
@@ -279,9 +381,17 @@
   }
 
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-approve],[data-reject],[data-undo],[data-undo-session],[data-dismiss],[data-ignore]');
+    var el = e.target.closest('[data-approve],[data-reject],[data-undo],[data-undo-session],[data-dismiss],[data-ignore],[data-copy],#makeKeys');
     if (!el) return;
-    if (el.dataset.ignore) { ignore(el.dataset.ignore); toast('👍 Hidden from the list'); loadFlags(); }
+    if (el.id === 'makeKeys') {
+      if (el.textContent.indexOf('new') > 0 && !tapTwice('newkeys', 'Tap again: you\'ll need to paste both new keys into Supabase')) return;
+      makeKeys(el);
+    }
+    else if (el.dataset.copy) {
+      var input = $(el.dataset.copy);
+      navigator.clipboard.writeText(input.value).then(function () { toast('📋 Copied!'); }, function () { input.select(); toast('Select the key and copy it'); });
+    }
+    else if (el.dataset.ignore) { ignore(el.dataset.ignore); toast('👍 Hidden from the list'); loadFlags(); }
     else if (el.dataset.approve) setStatus(el.dataset.approve, 'approved', el);
     else if (el.dataset.reject) setStatus(el.dataset.reject, 'rejected', el);
     else if (el.dataset.undo) {

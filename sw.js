@@ -6,13 +6,13 @@
 // New version? Change VERSION (the deploy step does this): the phone downloads the new files
 // quietly in the background, then the next time you open PadPal you get the new version.
 // =====================================================================
-var VERSION = 'padpal-v25';
+var VERSION = 'padpal-v26';
 var FILES = [
   './', 'index.html', 'login.html', 'feed.html', 'play.html', 'chat.html', 'ranks.html', 'profile.html',
   'notifications.html', 'road.html', 'tourney.html', 'admin.html',
   'styles.css', 'config.js', 'supabase-2.45.4.js', 'auth.js', 'levels.js', 'doodles.js', 'sessions.js',
   'share.js', 'rate.js', 'tracker.js',
-  'logo-dark.svg', 'logo-light.svg', 'favicon.png', 'icon-180.png', 'icon-512.png'
+  'logo-dark.svg', 'logo-light.svg', 'favicon.png', 'icon-180.png', 'icon-512.png', 'manifest.json'
 ];
 
 // Install: download every file once (all or nothing, so a version is never half-updated)
@@ -47,5 +47,31 @@ self.addEventListener('fetch', function (e) {
         return req.mode === 'navigate' ? c.match('feed.html') : Response.error();
       });
     });
+  }));
+});
+
+// 📲 A pop-up notification arrived (sent by the "push" messenger in Supabase), even if PadPal is closed
+self.addEventListener('push', function (e) {
+  var d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { body: e.data ? e.data.text() : '' }; }
+  var jobs = [self.registration.showNotification(d.title || 'PadPal', {
+    body: d.body || '', tag: d.tag || undefined, icon: 'icon-512.png', badge: 'favicon.png',
+    data: { link: d.link || 'notifications.html' }
+  })];
+  // the red number on the PadPal icon = unread notifications
+  if (d.badge != null && self.navigator.setAppBadge) jobs.push(self.navigator.setAppBadge(d.badge).catch(function () {}));
+  e.waitUntil(Promise.all(jobs));
+});
+
+// Tap on the pop-up → open PadPal on the right page
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  var url = new URL((e.notification.data && e.notification.data.link) || 'notifications.html', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+    var open = list[0];
+    if (open && open.navigate) {
+      return open.focus().then(function (c) { return (c || open).navigate(url); }).catch(function () { return self.clients.openWindow(url); });
+    }
+    return self.clients.openWindow(url);
   }));
 });

@@ -95,6 +95,7 @@
       document.documentElement.style.visibility = '';
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountBell);
       else mountBell();
+      setTimeout(push.refresh, 4000);
       return me;
     });
   }
@@ -128,8 +129,84 @@
       var n = r.count || 0;
       el.textContent = n > 9 ? '9+' : n;
       el.hidden = !n;
+      if (navigator.setAppBadge) (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(function () {});   // red number on the Home Screen icon
     } catch (e) {}
   }
+
+  // ===== 📲 Phone pop-up notifications (also when PadPal is closed) =====
+  // iPhone: only works when PadPal is opened from its Home Screen icon (iOS 16.4+).
+  function b64uBytes(s) {
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); });
+  }
+  var push = {
+    isIPhone: /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
+    homeScreen: function () { return navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); },
+    supported: function () { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; },
+    key: async function () {
+      var r = await db.from('settings').select('push_key').eq('id', 1).maybeSingle();
+      return (r.data && r.data.push_key) || null;
+    },
+    registration: function () {
+      return navigator.serviceWorker.register('sw.js').then(function () { return navigator.serviceWorker.ready; });
+    },
+    // 'on' | 'off' | 'blocked' | 'homescreen' (iPhone in Safari) | 'unsupported' | 'notready' (admin hasn't made the keys yet)
+    state: async function () {
+      if (!push.supported()) return push.isIPhone && !push.homeScreen() ? 'homescreen' : 'unsupported';
+      if (Notification.permission === 'denied') return 'blocked';
+      if (!(await push.key())) return 'notready';
+      var reg = await navigator.serviceWorker.getRegistration();
+      var sub = reg && await reg.pushManager.getSubscription();
+      return sub && Notification.permission === 'granted' ? 'on' : 'off';
+    },
+    // Must be called straight from a tap (Apple only shows "Allow notifications?" after a tap)
+    enable: async function () {
+      var asking = Notification.requestPermission();   // first thing, before any waiting
+      var permission = await asking;
+      if (permission !== 'granted') throw new Error(permission === 'denied' ? 'blocked' : 'not allowed');
+      var key = await push.key();
+      if (!key) throw new Error('notready');
+      var reg = await push.registration();
+      var sub = await reg.pushManager.getSubscription();
+      var savedKey = null;
+      try { savedKey = localStorage.getItem('padpal_push_key'); } catch (e) {}
+      if (sub && savedKey !== key) { await sub.unsubscribe(); sub = null; }   // the admin made new keys
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uBytes(key) });
+      await push.save(sub);
+      try { localStorage.setItem('padpal_push_key', key); } catch (e) {}
+    },
+    save: async function (sub) {
+      var j = sub.toJSON();
+      var r = await db.rpc('save_push', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+      if (r.error) throw r.error;
+      try { localStorage.setItem('padpal_push_saved', String(Date.now())); } catch (e) {}
+    },
+    disable: async function () {
+      var reg = await navigator.serviceWorker.getRegistration();
+      var sub = reg && await reg.pushManager.getSubscription();
+      if (!sub) return;
+      await db.rpc('drop_push', { p_endpoint: sub.endpoint });
+      await sub.unsubscribe();
+    },
+    test: async function () {
+      var r = await db.rpc('push_test');
+      if (r.error) throw r.error;
+    },
+    // Once a day: tell PadPal this phone is still on (phones sometimes change their push address),
+    // and switch to the new keys quietly if the admin made new ones
+    refresh: async function () {
+      try {
+        if (!push.supported() || Notification.permission !== 'granted') return;
+        var reg = await navigator.serviceWorker.getRegistration();
+        var sub = reg && await reg.pushManager.getSubscription();
+        if (!sub) return;
+        var key = await push.key(), savedKey = localStorage.getItem('padpal_push_key');
+        if (key && savedKey && key !== savedKey) return push.enable();
+        if (Date.now() - Number(localStorage.getItem('padpal_push_saved') || 0) > 86400000) await push.save(sub);
+      } catch (e) {}
+    }
+  };
 
   async function signOut() {
     try { Object.keys(localStorage).forEach(function (k) { if (/^padpal_snap_/.test(k)) localStorage.removeItem(k); }); sessionStorage.removeItem('padpal_members'); } catch (e) {}
@@ -382,6 +459,8 @@
       return "Photos aren't set up yet. Run 02_photos.sql in Supabase first.";
     if (/could not find the function|save_game_match|create_game|join_game/i.test(m))
       return "Games aren't set up yet. Run 04_matches.sql and then 05_lobby.sql in Supabase.";
+    if (/save_push|push_test|push_key|push_off/i.test(m))
+      return "Phone notifications aren't set up yet. Run 22_push.sql in Supabase first.";
     if (/fetch|network/i.test(m))
       return "Can't reach PadPal. Check your internet and try again.";
     return m;
@@ -393,7 +472,7 @@
     uploadPhoto: uploadPhoto, photoUrls: photoUrls,
     remembered: remembered, setRemember: setRemember,
     TIERS: TIERS, tierOf: tierOf, nextTier: nextTier, members: members, forgetMembers: forgetMembers, rankPlayers: rankPlayers, snap: snap, fmt: fmt, fmtChange: fmtChange,
-    inactivity: inactivity, refreshBell: refreshBell, mountBell: mountBell,
+    inactivity: inactivity, refreshBell: refreshBell, mountBell: mountBell, push: push,
     getTheme: getTheme, setTheme: setTheme, hasStoredLogin: hasStoredLogin
   };
 })();
