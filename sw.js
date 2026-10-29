@@ -6,12 +6,12 @@
 // New version? Change VERSION (the deploy step does this): the phone downloads the new files
 // quietly in the background, then the next time you open PadPal you get the new version.
 // =====================================================================
-var VERSION = 'padpal-v26';
+var VERSION = 'padpal-v28';
 var FILES = [
   './', 'index.html', 'login.html', 'feed.html', 'play.html', 'chat.html', 'ranks.html', 'profile.html',
   'notifications.html', 'road.html', 'tourney.html', 'admin.html',
   'styles.css', 'config.js', 'supabase-2.45.4.js', 'auth.js', 'levels.js', 'doodles.js', 'sessions.js',
-  'share.js', 'rate.js', 'tracker.js',
+  'share.js', 'rate.js', 'tracker.js', 'rackets.js', 'racket-list.js',
   'logo-dark.svg', 'logo-light.svg', 'favicon.png', 'icon-180.png', 'icon-512.png', 'manifest.json'
 ];
 

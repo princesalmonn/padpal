@@ -378,12 +378,15 @@
     } catch (e) {}
     return null;
   }
+  // The app version (the ?v=NN on auth.js): a screen saved by an older version is never shown,
+  // because its layout may be different from the new page
+  var APP_V = (((document.currentScript && document.currentScript.src) || '').match(/[?&]v=(\d+)/) || [])[1] || '0';
   var snap = {
-    // put back the saved HTML of these elements (if it's yours and less than 2 days old)
+    // put back the saved HTML of these elements (if it's yours, from this app version and less than 2 days old)
     show: function (key, els) {
       try {
         var uid = storedUserId(), s = JSON.parse(localStorage.getItem('padpal_snap_' + key) || 'null');
-        if (!uid || !s || s.uid !== uid || Date.now() - s.at > 2 * 86400000) return false;
+        if (!uid || !s || s.uid !== uid || s.v !== APP_V || Date.now() - s.at > 2 * 86400000) return false;
         els.forEach(function (el, i) { if (el && s.html[i] != null) el.innerHTML = s.html[i]; });
         return true;
       } catch (e) { return false; }
@@ -391,7 +394,7 @@
     save: function (key, els) {
       try {
         var uid = storedUserId();
-        if (uid) localStorage.setItem('padpal_snap_' + key, JSON.stringify({ uid: uid, at: Date.now(), html: els.map(function (el) { return el ? el.innerHTML : null; }) }));
+        if (uid) localStorage.setItem('padpal_snap_' + key, JSON.stringify({ uid: uid, v: APP_V, at: Date.now(), html: els.map(function (el) { return el ? el.innerHTML : null; }) }));
       } catch (e) {}
     }
   };

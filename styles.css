@@ -334,3 +334,12 @@ nav.tabbar a.on { color: var(--primary); font-weight: 700; }
 .chips-row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-bottom: 12px; }
 .chips-row button { flex-shrink: 0; border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--text-2); }
 .chips-row button.on { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+/* ===== 🏸 Racket sticker next to a profile picture (rackets.js) ===== */
+.racket-stk { position: absolute; z-index: 2; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: manipulation; cursor: pointer; transition: filter .15s; }
+.racket-stk svg { display: block; overflow: visible; pointer-events: none; }
+.racket-stk.holding { filter: brightness(1.15) drop-shadow(0 0 6px var(--accent)); }
+.racket-bubble { position: absolute; z-index: 3; transform: translate(-50%, -100%) scale(.8); opacity: 0; pointer-events: none; white-space: nowrap;
+  background: #F3F6FB; color: #0B1426; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); transition: opacity .2s, transform .2s; }
+.racket-bubble.ask { background: var(--accent); color: var(--accent-text, #0F1E3C); }
+.racket-bubble.show { opacity: 1; transform: translate(-50%, -100%) scale(1); }

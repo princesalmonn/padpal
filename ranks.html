@@ -9,14 +9,16 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=26">
+<link rel="stylesheet" href="styles.css?v=28">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=26"></script>
-<script src="auth.js?v=26"></script>
-<script src="doodles.js?v=26"></script>
-<script src="levels.js?v=26"></script>
-<script src="sessions.js?v=26"></script>
+<script src="config.js?v=28"></script>
+<script src="auth.js?v=28"></script>
+<script src="doodles.js?v=28"></script>
+<script src="levels.js?v=28"></script>
+<script src="sessions.js?v=28"></script>
+<script src="rackets.js?v=28"></script>
+<script src="racket-list.js?v=28"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Ranks-only styles ===== */
@@ -85,6 +87,8 @@
   /* Player pop-up */
   .pp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
   .pp-head .avatar { width: 56px; height: 56px; font-size: 22px; }
+  .pp-pic { position: relative; width: 56px; height: 56px; flex: none; transition: margin .2s; }
+  .pp-pic.has-racket { margin: 12px 0 0 30px; }
   .pp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
   .pp-grid div { background: var(--card-2); border-radius: 12px; padding: 10px; text-align: center; }
   .pp-grid strong { display: block; font-size: 18px; }
@@ -371,7 +375,7 @@
     var rate = games ? Math.round(p.wins / games * 100) + '%' : '–';
     var idle = daysIdle(p);
     $('playerBody').innerHTML =
-      '<div class="pp-head">' + avatar(p) +
+      '<div class="pp-head"><div class="pp-pic" id="ppPic">' + avatar(p) + '</div>' +
         '<div><div class="name" data-uid="' + p.id + '">' + esc(nameOf(p)) + (p.id === me.id ? ' (you)' : '') + '</div><div class="meta">@' + esc(p.username) + '</div>' +
         '<div style="margin-top:4px">' + pill(p) + '</div></div></div>' +
       '<div class="pp-grid">' +
@@ -388,6 +392,13 @@
           '<a class="btn btn-primary" href="profile.html?id=' + p.id + '" style="text-align:center;text-decoration:none">👤 View profile</a></div>');
     $('playerSheet').classList.add('open');
     $('backdrop').classList.add('open');
+    // 🏸 their racket, next to the picture (loaded on its own, so Ranks also works before 23_rackets.sql)
+    db.from('profiles').select('racket').eq('id', p.id).maybeSingle().then(function (r) {
+      var box = $('ppPic');
+      if (!box || r.error || !r.data || !r.data.racket || !PadPal.racket) return;
+      box.classList.add('has-racket');
+      PadPal.racket.attach(box, r.data.racket, { size: 56 });
+    });
   }
   function closePlayer() {
     $('playerSheet').classList.remove('open');

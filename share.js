@@ -185,10 +185,11 @@
   }
 
   // ===== 📊 Profile card =====
-  // p = { name, handle, tier: {icon,name,color}, title, points, matches, w, l, d, rate, streak, badges: [[icon, text]], flair }
+  // p = { name, handle, tier: {icon,name,color}, title, points, matches, w, l, d, rate, streak, badges: [[icon, text]], flair, racket }
   async function profile(p) {
     var k = await canvas(p.tier.color), x = k.x;
     face(x, p.name, W / 2, 620, 150, p.tier.color);
+    if (p.racket && PadPal.racket) await PadPal.racket.drawOnCanvas(x, p.racket, W / 2, 620, 150);   // 🏸 racket sticker
     x.fillStyle = WHITE; x.font = font(900, 84);
     x.fillText(p.name + (p.flair ? ' ' + p.flair : ''), W / 2, 880);
     x.fillStyle = SOFT; x.font = font(500, 42);

@@ -9,16 +9,18 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=26">
+<link rel="stylesheet" href="styles.css?v=28">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=26"></script>
-<script src="auth.js?v=26"></script>
-<script src="doodles.js?v=26"></script>
-<script src="rate.js?v=26"></script>
-<script src="sessions.js?v=26"></script>
-<script src="levels.js?v=26"></script>
-<script src="share.js?v=26"></script>
+<script src="config.js?v=28"></script>
+<script src="auth.js?v=28"></script>
+<script src="doodles.js?v=28"></script>
+<script src="rate.js?v=28"></script>
+<script src="sessions.js?v=28"></script>
+<script src="levels.js?v=28"></script>
+<script src="share.js?v=28"></script>
+<script src="rackets.js?v=28"></script>
+<script src="racket-list.js?v=28"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Profile-only styles ===== */
@@ -84,14 +86,31 @@
   .pins .loading { background: var(--card); color: var(--text-2); font-size: 13px; }
 
   /* Tappable profile picture */
-  .avatar-btn { position: relative; border: 0; background: none; padding: 0; display: block; margin: 0 auto 10px; }
-  .avatar-btn .avatar { margin: 0; overflow: hidden; }
-  .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
-  .avatar-btn .cam {
-    position: absolute; right: 0; bottom: 2px; width: 30px; height: 30px; border-radius: 50%;
-    background: var(--primary); border: 3px solid var(--bg); display: grid; place-items: center; font-size: 13px;
-  }
+  .hero-pic { position: relative; width: 92px; height: 92px; margin: 24px auto 10px; }
+  .avatar-btn { position: relative; border: 0; background: none; padding: 0; display: block; margin: 0; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  .avatar-btn .avatar { margin: 0; overflow: hidden; transition: transform .15s; }
+  .avatar-btn.holding .avatar { transform: scale(.93); }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; -webkit-touch-callout: none; pointer-events: none; }
   .avatar-btn.busy .avatar { opacity: .5; }
+  .hold-hint { display: inline-block; margin: 0 0 10px; background: var(--accent); color: var(--accent-text, #0F1E3C); font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 12px; }
+  /* 🏸 Racket picker */
+  .rk-search { margin-bottom: 10px; }
+  .rk-list { max-height: 52vh; overflow-y: auto; margin: 0 -4px; }
+  .rk-brand { font-size: 12px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .5px; margin: 12px 4px 4px; }
+  .rk-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: none; border: 0; border-radius: 12px; padding: 6px 4px; color: var(--text); font-size: 15px; }
+  .rk-row.on { background: var(--card-2); box-shadow: inset 0 0 0 2px var(--accent); }
+  .rk-row i { width: 22px; height: 40px; flex: none; }
+  .rk-row small { display: block; color: var(--text-2); font-size: 12px; }
+  .rk-actions { display: grid; gap: 8px; margin-top: 12px; }
+  .rk-make { display: flex; gap: 16px; align-items: center; }
+  .rk-make .big { width: 86px; height: 160px; flex: none; }
+  .rk-make .opts { flex: 1; min-width: 0; }
+  .rk-lbl { font-size: 12px; color: var(--text-2); font-weight: 600; margin: 8px 0 4px; }
+  .rk-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rk-pick button { border: 1px solid var(--line); background: var(--card-2); color: var(--text); border-radius: 10px; padding: 5px 8px; font-size: 12px; font-weight: 600; }
+  .rk-pick button.on { box-shadow: 0 0 0 2px var(--accent); border-color: var(--accent); }
+  .rk-pick .sw { width: 28px; height: 28px; padding: 0; border-radius: 50%; }
+  .rk-pick .sw.none { background: repeating-linear-gradient(45deg, var(--card-2) 0 4px, var(--line) 4px 8px); }
 
   /* Photo viewer */
   .viewer { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.92); display: none; flex-direction: column; align-items: center; justify-content: center; padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)); }
@@ -190,10 +209,13 @@
 <main class="wrap">
 
   <section class="hero">
-    <button class="avatar-btn" id="avatarBtn" aria-label="Change profile picture">
-      <div class="avatar" id="heroAvatar"></div>
-      <span class="cam">📷</span>
-    </button>
+    <div class="hero-pic" id="heroPic">
+      <button class="avatar-btn" id="avatarBtn" aria-label="Profile picture (hold to change)">
+        <div class="avatar" id="heroAvatar"></div>
+      </button>
+    </div>
+    <div class="hold-hint" id="holdHint" hidden>👆 Hold your picture or racket to change them</div>
+    <input type="file" id="racketPhoto" accept="image/*" hidden>
     <input type="file" id="avatarInput" accept="image/*" hidden>
     <h1 id="heroName"></h1>
     <div class="handle" id="heroHandle"></div>
@@ -419,6 +441,40 @@
 
 <!-- Session details / PadPals list -->
 <div class="sheet" id="infoSheet"><div class="grab"></div><div id="infoBody"></div></div>
+
+<!-- 🏸 Choose your racket -->
+<div class="sheet" id="racketSheet">
+  <div class="grab"></div>
+  <h3>🏸 What's your racket?</h3>
+  <input class="input rk-search" id="rkSearch" type="search" placeholder="🔍 Search brand or model" aria-label="Search rackets">
+  <div class="rk-list" id="rkList"></div>
+  <div class="rk-actions">
+    <button class="btn btn-primary" id="rkPhotoBtn">📷 Not in the list? Make one from a photo</button>
+    <button class="btn btn-ghost" id="rkRemove">Remove my racket</button>
+  </div>
+</div>
+
+<!-- 📷 Make a racket doodle from a photo -->
+<div class="sheet" id="makeSheet">
+  <div class="grab"></div>
+  <h3>📷 Your racket doodle</h3>
+  <p class="meta" style="margin:-4px 0 12px">Your phone picked the colours from the photo. The photo itself is not saved.</p>
+  <div class="rk-make">
+    <div class="big" id="mkBig"></div>
+    <div class="opts">
+      <div class="rk-lbl">Shape</div>
+      <div class="rk-pick" id="mkShape"></div>
+      <div class="rk-lbl">Colours: tap a part, then a colour</div>
+      <div class="rk-pick" id="mkSlots"></div>
+      <div class="rk-pick" id="mkColours" style="margin-top:8px"></div>
+    </div>
+  </div>
+  <div class="field" style="margin-top:12px">
+    <label for="mkName">Racket name (optional)</label>
+    <input class="input" id="mkName" maxlength="40" placeholder="e.g. Siux Electra ST3">
+  </div>
+  <button class="btn btn-primary" id="mkSave" style="width:100%;margin-top:6px">🏸 Use this racket</button>
+</div>
 
 <!-- Photo viewer -->
 <div class="viewer" id="viewer">
@@ -931,7 +987,7 @@
     var w = myMatches.filter(function (m) { return m.won; }).length, l = myMatches.filter(function (m) { return m.lost; }).length;
     PadPal.share.profile({ name: profile.display_name || profile.username, handle: profile.username, tier: t, title: PadPal.levels.info(t).title,
       points: profile.points, matches: myMatches.length, w: w, l: l, d: myMatches.length - w - l,
-      rate: myMatches.length ? Math.round(w / myMatches.length * 100) + '%' : '–', flair: profile.flair,
+      rate: myMatches.length ? Math.round(w / myMatches.length * 100) + '%' : '–', flair: profile.flair, racket: profile.racket,
       badges: badgeList.map(function (b) { return [b[0], b[1]]; }) });
   }
   function shareShots() {
@@ -1099,8 +1155,7 @@
     $('settingsBtn').classList.add('back');
     $('settingsBtn').setAttribute('aria-label', 'Back');
     document.querySelector('.tabbar a.on').classList.remove('on');
-    $('avatarBtn').querySelector('.cam').hidden = true;
-    $('avatarBtn').style.cursor = 'default';
+    $('avatarBtn').setAttribute('aria-label', 'Profile picture');
     $('myBtns').hidden = true;
     $('theirBtns').hidden = false;
     $('msgBtn').href = 'chat.html?with=' + profile.id;
@@ -1131,14 +1186,18 @@
   $('palsBtn').addEventListener('click', openPals);
 
   // ===== Your header (name, picture, chips) =====
+  var heroUrl = null;
   async function renderHero() {
     var p = profile;
     var initial = esc((p.display_name || p.username)[0].toUpperCase());
+    renderRacket();
     $('heroAvatar').innerHTML = initial;
+    heroUrl = null;
     if (p.avatar_url) {
       try {
         var urls = await PadPal.photoUrls([p.avatar_url]);
-        if (urls[p.avatar_url]) $('heroAvatar').innerHTML = '<img src="' + urls[p.avatar_url] + '" alt="">';
+        heroUrl = urls[p.avatar_url] || null;
+        if (heroUrl) $('heroAvatar').innerHTML = '<img src="' + heroUrl + '" alt="">';
       } catch (err) { /* keep the letter if the photo can't load */ }
     }
     $('heroAvatar').setAttribute('data-uid', p.id);
@@ -1162,7 +1221,17 @@
   }
 
   // ===== Profile picture: kept forever, until you change it =====
-  $('avatarBtn').addEventListener('click', function () { if (isMe) $('avatarInput').click(); });
+  // Tap = see it big · hold (your own) = choose a new one. No camera button.
+  PadPal.racket.press($('avatarBtn'), {
+    tap: function () {
+      if (!heroUrl) { if (isMe) toast('👆 Hold your picture to add a photo'); return; }
+      $('vImg').src = heroUrl;
+      $('vDate').textContent = profile.display_name || profile.username;
+      $('vRemove').hidden = true;
+      $('viewer').classList.add('open');
+    },
+    hold: function () { if (isMe) { hideHint(); $('avatarInput').click(); } }
+  });
   $('avatarInput').addEventListener('change', async function () {
     var file = this.files[0];
     this.value = '';
@@ -1182,6 +1251,99 @@
       toast(PadPal.friendlyError(err));
     }
     $('avatarBtn').classList.remove('busy');
+  });
+
+  // ===== 🏸 Your racket: sticker on the left of your picture =====
+  // Tap = name bubble · hold (your own) = change it. No racket yet? A dashed one asks "What's your racket?" (only you see it).
+  function renderRacket() {
+    PadPal.racket.attach($('heroPic'), profile.racket, { size: 92, mine: isMe, onHold: openRacketSheet });
+    var seen = true;
+    try { seen = localStorage.getItem('padpal_hint_hold') === '1'; } catch (e) {}
+    $('holdHint').hidden = !isMe || seen;
+  }
+  function hideHint() {
+    $('holdHint').hidden = true;
+    try { localStorage.setItem('padpal_hint_hold', '1'); } catch (e) {}
+  }
+  var rkQuery = '';
+  function openRacketSheet() {
+    hideHint();
+    rkQuery = '';
+    $('rkSearch').value = '';
+    renderRacketList();
+    $('rkRemove').hidden = !profile.racket;
+    openSheet($('racketSheet'));
+  }
+  function renderRacketList() {
+    var q = rkQuery.toLowerCase(), cur = profile.racket && profile.racket.id, brand = '', html = '';
+    PadPal.racket.list().filter(function (r) { return !q || (r.brand + ' ' + r.model + ' ' + r.year).toLowerCase().indexOf(q) > -1; })
+      .forEach(function (r) {
+        if (r.brand !== brand) { brand = r.brand; html += '<div class="rk-brand">' + esc(brand) + '</div>'; }
+        html += '<button type="button" class="rk-row' + (r.id === cur ? ' on' : '') + '" data-rk="' + r.id + '"><i>' + PadPal.racket.svg(r) + '</i>' +
+          '<span>' + esc(r.model) + '<small>' + r.year + ' · ' + PadPal.racket.SHAPES[r.shape] + '</small></span></button>';
+      });
+    $('rkList').innerHTML = html || '<p class="meta" style="text-align:center;margin:20px 0">Not in our list yet. Make one from a photo 👇</p>';
+  }
+  $('rkSearch').addEventListener('input', function () { rkQuery = this.value.trim(); renderRacketList(); });
+  $('rkList').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rk]');
+    if (b) saveRacket({ id: b.dataset.rk });
+  });
+  $('rkRemove').addEventListener('click', function () {
+    if (!tapTwice('rkremove', 'Tap again to remove your racket')) return;
+    saveRacket(null);
+  });
+  async function saveRacket(value) {
+    var r = await db.from('profiles').update({ racket: value }).eq('id', profile.id);
+    if (r.error) return toast(/racket/.test(r.error.message || '') ? 'Run 23_rackets.sql in Supabase first' : PadPal.friendlyError(r.error));
+    profile.racket = value;
+    PadPal.forgetMembers();
+    closeSheets();
+    renderRacket();
+    toast(value ? '🏸 ' + PadPal.racket.label(value) : 'Racket removed');
+  }
+
+  // 📷 Doodle from a photo: the phone finds the colours, you pick the shape. The photo is never uploaded.
+  var mk = null;
+  $('rkPhotoBtn').addEventListener('click', function () { $('racketPhoto').click(); });
+  $('racketPhoto').addEventListener('change', async function () {
+    var file = this.files[0];
+    this.value = '';
+    if (!file) return;
+    try {
+      var found = await PadPal.racket.photoColours(file);
+      mk = { shape: 'tear', c: found.c, palette: found.palette, slot: 0, name: '' };
+      $('mkName').value = '';
+      closeSheets();
+      renderMake();
+      openSheet($('makeSheet'));
+    } catch (err) { toast(PadPal.friendlyError(err)); }
+  });
+  var SLOTS = ['Main colour', 'Middle stripe', 'Bottom'];
+  function renderMake() {
+    $('mkBig').innerHTML = PadPal.racket.svg({ shape: mk.shape, c: mk.c, p: mk.c[1] ? 'band' : '' });
+    $('mkShape').innerHTML = Object.keys(PadPal.racket.SHAPES).map(function (s) {
+      return '<button type="button" class="' + (mk.shape === s ? 'on' : '') + '" data-shape="' + s + '">' + PadPal.racket.SHAPES[s] + '</button>';
+    }).join('');
+    $('mkSlots').innerHTML = SLOTS.map(function (n, i) {
+      return '<button type="button" class="' + (mk.slot === i ? 'on' : '') + '" data-slot="' + i + '">' + n + '</button>';
+    }).join('');
+    var cols = mk.palette.slice();
+    if (mk.c[mk.slot] && cols.indexOf(mk.c[mk.slot]) < 0) cols.unshift(mk.c[mk.slot]);
+    $('mkColours').innerHTML = (mk.slot ? '<button type="button" class="sw none' + (!mk.c[mk.slot] ? ' on' : '') + '" data-col="" aria-label="None"></button>' : '') +
+      cols.map(function (c) { return '<button type="button" class="sw' + (mk.c[mk.slot] === c ? ' on' : '') + '" data-col="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>'; }).join('');
+  }
+  $('makeSheet').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-shape],[data-slot],[data-col]');
+    if (!b) return;
+    if (b.dataset.shape) mk.shape = b.dataset.shape;
+    else if (b.dataset.slot) mk.slot = +b.dataset.slot;
+    else mk.c[mk.slot] = b.dataset.col || null;
+    renderMake();
+  });
+  $('mkSave').addEventListener('click', function () {
+    var name = $('mkName').value.trim().slice(0, 40);
+    saveRacket({ name: name || 'My racket', shape: mk.shape, c: mk.c.slice(0, 3), p: mk.c[1] ? 'band' : '' });
   });
 
   // ===== Edit profile =====
@@ -1306,6 +1468,7 @@
   // Photo viewer
   function openViewer(i) {
     viewing = pins[i];
+    $('vRemove').hidden = !isMe;
     $('vImg').src = viewing.url || '';
     $('vDate').textContent = 'Pinned ' + new Date(viewing.created_at).toLocaleDateString();
     $('viewer').classList.add('open');
