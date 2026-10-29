@@ -171,6 +171,10 @@
     var a = pl.angle * Math.PI / 180, dx = (56 / 112) * pl.w - pl.gx, dy = (8 / 196) * pl.h - pl.gy;
     b.style.left = Math.max(-40, pl.left + pl.gx + dx * Math.cos(a) - dy * Math.sin(a)) + 'px';
     b.style.top = (pl.top + pl.gy + dx * Math.sin(a) + dy * Math.cos(a) - 4) + 'px';
+    // never float off the screen: keep the whole bubble 8px inside the edges
+    var boxLeft = box.getBoundingClientRect().left, half = b.offsetWidth / 2;
+    var centre = boxLeft + parseFloat(b.style.left), min = 8 + half, max = window.innerWidth - 8 - half;
+    b.style.left = (Math.min(Math.max(centre, min), Math.max(min, max)) - boxLeft) + 'px';
     clearTimeout(b._t);
     b.classList.add('show');
     if (!stay) b._t = setTimeout(function () { b.classList.remove('show'); }, 3000);
