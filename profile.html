@@ -9,27 +9,44 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=28">
+<link rel="stylesheet" href="styles.css?v=29">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=28"></script>
-<script src="auth.js?v=28"></script>
-<script src="doodles.js?v=28"></script>
-<script src="rate.js?v=28"></script>
-<script src="sessions.js?v=28"></script>
-<script src="levels.js?v=28"></script>
-<script src="share.js?v=28"></script>
-<script src="rackets.js?v=28"></script>
-<script src="racket-list.js?v=28"></script>
+<script src="config.js?v=29"></script>
+<script src="auth.js?v=29"></script>
+<script src="doodles.js?v=29"></script>
+<script src="rate.js?v=29"></script>
+<script src="sessions.js?v=29"></script>
+<script src="levels.js?v=29"></script>
+<script src="share.js?v=29"></script>
+<script src="rackets.js?v=29"></script>
+<script src="racket-list.js?v=29"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Profile-only styles ===== */
 
   /* Header */
-  .hero { text-align: center; padding: 6px 0 4px; }
-  .hero .avatar { width: 92px; height: 92px; font-size: 36px; margin: 0 auto 10px; border-width: 3px; }
+  .hero { padding: 6px 0 4px; margin-bottom: 14px; }
+  .hero-row { display: flex; align-items: center; gap: 16px; padding: 22px 0 0 50px; }   /* room on the left for the racket */
+  .hero-info { min-width: 0; flex: 1; }
+  .hero .avatar { width: 92px; height: 92px; font-size: 36px; margin: 0; border-width: 3px; }
   .hero .avatar:not([class*="frame-"]) { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
-  .hero .lvl-title { font-size: 13px; color: var(--gold); font-style: italic; margin-top: 4px; }
+  .hero .lvl-title { font-size: 11px; color: var(--gold); text-transform: uppercase; letter-spacing: .8px; font-weight: 700; margin-bottom: 2px; }
+  .pals-link { border: 0; background: none; padding: 0; margin-top: 4px; font-size: 13px; font-weight: 700; color: var(--accent); }
+  .pals-link b { color: inherit; }
+  .hero-btns { display: flex; gap: 8px; margin-top: 12px; }
+  .hero-btns .btn { flex: 1; padding: 10px 8px; font-size: 14px; text-align: center; text-decoration: none; white-space: nowrap; }
+  .hero-btns .btn.sq { flex: 0 0 46px; padding: 10px 0; }
+  .hero .hold-hint { margin: 12px 0 0; }
+  .eyebrow { font-size: 11px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .8px; }
+  .style-row { display: flex; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 4px; margin-bottom: 12px; }
+  .style-row div { flex: 1; min-width: 0; text-align: center; border-left: 1px solid var(--line); padding: 0 2px; }
+  .style-row div:first-child { border-left: 0; }
+  .style-row i { font-style: normal; font-size: 17px; display: block; }
+  .style-row b { display: block; font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .style-row small { display: block; font-size: 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: .5px; }
+  .next-big { font-size: 20px; font-weight: 800; margin-top: 4px; }
+  .ladder-card, .next-card { margin-bottom: 12px; }
   .rank-link { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; }
   .next-line { font-size: 12px; margin-top: 6px; color: var(--text); }
   .flair-pick { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -37,9 +54,9 @@
   .flair-pick button small { display: block; font-size: 9px; color: var(--text-2); margin-top: 2px; }
   .flair-pick button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
   .flair-pick button:disabled { opacity: .4; }
-  .hero h1 { margin: 0; font-size: 22px; }
-  .hero .handle { color: var(--text-2); font-size: 14px; margin-top: 2px; }
-  .hero .bio { margin: 10px auto 0; max-width: 320px; font-size: 14px; line-height: 1.45; }
+  .hero h1 { margin: 0; font-size: 24px; line-height: 1.15; overflow-wrap: anywhere; }
+  .hero .handle { color: var(--text-2); font-size: 13px; margin-top: 2px; }
+  .hero .bio { margin: 12px 0 0; font-size: 15px; line-height: 1.45; }
 
   .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 12px 0 4px; }
   .chip { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; font-size: 12px; }
@@ -48,11 +65,11 @@
   /* Rank card */
   .rank { display: flex; align-items: center; gap: 12px; }
   .badge {
-    width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; flex-shrink: 0;
+    width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 16px; flex-shrink: 0; margin-right: 8px; vertical-align: middle;
     background: #7E6AA8; box-shadow: inset 0 0 0 2px rgba(255,255,255,.15);
   }
-  .rank .tier { font-weight: 700; font-size: 17px; }
-  .rank .pts { font-size: 26px; font-weight: 800; margin-left: auto; text-align: right; line-height: 1; }
+  .rank .tier { font-weight: 800; font-size: 20px; margin: 6px 0 2px; display: flex; align-items: center; }
+  .rank .pts { font-size: 38px; font-weight: 800; margin-left: auto; text-align: right; line-height: 1; color: var(--accent); }
   .rank .pts small { display: block; font-size: 11px; font-weight: 500; color: var(--text-2); margin-top: 3px; }
   .progress { height: 10px; border-radius: 999px; background: var(--card-2); overflow: hidden; margin: 14px 0 6px; }
   .progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); }
@@ -86,7 +103,7 @@
   .pins .loading { background: var(--card); color: var(--text-2); font-size: 13px; }
 
   /* Tappable profile picture */
-  .hero-pic { position: relative; width: 92px; height: 92px; margin: 24px auto 10px; }
+  .hero-pic { position: relative; width: 92px; height: 92px; flex: none; }
   .avatar-btn { position: relative; border: 0; background: none; padding: 0; display: block; margin: 0; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
   .avatar-btn .avatar { margin: 0; overflow: hidden; transition: transform .15s; }
   .avatar-btn.holding .avatar { transform: scale(.93); }
@@ -208,36 +225,61 @@
 
 <main class="wrap">
 
+  <!-- Header: picture (with racket) on the left, name on the right, bio, two buttons -->
   <section class="hero">
-    <div class="hero-pic" id="heroPic">
-      <button class="avatar-btn" id="avatarBtn" aria-label="Profile picture (hold to change)">
-        <div class="avatar" id="heroAvatar"></div>
-      </button>
+    <div class="hero-row">
+      <div class="hero-pic" id="heroPic">
+        <button class="avatar-btn" id="avatarBtn" aria-label="Profile picture (hold to change)">
+          <div class="avatar" id="heroAvatar"></div>
+        </button>
+      </div>
+      <div class="hero-info">
+        <div class="lvl-title" id="heroTitle"></div>
+        <h1 id="heroName"></h1>
+        <div class="handle" id="heroHandle"></div>
+        <button class="pals-link" id="palsBtn">👥 <b id="palsN">…</b> PadPals ›</button>
+      </div>
     </div>
     <div class="hold-hint" id="holdHint" hidden>👆 Hold your picture or racket to change them</div>
     <input type="file" id="racketPhoto" accept="image/*" hidden>
     <input type="file" id="avatarInput" accept="image/*" hidden>
-    <h1 id="heroName"></h1>
-    <div class="handle" id="heroHandle"></div>
-    <div class="lvl-title" id="heroTitle"></div>
     <p class="bio" id="heroBio"></p>
-    <div class="chips" id="heroChips"></div>
-    <button class="pals-btn" id="palsBtn">👥 <b id="palsN">…</b> PadPals</button>
-    <button class="pals-btn" id="shareCardBtn">📤 Share card</button>
+    <div class="hero-btns" id="myBtns">
+      <button class="btn btn-primary" data-edit>✏️ Edit profile</button>
+      <button class="btn btn-ghost" id="shareCardBtn">📤 Share card</button>
+      <button class="btn btn-ghost sq" id="inviteBtn" aria-label="Invite a friend">➕</button>
+    </div>
+    <div class="hero-btns" id="theirBtns" hidden>
+      <a class="btn btn-primary" id="msgBtn">💬 Message</a>
+      <a class="btn btn-ghost" id="gameBtn">🎾 Invite</a>
+      <button class="btn btn-ghost sq" id="starBtn">☆</button>
+    </div>
+    <button class="btn btn-accent" id="rateBtn" style="width:100%;margin-top:8px" hidden>🎯 Rate their shots</button>
   </section>
 
-  <div style="height:14px"></div>
-
-  <div class="card">
+  <!-- Ladder card -->
+  <div class="card ladder-card">
     <div class="rank">
-      <div class="badge" id="rBadge"></div>
-      <div><div class="tier" id="rTier"></div><div class="meta" id="rPos"></div></div>
+      <div>
+        <div class="eyebrow" id="rLadder">Ladder</div>
+        <div class="tier"><span class="badge" id="rBadge"></span><span id="rTier"></span></div>
+        <div class="meta" id="rPos"></div>
+      </div>
       <div class="pts"><span id="rPts">0</span><small>points</small></div>
     </div>
+  </div>
+
+  <!-- Playing style: one small row -->
+  <div class="style-row" id="heroChips"></div>
+
+  <!-- The next level -->
+  <div class="card next-card">
+    <div class="eyebrow" id="rNextTitle">The next level</div>
+    <div class="next-big" id="rTo"></div>
     <div class="progress"><i id="rBar" style="width:0%"></i></div>
-    <div class="prog-label"><span id="rFrom"></span><span id="rTo"></span></div>
+    <div class="prog-label"><span id="rFrom"></span><span id="rNextName"></span></div>
     <div class="next-line" id="rNext" hidden></div>
-    <div class="meta" id="rMixed" style="margin-top:8px"></div>
+    <div class="meta" id="rMixed" style="margin-top:6px"></div>
     <div class="warn" id="rWarn"></div>
     <a class="rank-link" href="road.html"><span>ⓘ What do levels do?</span><span>🗺️ Road to Legend ›</span></a>
   </div>
@@ -247,17 +289,6 @@
     <div><strong id="qRate">–</strong><small>Win rate</small></div>
     <div><strong id="qStreak">0</strong><small>Win streak</small></div>
   </div>
-
-  <div class="row-btns" id="myBtns">
-    <button class="btn btn-ghost" data-edit>✏️ Edit profile</button>
-    <button class="btn btn-primary" id="inviteBtn">➕ Invite friend</button>
-  </div>
-  <div class="row-btns" id="theirBtns" hidden>
-    <a class="btn btn-primary" id="msgBtn" style="text-align:center;text-decoration:none">💬 Message</a>
-    <a class="btn btn-ghost" id="gameBtn" style="text-align:center;text-decoration:none">🎾 Invite</a>
-    <button class="btn btn-ghost" id="starBtn" style="flex:0 0 52px">☆</button>
-  </div>
-  <button class="btn btn-accent" id="rateBtn" style="width:100%;margin:-6px 0 16px" hidden>🎯 Rate their shots</button>
 
   <div id="segAnchor"></div>
   <div class="seg" id="seg">
@@ -862,14 +893,18 @@
     // same ranking rule as the Ranks page (equal points share a place)
     var ladder = PadPal.rankPlayers(list.filter(function (m) { return m.gender === profile.gender; }), function (m) { return m.points; });
     var row = ladder.filter(function (x) { return x.p.id === profile.id; })[0];
-    $('rPos').textContent = row && (profile.gender === 'm' || profile.gender === 'f')
-      ? '#' + row.rank + ' in ' + (profile.gender === 'f' ? "Women's" : "Men's") + ' ladder' + (row.tied > 1 ? ' · tied with ' + (row.tied - 1) + ' other' + (row.tied > 2 ? 's' : '') : '')
+    var hasLadder = profile.gender === 'm' || profile.gender === 'f';
+    $('rLadder').textContent = hasLadder ? (profile.gender === 'f' ? "Women's" : "Men's") + ' ladder' : 'Ladder';
+    $('rPos').textContent = row && hasLadder
+      ? 'Rank #' + row.rank + (row.tied > 1 ? ' · tied with ' + (row.tied - 1) + ' other' + (row.tied > 2 ? 's' : '') : '')
       : '';
     $('rBar').style.width = PadPal.levels.progress(pts) + '%';   // same bar as the Road page
     $('rFrom').textContent = t.icon + ' ' + t.name + ' · ' + t.min;
+    $('rNextTitle').textContent = 'The next level' + (next ? ' · ' + next.icon + ' ' + next.name : '');
+    $('rNextName').textContent = next ? next.icon + ' ' + next.name + ' · ' + next.min : '';
     $('rTo').textContent = !next ? 'Top tier! 👑'
       : pts >= 500 ? '🏆 Official tournaments → ' + next.icon + ' ' + next.name
-      : PadPal.fmt(next.min - pts) + ' pts to ' + next.icon + ' ' + next.name;
+      : PadPal.fmt(next.min - pts) + ' pts to go';
     if (isMe) {   // the line above already says "90 pts to ⚡ Amateur", so only add the wins here
       $('rNext').textContent = PadPal.levels.nextStep(profile).short;
       $('rNext').title = PadPal.levels.WINS_NOTE;
@@ -1118,6 +1153,7 @@
   var SIDES = { right: '➡️ Right (drive)', left: '⬅️ Left (revés)', both: '↔️ Both' };
   var HANDS = { right: '✋ Right', left: '🤚 Left' };
   var LADDERS = { m: '👨 Men', f: '👩 Women' };
+  var STYLE_SIDE = { right: ['➡️', 'Drive'], left: ['⬅️', 'Revés'], both: ['↔️', 'Both'] };
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
   var db = PadPal.db;
@@ -1208,15 +1244,17 @@
     $('heroName').textContent = (p.display_name || p.username) + (p.flair ? ' ' + p.flair : '');
     $('heroHandle').textContent = '@' + p.username;
     var tier = PadPal.tierOf(p.points);
-    $('heroTitle').textContent = tier.icon + ' "' + PadPal.levels.info(tier).title + '"';
+    $('heroTitle').textContent = tier.icon + ' ' + PadPal.levels.info(tier).title;
     $('heroBio').textContent = p.bio || '';
     $('heroBio').hidden = !p.bio;
-    var chips = [];
-    if (p.side) chips.push(['Side', SIDES[p.side]]);
-    if (p.hand) chips.push(['Hand', HANDS[p.hand]]);
-    if (p.fav_shot) chips.push(['Fav shot', '🎯 ' + p.fav_shot]);
-    if (p.gender) chips.push(['Ladder', LADDERS[p.gender]]);
-    $('heroChips').innerHTML = chips.map(function (c) { return '<span class="chip"><b>' + c[0] + '</b>' + esc(c[1]) + '</span>'; }).join('');
+    // Playing style: one small row of icons (icon, short value, label)
+    var style = [];
+    if (p.side) style.push([STYLE_SIDE[p.side][0], STYLE_SIDE[p.side][1], 'Side']);
+    if (p.hand) style.push([HANDS[p.hand].split(' ')[0], HANDS[p.hand].split(' ')[1], 'Hand']);
+    if (p.fav_shot) style.push(['🎯', p.fav_shot, 'Fav shot']);
+    if (p.gender) style.push([LADDERS[p.gender].split(' ')[0], LADDERS[p.gender].split(' ')[1], 'Ladder']);
+    $('heroChips').innerHTML = style.map(function (c) { return '<div><i>' + c[0] + '</i><b>' + esc(c[1]) + '</b><small>' + c[2] + '</small></div>'; }).join('');
+    $('heroChips').hidden = !style.length;
     $('adminLink').hidden = !p.is_admin;
   }
 
