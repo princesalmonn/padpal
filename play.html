@@ -9,16 +9,16 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=31">
+<link rel="stylesheet" href="styles.css?v=32">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=31"></script>
-<script src="auth.js?v=31"></script>
-<script src="doodles.js?v=31"></script>
-<script src="levels.js?v=31"></script>
-<script src="rate.js?v=31"></script>
-<script src="sessions.js?v=31"></script>
-<script src="share.js?v=31"></script>
+<script src="config.js?v=32"></script>
+<script src="auth.js?v=32"></script>
+<script src="doodles.js?v=32"></script>
+<script src="levels.js?v=32"></script>
+<script src="rate.js?v=32"></script>
+<script src="sessions.js?v=32"></script>
+<script src="share.js?v=32"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Play-only styles ===== */
@@ -165,6 +165,28 @@
   .done-screen h3 { margin: 0; font-size: 22px; }
   .done-screen .final { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .done-screen .btn { width: 100%; max-width: 320px; }
+
+  /* 🖥️ iPad / computer: a big scoreboard over the whole screen, readable from the court */
+  @media (min-width: 768px) {
+    .tracker { max-width: none; z-index: 60; }
+    .t-bar { padding: 14px 20px; }
+    .t-bar .title { font-size: 18px; }
+    .t-bar button { font-size: 16px; padding: 10px 16px; }
+    .zone { margin: 8px 20px; border-radius: 30px; }
+    .zone .nm { font-size: 26px; }
+    .zone .pt { font-size: min(200px, 22vh); margin: 10px 0; }
+    .zone .gm { font-size: 22px; }
+    .zone .flag { font-size: 16px; top: 18px; right: 22px; padding: 5px 14px; }
+    .t-mid { font-size: 18px; padding: 6px 20px; }
+    .t-foot { padding: 10px 20px 20px; gap: 12px; }
+    .t-foot button { padding: 18px; font-size: 20px; }
+  }
+  /* sideways iPad / computer: the two teams next to each other */
+  @media (min-width: 768px) and (orientation: landscape) {
+    .tracker.open { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto auto; }
+    .tracker > :not(.zone) { grid-column: 1 / -1; }
+    .tracker > .zone { grid-row: 2; }
+  }
 </style>
 </head>
 <body>

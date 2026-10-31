@@ -19,7 +19,14 @@
     '.pp-tracker .mid{text-align:center;font-size:13px;color:var(--text-2);padding:2px}' +
     '.pp-tracker .foot{display:flex;gap:8px;padding:8px 12px 12px}.pp-tracker .foot button{flex:1}' +
     '.pp-tracker .done{position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center}' +
-    '.pp-tracker .done .big{font-size:60px}.pp-tracker .done .final{font-size:28px;font-weight:800}.pp-tracker .done .btn{width:100%;max-width:320px}';
+    '.pp-tracker .done .big{font-size:60px}.pp-tracker .done .final{font-size:28px;font-weight:800}.pp-tracker .done .btn{width:100%;max-width:320px}' +
+    // 🖥️ iPad / computer: a big scoreboard (sideways: the two teams next to each other)
+    '@media (min-width:768px){.pp-tracker{max-width:none}.pp-tracker .bar{padding:14px 20px}.pp-tracker .bar .title{font-size:18px}' +
+      '.pp-tracker .zone{margin:8px 20px;border-radius:30px}.pp-tracker .nm{font-size:26px}.pp-tracker .pt{font-size:min(200px,22vh);margin:10px 0}' +
+      '.pp-tracker .gm{font-size:22px}.pp-tracker .flag{font-size:16px;top:18px;right:22px}.pp-tracker .mid{font-size:18px;padding:6px}' +
+      '.pp-tracker .foot{padding:10px 20px 20px}.pp-tracker .foot button{padding:18px;font-size:20px}}' +
+    '@media (min-width:768px) and (orientation:landscape){.pp-tracker{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr auto auto}' +
+      '.pp-tracker>:not(.zone){grid-column:1/-1}.pp-tracker>.zone{grid-row:2}}';
   document.head.appendChild(css);
 
   var LABELS = ['0', '15', '30', '40'];

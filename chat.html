@@ -9,13 +9,13 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=31">
+<link rel="stylesheet" href="styles.css?v=32">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=31"></script>
-<script src="auth.js?v=31"></script>
-<script src="doodles.js?v=31"></script>
-<script src="levels.js?v=31"></script>
+<script src="config.js?v=32"></script>
+<script src="auth.js?v=32"></script>
+<script src="doodles.js?v=32"></script>
+<script src="levels.js?v=32"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Chat-only styles ===== */
@@ -131,6 +131,19 @@
   .c-foot .cam { background: var(--card-2); }
   .c-foot .send { background: var(--primary); color: var(--primary-text); }
 
+  /* 🖥️ Big screens: chat list on the left, the open chat on the right */
+  .chat-pick { display: none; }
+  @media (min-width: 1024px) {
+    main.wrap, .topbar-inner { max-width: 380px; margin-left: 0; margin-right: 0; }
+    main.wrap { padding-left: 16px; }
+    .chat-pick, .convo { position: fixed; top: 0; bottom: 0; left: calc(var(--side) + 396px); right: 0; max-width: none; margin: 0; border-left: 1px solid var(--line); }
+    .chat-pick { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--text-2); font-size: 15px; z-index: 1; }
+    .chat-pick .big { font-size: 56px; }
+    .convo { z-index: 15; }
+    .c-head .back { display: none; }
+    .msg { max-width: 60%; }
+  }
+
   /* Sheets */
   .pick { display: flex; flex-wrap: wrap; gap: 8px; }
   .pick button { border: 1px solid var(--line); background: var(--card-2); border-radius: 999px; padding: 7px 12px; font-size: 14px; }
@@ -177,6 +190,9 @@
     <a href="profile.html"><span>👤</span>Me</a>
   </div>
 </nav>
+
+<!-- Big screens: shown on the right until you pick a chat -->
+<div class="chat-pick" aria-hidden="true"><div class="big">💬</div>Pick a chat on the left</div>
 
 <!-- Conversation -->
 <div class="convo" id="convo">
@@ -437,6 +453,7 @@
 
   // ===== A conversation =====
   async function openChat(id) {
+    if ($('convo').classList.contains('open')) stopLive();   // big screens: switching straight from one chat to another
     current = chats.filter(function (c) { return c.id === id; })[0];
     if (!current) { await loadChats(); current = chats.filter(function (c) { return c.id === id; })[0]; }
     if (!current) {
@@ -465,7 +482,9 @@
     markRead(id);
     current.unread = 0;
     listenLive(id);
+    if (SIDE_BY_SIDE.matches) reading.then(loadChats);   // the list stays visible next to the chat: un-bold it
   }
+  var SIDE_BY_SIDE = window.matchMedia('(min-width: 1024px)');
 
   async function signPhotos(list) {
     var paths = list.filter(function (m) { return m.photo_path && photoAlive(m) && !urls[m.photo_path]; }).map(function (m) { return m.photo_path; });

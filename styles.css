@@ -343,3 +343,45 @@ nav.tabbar a.on { color: var(--primary); font-weight: 700; }
   background: #F3F6FB; color: #0B1426; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); transition: opacity .2s, transform .2s; }
 .racket-bubble.ask { background: var(--accent); color: var(--accent-text, #0F1E3C); }
 .racket-bubble.show { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+
+/* =====================================================================
+   🖥️ Big screens (iPad, computer): side menu instead of the bottom tab bar,
+   a wider page, sheets as centred windows. Phones (under 768px) are unchanged.
+   ===================================================================== */
+@media (min-width: 768px) {
+  :root { --side: 0px; --page: 720px; }
+  :root:has(nav.tabbar) { --side: 96px; }   /* pages without the menu (login, admin) stay centred */
+  body { padding-left: var(--side); }
+  .wrap { max-width: var(--page); padding-bottom: 60px; }
+  .topbar-inner { max-width: calc(var(--page) - 32px); }
+  /* the menu on the left */
+  nav.tabbar, :root[data-theme="glass"] nav.tabbar {
+    top: 0; bottom: 0; left: 0; right: auto; width: var(--side); max-width: none; margin: 0;
+    border-top: 0; border-right: 1px solid var(--line); border-radius: 0;
+    padding: calc(84px + env(safe-area-inset-top)) 10px 20px;
+  }
+  :root[data-theme="glass"] nav.tabbar { top: 12px; bottom: 12px; left: 12px; width: calc(var(--side) - 24px); border-radius: 26px; border: 1px solid var(--line); padding-left: 6px; padding-right: 6px; }
+  nav.tabbar .tabs { flex-direction: column; justify-content: flex-start; gap: 6px; max-width: none; }
+  nav.tabbar a { font-size: 12px; padding: 10px 4px; border-radius: 16px; gap: 4px; }
+  nav.tabbar a span { font-size: 24px; }
+  nav.tabbar a:hover { background: var(--card-2); color: var(--text); }
+  nav.tabbar a.on, :root[data-theme="glass"] nav.tabbar a.on { background: var(--card-2); padding: 10px 4px; border-radius: 16px; }
+  .fab { right: max(24px, calc((100vw - var(--side)) / 2 - var(--page) / 2 + 16px)); bottom: 32px; }
+  /* pop-ups from the bottom become centred windows */
+  .sheet, :root[data-theme="glass"] .sheet {
+    left: var(--side); right: 0; top: 50%; bottom: auto; max-width: 520px; max-height: 84vh;
+    border-radius: 22px; padding-bottom: 20px;
+    transform: translateY(-46%) scale(.97); opacity: 0; pointer-events: none; transition: transform .2s ease, opacity .2s ease;
+  }
+  .sheet.open { transform: translateY(-50%); opacity: 1; pointer-events: auto; }
+  .sheet .grab { display: none; }
+  .toast { left: calc(var(--side) + (100vw - var(--side)) / 2); bottom: 40px; }
+  button:hover, a.btn:hover { filter: brightness(1.06); }
+}
+@media (min-width: 1100px) {
+  :root:has(nav.tabbar) { --side: 220px; }
+  nav.tabbar .tabs { gap: 4px; }
+  nav.tabbar a { flex-direction: row; justify-content: flex-start; gap: 14px; font-size: 16px; padding: 12px 16px; }
+  nav.tabbar a.on, :root[data-theme="glass"] nav.tabbar a.on { padding: 12px 16px; }
+  nav.tabbar a span { font-size: 24px; }
+}

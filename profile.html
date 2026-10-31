@@ -9,18 +9,18 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=31">
+<link rel="stylesheet" href="styles.css?v=32">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=31"></script>
-<script src="auth.js?v=31"></script>
-<script src="doodles.js?v=31"></script>
-<script src="rate.js?v=31"></script>
-<script src="sessions.js?v=31"></script>
-<script src="levels.js?v=31"></script>
-<script src="share.js?v=31"></script>
-<script src="rackets.js?v=31"></script>
-<script src="racket-list.js?v=31"></script>
+<script src="config.js?v=32"></script>
+<script src="auth.js?v=32"></script>
+<script src="doodles.js?v=32"></script>
+<script src="rate.js?v=32"></script>
+<script src="sessions.js?v=32"></script>
+<script src="levels.js?v=32"></script>
+<script src="share.js?v=32"></script>
+<script src="rackets.js?v=32"></script>
+<script src="racket-list.js?v=32"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Profile-only styles ===== */
@@ -47,6 +47,13 @@
   .style-row small { display: block; font-size: 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: .5px; }
   .next-big { font-size: 20px; font-weight: 800; margin-top: 4px; }
   .ladder-card, .next-card { margin-bottom: 12px; }
+  /* 🖥️ Big screens: you on the left, your stats and history on the right */
+  @media (min-width: 1100px) {
+    main.wrap { max-width: 1060px; }
+    .topbar-inner { max-width: 1028px; }
+    .pf-cols { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 28px; align-items: start; }
+    .pins { grid-template-columns: repeat(6, 1fr); }
+  }
   .rank-link { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; }
   .next-line { font-size: 12px; margin-top: 6px; color: var(--text); }
   .flair-pick { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -227,6 +234,7 @@
 </header>
 
 <main class="wrap">
+<div class="pf-cols"><div class="pf-left">
 
   <!-- Header: picture (with racket) on the left, name on the right, bio, two buttons -->
   <section class="hero">
@@ -293,6 +301,7 @@
     <div><strong id="qStreak">0</strong><small>Win streak</small></div>
   </div>
 
+</div><div class="pf-right">
   <div id="segAnchor"></div>
   <div class="seg" id="seg">
     <button class="on" data-panel="overview">Overview</button>
@@ -356,7 +365,7 @@
     </div>
     <div id="matches"></div>
   </section>
-
+</div></div>
 </main>
 
 <!-- Bottom tab bar -->

@@ -9,16 +9,16 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=31">
+<link rel="stylesheet" href="styles.css?v=32">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=31"></script>
-<script src="auth.js?v=31"></script>
-<script src="doodles.js?v=31"></script>
-<script src="levels.js?v=31"></script>
-<script src="sessions.js?v=31"></script>
-<script src="rackets.js?v=31"></script>
-<script src="racket-list.js?v=31"></script>
+<script src="config.js?v=32"></script>
+<script src="auth.js?v=32"></script>
+<script src="doodles.js?v=32"></script>
+<script src="levels.js?v=32"></script>
+<script src="sessions.js?v=32"></script>
+<script src="rackets.js?v=32"></script>
+<script src="racket-list.js?v=32"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Ranks-only styles ===== */
@@ -95,6 +95,19 @@
   .pp-grid small { font-size: 11px; color: var(--text-2); }
   .pp-btns { display: flex; gap: 8px; }
   .pp-btns .btn { flex: 1; padding: 11px; font-size: 14px; }
+  .pp-close { display: none; }
+  /* 🖥️ Big screens: the ranking on the left, the tapped player's card on the right */
+  @media (min-width: 1100px) {
+    body.pp-open { --ppw: min(var(--page), calc(100vw - var(--side) - 440px)); }
+    body.pp-open main.wrap, body.pp-open .topbar-inner { max-width: var(--ppw); margin-left: calc((100vw - var(--side) - 400px - var(--ppw)) / 2); }
+    #playerSheet, :root[data-theme="glass"] #playerSheet {
+      top: 0; bottom: 0; left: auto; right: 0; width: 400px; max-width: none; max-height: none; border-radius: 0;
+      padding: calc(24px + env(safe-area-inset-top)) 20px 24px; z-index: 25;
+      transform: translateX(105%); opacity: 1; pointer-events: auto;
+    }
+    #playerSheet.open { transform: translateX(0); }
+    .pp-close { display: block; position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 14px; border: 0; background: var(--card-2); width: 36px; height: 36px; border-radius: 50%; font-size: 22px; line-height: 1; }
+  }
 </style>
 </head>
 <body>
@@ -144,6 +157,7 @@
 <div class="backdrop" id="backdrop"></div>
 <div class="sheet" id="playerSheet">
   <div class="grab"></div>
+  <button class="pp-close" id="ppClose" aria-label="Close">×</button>
   <div id="playerBody"></div>
 </div>
 
@@ -391,7 +405,8 @@
         : '<div class="pp-btns"><a class="btn btn-ghost" href="chat.html?with=' + p.id + '" style="text-align:center;text-decoration:none">💬 Message</a>' +
           '<a class="btn btn-primary" href="profile.html?id=' + p.id + '" style="text-align:center;text-decoration:none">👤 View profile</a></div>');
     $('playerSheet').classList.add('open');
-    $('backdrop').classList.add('open');
+    if (SIDE_PANEL.matches) document.body.classList.add('pp-open');   // big screen: a panel next to the list, no dark cover
+    else $('backdrop').classList.add('open');
     // 🏸 their racket, next to the picture (loaded on its own, so Ranks also works before 23_rackets.sql)
     db.from('profiles').select('racket').eq('id', p.id).maybeSingle().then(function (r) {
       var box = $('ppPic');
@@ -403,8 +418,11 @@
   function closePlayer() {
     $('playerSheet').classList.remove('open');
     $('backdrop').classList.remove('open');
+    document.body.classList.remove('pp-open');
   }
+  var SIDE_PANEL = window.matchMedia('(min-width: 1100px)');
   $('backdrop').addEventListener('click', closePlayer);
+  $('ppClose').addEventListener('click', closePlayer);
 
   // How ranking works
   $('rulesBtn').addEventListener('click', function () {
