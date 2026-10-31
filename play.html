@@ -9,26 +9,61 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=32">
+<link rel="stylesheet" href="styles.css?v=33">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=32"></script>
-<script src="auth.js?v=32"></script>
-<script src="doodles.js?v=32"></script>
-<script src="levels.js?v=32"></script>
-<script src="rate.js?v=32"></script>
-<script src="sessions.js?v=32"></script>
-<script src="share.js?v=32"></script>
+<script src="config.js?v=33"></script>
+<script src="auth.js?v=33"></script>
+<script src="doodles.js?v=33"></script>
+<script src="levels.js?v=33"></script>
+<script src="rate.js?v=33"></script>
+<script src="sessions.js?v=33"></script>
+<script src="share.js?v=33"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Play-only styles ===== */
-  .seg { display: flex; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 3px; margin: 4px 0 14px; }
-  .seg button { flex: 1; border: 0; background: none; padding: 9px 0; border-radius: 9px; font-size: 14px; color: var(--text-2); font-weight: 600; }
-  .seg button.on { background: var(--primary); color: var(--primary-text); }
   .panel { display: none; }
   .panel.on { display: block; }
 
+  /* Play home: title, 3 ways to play (calls 120–121) */
+  .play-title { font-size: 34px; font-weight: 800; letter-spacing: -.5px; margin: 6px 0 2px; }
+  .play-sub { color: var(--text-2); font-size: 14px; margin: 0 0 16px; }
+  .play-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .pa { display: flex; align-items: center; gap: 10px; text-align: left; min-width: 0; padding: 16px 22px 14px 12px; border-radius: 16px;
+        background: var(--card); border: 1px solid var(--line); color: var(--text); font: inherit; position: relative; }
+  .pa:active { transform: scale(.98); }
+  .pa-ic { font-size: 22px; line-height: 1; flex-shrink: 0; }
+  .pa-tx { flex: 1; min-width: 0; }
+  .pa-tx b { display: block; font-size: 15px; }
+  .pa-tx small { display: block; font-size: 12px; color: var(--text-2); margin-top: 2px; }
+  .pa-go { position: absolute; top: 9px; right: 11px; font-size: 13px; font-weight: 700; opacity: .7; }
+  .pa-main { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+  .pa-main .pa-tx small { color: inherit; opacity: .75; }
+  .pa-wide { grid-column: 1 / -1; }
+  .back-link { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 700; font-size: 15px; padding: 4px 0 10px; }
+
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-2); margin: 18px 0 10px; }
+  /* section headings with a count: "Current games (2)" */
+  h2.sec { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 18px; font-weight: 800; color: var(--text); margin: 22px 0 10px; }
+  h2.sec .cnt { font-size: 12px; font-weight: 700; color: var(--text-2); background: var(--card-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+  h2.sec .aside { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--text-2); }
+  h2.sec button.aside { border: 0; background: none; color: var(--accent); font-weight: 700; padding: 0; }
+  /* friendly empty box */
+  .empty { display: flex; align-items: center; gap: 14px; padding: 18px 16px; }
+  .empty .ei { width: 46px; height: 46px; flex-shrink: 0; border-radius: 12px; border: 1.5px dashed var(--line); display: grid; place-items: center; font-size: 20px; opacity: .8; }
+  .empty b { display: block; font-size: 15px; }
+  .empty small { display: block; color: var(--text-2); font-size: 13px; margin-top: 2px; }
+  /* your last finished game */
+  .last { width: 100%; text-align: left; color: var(--text); display: block; margin-bottom: 8px; padding: 14px 16px; font: inherit; }
+  .last .lt { display: flex; align-items: center; gap: 10px; }
+  .last .lt b { font-size: 17px; }
+  .last .lt .meta { display: block; }
+  .last .lt .go { margin-left: auto; color: var(--text-2); font-size: 18px; }
+  .last .lb { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+  .last .placed { text-align: right; line-height: 1.1; }
+  .last .placed small { display: block; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-2); }
+  .last .placed strong { font-size: 30px; font-weight: 800; color: var(--accent); }
+  .last .placed strong.lost { color: var(--text-2); }
   .big-btn { width: 100%; margin-bottom: 12px; padding: 14px; font-size: 16px; }
 
   /* Open games */
@@ -36,7 +71,7 @@
   .game .where { font-size: 13px; color: var(--text-2); margin-top: 2px; }
   .game .tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
   .tag { font-size: 12px; background: var(--card-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; }
-  .slots { display: flex; align-items: center; gap: 6px; }
+  .slots { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .slots .avatar { width: 36px; height: 36px; font-size: 14px; }
   .slots .free { width: 36px; height: 36px; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; color: var(--text-2); font-size: 13px; }
   .slots .need { font-size: 13px; font-weight: 700; color: var(--accent); margin-left: 4px; white-space: nowrap; }
@@ -199,35 +234,33 @@
 </header>
 
 <main class="wrap">
-  <div class="seg" id="seg">
-    <button class="on" data-panel="open">📣 Open games</button>
-    <button data-panel="organize">🎯 Organize</button>
-    <button data-panel="tourney">🏆 Tourneys</button>
-  </div>
-
-  <!-- ===== Open games ===== -->
+  <!-- ===== Play home: 3 ways to play, then your games (calls 120–121) ===== -->
   <section class="panel on" id="open">
-    <button class="btn btn-primary big-btn" data-gcreate="1">🎾 Create a match</button>
+    <h1 class="play-title">Let's play.</h1>
+    <p class="play-sub">Your next game starts here.</p>
+    <div class="play-acts">
+      <button class="pa pa-main" data-quick="1"><span class="pa-ic">🎾</span><span class="pa-tx"><b>Quick match</b><small>4 players · 1 court</small></span><span class="pa-go">↗</span></button>
+      <button class="pa" data-panel="organize"><span class="pa-ic">🔄</span><span class="pa-tx"><b>Group session</b><small>Americano, Mexicano &amp; more</small></span><span class="pa-go">↗</span></button>
+      <button class="pa pa-wide" data-panel="tourney"><span class="pa-ic">🏆</span><span class="pa-tx"><b>Tourney</b><small>PadPal Cups &amp; Season 0</small></span><span class="pa-go">↗</span></button>
+    </div>
     <div id="games"><p class="meta">Loading games…</p></div>
     <div id="finished"></div>
   </section>
 
-  <!-- ===== Organize ===== -->
+  <!-- ===== Group session: formats, and the running session ===== -->
   <section class="panel" id="organize">
+    <button class="back-link" data-panel="open">‹ Play</button>
     <div id="sessionArea"></div>
     <div id="organizeHome">
-      <h2>Quick start</h2>
-      <div class="quick-row">
-        <button style="background:linear-gradient(150deg,#1F3566,#0F1E3C);border:1px solid #27395E" data-match="1"><span>🎾</span><strong>Normal match</strong><small>Sets · 15-30-40</small></button>
-        <button style="background:linear-gradient(150deg,#D6F04A,#9DB816);color:#0F1E3C" data-setup="americano"><span>🔄</span><strong>Americano</strong><small>Rotate partners</small></button>
-      </div>
-      <h2>All formats <span style="text-transform:none;letter-spacing:0;font-weight:500">· tap for how it works</span></h2>
+      <h1 class="play-title" style="font-size:26px">🔄 Group session</h1>
+      <p class="play-sub">5 or more players, partners rotate. Pick a format: tap to see how it works.</p>
       <div class="formats" id="formats"></div>
     </div>
   </section>
 
   <!-- ===== Tournaments ===== -->
   <section class="panel" id="tourney">
+    <button class="back-link" data-panel="open">‹ Play</button>
     <div class="card locked">
       <div class="big">🔒</div>
       <h3>Official PadPal Tournaments</h3>
@@ -410,6 +443,13 @@
         buttons + '</div></article>';
   }
 
+  function secHead(title, n, aside) {
+    return '<h2 class="sec">' + title + ' <span class="cnt">' + n + '</span>' + (aside || '') + '</h2>';
+  }
+  function emptyBox(icon, title, text) {
+    return '<div class="card empty"><span class="ei">' + icon + '</span><div><b>' + title + '</b><small>' + text + '</small></div></div>';
+  }
+
   function renderGames() {
     var invites = games.filter(function (g) { return myStatus(g) === 'invited'; });
     var mine = games.filter(function (g) { return myStatus(g) === 'joined'; });
@@ -417,20 +457,21 @@
       return g.is_open && myStatus(g) !== 'joined' && myStatus(g) !== 'invited' && joinedOf(g).length < g.size;
     });
     var html = '';
-    if (invites.length) {
-      html += '<h2>🎟️ Invites for you</h2>' + invites.map(function (g) {
-        return gameCard(g, '<button class="btn btn-ghost" data-gleave="' + g.id + '">No</button><button class="btn btn-primary" data-gjoin="' + g.id + '">Join</button>');
-      }).join('');
-    }
+    // Current games = invites for you + the games you're in
+    html += secHead('Current games', invites.length + mine.length);
+    html += invites.map(function (g) {
+      return gameCard(g, '<button class="btn btn-ghost" data-gleave="' + g.id + '">No</button><button class="btn btn-primary" data-gjoin="' + g.id + '">Join</button>');
+    }).join('');
     // tap your game → where the action is: the running session, or the lobby before it starts
-    html += '<h2>🎾 Your games</h2>' + (mine.length ? mine.map(function (g) {
+    html += mine.map(function (g) {
       var host = g.host_id === me.id, live = !!g.session_state;
       var label = live ? (host ? '▶️ Open session' : '🔴 Watch live') : (host ? 'Open lobby' : 'View');
       return gameCard(g, '<button class="btn btn-primary" data-gplay="' + g.id + '">' + label + '</button>', true);
-    }).join('') : '<p class="meta">No games yet. Create one, or join an open game below!</p>');
-    html += '<h2>📣 Open games</h2>' + (open.length ? open.map(function (g) {
+    }).join('');
+    if (!invites.length && !mine.length) html += emptyBox('▦', 'No current games', 'Start a quick match or a group session and your next game gets going.');
+    html += secHead('Open games', open.length) + (open.length ? open.map(function (g) {
       return gameCard(g, '<button class="btn btn-primary" data-gjoin="' + g.id + '">Join</button>');
-    }).join('') : '<p class="meta">No open games right now.</p>');
+    }).join('') : emptyBox('📡', 'No open games right now.', 'When there\'s a game to join, you\'ll find it here.'));
     $('games').innerHTML = html;
     PadPal.snap.save('play', [$('games'), $('finished')]);   // 🗂️ shown instantly next time
   }
@@ -447,17 +488,19 @@
     return '🎾 ' + rounds + ' rounds on ' + courts + ' court' + (courts > 1 ? 's' : '') + ' · everyone plays about <b>' + each + '</b> game' + (each === 1 ? '' : 's') + '.';
   }
 
-  function openCreate(kind, prefill) {
+  // only: 'match' = Quick match (no format choice) · 'group' = Group session (formats without Match)
+  function openCreate(kind, prefill, only) {
     kind = kind || 'match';
     var d = new Date(Date.now() + 3600000);
     d.setMinutes(0, 0, 0);
     var local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     var radio = function (k, label) { return '<label><input type="radio" name="cKind" value="' + k + '"' + (k === kind ? ' checked' : '') + '><span>' + label + '</span></label>'; };
     openSheet(
-      '<h3>🎾 New game</h3>' +
+      (only === 'match' ? '<h3>🎾 Quick match</h3><p class="meta" style="margin:-6px 0 12px">4 players · 1 court · sets 15-30-40</p>'
+        : only === 'group' ? '<h3>🔄 Group session</h3>' : '<h3>🎾 New game</h3>') +
       '<form id="createForm">' +
-        '<div class="field"><span class="label">What do you want to play?</span><div class="choices">' +
-          radio('match', '🎾 Match (4)') + radio('americano', '🔄 Americano') + radio('mexicano', '🌮 Mexicano') + radio('mixicano', '🔀 Mixicano') + radio('team_americano', '🤝 Team Americano') + radio('round_robin', '⭕ Round Robin') + radio('king', '👑 King of the Court') +
+        '<div class="field"' + (only === 'match' ? ' hidden' : '') + '><span class="label">' + (only === 'group' ? 'Format' : 'What do you want to play?') + '</span><div class="choices">' +
+          (only === 'group' ? '' : radio('match', '🎾 Match (4)')) + radio('americano', '🔄 Americano') + radio('mexicano', '🌮 Mexicano') + radio('mixicano', '🔀 Mixicano') + radio('team_americano', '🤝 Team Americano') + radio('round_robin', '⭕ Round Robin') + radio('king', '👑 King of the Court') +
         '</div></div>' +
         '<div id="cSession"' + (kind === 'match' ? ' hidden' : '') + '>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">' +
@@ -757,6 +800,7 @@
   // Your finished games (newest first): tap to see the result again
   var finishedGames = [];
   var againPlayers = {};   // match game id → its 4 players (for 🔁 Play again)
+  var finishedWinner = {}; // match game id → 'won' / 'lost' (for you)
   function againBtn(id) { return '<button class="btn btn-accent" style="width:100%;margin-top:12px" data-again="' + id + '">🔁 Play again with this group</button>'; }
   async function loadFinished() {
     var mine = await db.from('game_players').select('game_id').eq('user_id', me.id).eq('status', 'joined');
@@ -771,8 +815,12 @@
     if (fids.length) {
       var pc = await db.from('point_changes').select('game_id, created_at').eq('user_id', me.id).eq('reason', 'session').in('game_id', fids);
       (pc.data || []).forEach(function (c) { ended[c.game_id] = c.created_at; });
-      var mm = await db.from('matches').select('game_id, a1, a2, b1, b2, played_at').in('game_id', fids);
-      (mm.data || []).forEach(function (m) { ended[m.game_id] = m.played_at; players[m.game_id] = [m.a1, m.a2, m.b1, m.b2]; });
+      var mm = await db.from('matches').select('game_id, a1, a2, b1, b2, played_at, winner').in('game_id', fids);
+      (mm.data || []).forEach(function (m) {
+        ended[m.game_id] = m.played_at; players[m.game_id] = [m.a1, m.a2, m.b1, m.b2];
+        var side = m.a1 === me.id || m.a2 === me.id ? 'a' : 'b';
+        if (m.winner) finishedWinner[m.game_id] = m.winner === side ? 'won' : 'lost';
+      });
     }
     againPlayers = players;
     function rateFor(g) {
@@ -782,18 +830,35 @@
       var hours = Math.max(1, Math.ceil((24 * 3600000 - (Date.now() - new Date(at))) / 3600000));
       return '<button class="btn btn-accent" style="width:100%;margin:-4px 0 10px;padding:8px;font-size:13px" data-rate="' + ids.join(',') + '">🎯 Rate their shots · ' + hours + 'h left</button>';
     }
-    $('finished').innerHTML = finishedGames.length ? '<h2>✅ Finished</h2>' + finishedGames.map(function (g) {
-      var label = PadPal.sessions.KINDS[g.kind] || '🎾 Match';
-      var res = '';
-      if (g.session_state && g.session_state.players) {
-        var row = PadPal.sessions.rows(g.session_state).filter(function (x) { return x.id === me.id; })[0];
-        if (row) res = (row.place <= 3 ? PadPal.sessions.medal(row.place) + ' ' : '') + PadPal.sessions.ordinal(row.place) + ' of ' + g.session_state.players.length;
-      }
-      return '<button class="card" style="width:100%;text-align:left;margin-bottom:8px;color:var(--text);display:flex;align-items:center;gap:10px" data-gdone="' + g.id + '">' +
-        '<div style="flex:1;min-width:0"><b>' + label + '</b>' + (g.host_id === me.id ? ' <small class="meta">👑 you hosted</small>' : '') +
-        '<div class="meta">' + whenText(g.scheduled_at) + (g.place ? ' · 📍 ' + escH(g.place) : '') + '</div></div>' +
-        '<span style="font-weight:700;white-space:nowrap">' + res + '</span><span class="meta">›</span></button>' + rateFor(g);
-    }).join('') : '';
+    finishedRate = rateFor;
+    renderFinished();
+  }
+  // Finished: your last game as a big card ("Placed 5th of 6"), the rest behind "See all"
+  var finishedRate = function () { return ''; }, showAllDone = false;
+  function renderFinished() {
+    if (!finishedGames.length) { $('finished').innerHTML = ''; PadPal.snap.save('play', [$('games'), $('finished')]); return; }
+    var more = finishedGames.length > 1;
+    $('finished').innerHTML = secHead('Finished', finishedGames.length,
+        more ? '<button class="aside" data-alldone="1">' + (showAllDone ? 'Show less' : 'See all ›') + '</button>' : '<span class="aside">Your last game</span>') +
+      (showAllDone ? finishedGames : finishedGames.slice(0, 1)).map(function (g) {
+        var label = PadPal.sessions.KINDS[g.kind] || '🎾 Match';
+        var big = '', small = '';
+        if (g.session_state && g.session_state.players) {
+          var row = PadPal.sessions.rows(g.session_state).filter(function (x) { return x.id === me.id; })[0];
+          if (row) {
+            small = 'Placed';
+            big = '<span class="meta">' + (row.place <= 3 ? PadPal.sessions.medal(row.place) + ' ' : '') + 'of ' + g.session_state.players.length + '</span> <strong>' + PadPal.sessions.ordinal(row.place) + '</strong>';
+          }
+        } else if (finishedWinner[g.id]) {
+          var won = finishedWinner[g.id] === 'won';
+          small = 'Result'; big = '<strong' + (won ? '' : ' class="lost"') + '>' + (won ? 'Won 🏆' : 'Lost') + '</strong>';
+        }
+        return '<button class="card last" data-gdone="' + g.id + '">' +
+          '<div class="lt"><span style="font-size:20px">' + label.split(' ')[0] + '</span><div style="min-width:0"><b>' + label.split(' ').slice(1).join(' ') + '</b>' +
+            (g.host_id === me.id ? '<small class="meta">👑 you hosted</small>' : '') + '</div><span class="go">›</span></div>' +
+          '<div class="lb"><div class="meta">' + whenText(g.scheduled_at) + (g.place ? '<br>📍 ' + escH(g.place) : '') + '</div>' +
+            (big ? '<div class="placed"><small>' + small + '</small>' + big + '</div>' : '') + '</div></button>' + finishedRate(g);
+      }).join('');
     PadPal.snap.save('play', [$('games'), $('finished')]);
   }
   async function openFinished(id) {
@@ -1913,16 +1978,18 @@
   // CLICKS
   // =====================================================
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-again],[data-gplay],[data-sharematch],[data-sharesession],[data-skipcurrent],[data-swap],[data-swapto],[data-addround],[data-skipround],[data-typescore],[data-typeinstead],[data-finishearly],[data-skipnext],[data-invto],[data-invnew],[data-gdone],[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-gsession],[data-pplayers],[data-pout],[data-pback],[data-padd],[data-preason],[data-psub],[data-pshare],[data-close-sheet],[data-rate],[data-guide],[data-open-guide],[data-setup],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
+    var el = e.target.closest('[data-quick],[data-alldone],[data-again],[data-gplay],[data-sharematch],[data-sharesession],[data-skipcurrent],[data-swap],[data-swapto],[data-addround],[data-skipround],[data-typescore],[data-typeinstead],[data-finishearly],[data-skipnext],[data-invto],[data-invnew],[data-gdone],[data-panel],[data-gcreate],[data-gjoin],[data-gleave],[data-gopen],[data-ginvite],[data-ginvpick],[data-ginvsend],[data-gshare],[data-gremove],[data-gcancel],[data-gteams],[data-gsession],[data-pplayers],[data-pout],[data-pback],[data-padd],[data-preason],[data-psub],[data-pshare],[data-close-sheet],[data-rate],[data-guide],[data-open-guide],[data-setup],[data-view],[data-score],[data-next],[data-finish],[data-end],[data-match],[data-point],[data-save-score],[data-undo-last],[data-mpart],[data-mstart],[data-mfree],[data-save-match],[data-close-tracker],[data-soon]');
     if (!el) return;
     var d = el.dataset;
 
     if (d.panel) {
-      document.querySelectorAll('#seg button').forEach(function (b) { b.classList.toggle('on', b === el); });
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.toggle('on', p.id === d.panel); });
+      window.scrollTo(0, 0);
       if (session && $('roundTrack')) fitTrack();
     }
     // ----- games & lobby -----
+    else if (d.quick) openCreate('match', null, 'match');   // 🎾 Quick match: 4 players, no format to pick
+    else if (d.alldone) { showAllDone = !showAllDone; renderFinished(); }
     else if (d.gcreate) openCreate();
     else if (d.gjoin) {
       gameAction('join_game', { p_game: d.gjoin, p_code: null }, '🎾 You joined!').then(function (r) { if (r) openLobby(d.gjoin); });
@@ -1964,7 +2031,7 @@
     else if (d.guide) openSheet(guideHtml(d.guide));
     else if (d.setup) {
       if (session) { closeSheet(); toast('Finish the current session first'); return; }
-      openCreate(d.setup);
+      openCreate(d.setup, null, 'group');
     }
     else if (d.gsession) startSessionFromLobby(gameById(lobbyId));
     // changing players during a session

@@ -9,27 +9,29 @@
   var REASONS = { injured: ['🤕', 'Injured'], sick: ['🤒', 'Sick'], tired: ['😴', 'Tired'], left: ['🏃', 'Had to leave'], other: ['🤷', 'Other'] };
   var MEDALS = ['🥇', '🥈', '🥉'];
 
-  // Everyone's final result: place (ties share a place), total, games won/lost, points change
+  // Everyone's final result: place, total, games won/lost, points change
+  // Same points? More games won goes first, then better point difference; only a full tie shares a place (call 122)
   // changes = { user id → points change } (optional)
   function rows(state, changes) {
     var s = state || {};
     var players = s.players || [];
     var wl = {};
-    players.forEach(function (id) { wl[id] = { w: 0, l: 0, d: 0 }; });
+    players.forEach(function (id) { wl[id] = { w: 0, l: 0, d: 0, diff: 0 }; });
     (s.rounds || []).forEach(function (r) {
       (r.matches || []).forEach(function (m) {
         if (!m.score) return;
         var aWon = m.score[0] > m.score[1], bWon = m.score[1] > m.score[0];
-        m.a.forEach(function (id) { if (!wl[id]) return; if (aWon) wl[id].w++; else if (bWon) wl[id].l++; else wl[id].d++; });
-        m.b.forEach(function (id) { if (!wl[id]) return; if (bWon) wl[id].w++; else if (aWon) wl[id].l++; else wl[id].d++; });
+        m.a.forEach(function (id) { if (!wl[id]) return; wl[id].diff += m.score[0] - m.score[1]; if (aWon) wl[id].w++; else if (bWon) wl[id].l++; else wl[id].d++; });
+        m.b.forEach(function (id) { if (!wl[id]) return; wl[id].diff += m.score[1] - m.score[0]; if (bWon) wl[id].w++; else if (aWon) wl[id].l++; else wl[id].d++; });
       });
     });
+    function better(a, b) { return (b.total - a.total) || (b.w - a.w) || (b.diff - a.diff); }
     var list = players.map(function (id) {
       var c = changes && changes[id];
-      return { id: id, total: (s.points || {})[id] || 0, played: (s.played || {})[id] || 0, w: wl[id].w, l: wl[id].l, d: wl[id].d,
+      return { id: id, total: (s.points || {})[id] || 0, played: (s.played || {})[id] || 0, w: wl[id].w, l: wl[id].l, d: wl[id].d, diff: wl[id].diff,
                out: s.out && s.out[id] || null, change: c == null ? null : Number(c) };
-    }).sort(function (a, b) { return b.total - a.total; });
-    list.forEach(function (x, i) { x.place = i > 0 && x.total === list[i - 1].total ? list[i - 1].place : i + 1; });
+    }).sort(better);
+    list.forEach(function (x, i) { x.place = i > 0 && better(list[i - 1], x) === 0 ? list[i - 1].place : i + 1; });
     return list;
   }
 

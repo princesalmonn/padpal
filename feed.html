@@ -9,16 +9,16 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="PadPal">
 <meta name="theme-color" content="#0B1426">
-<link rel="stylesheet" href="styles.css?v=32">
+<link rel="stylesheet" href="styles.css?v=33">
 <link rel="preconnect" href="https://cbakwbftxrxcojuohdrl.supabase.co" crossorigin>
 <script src="supabase-2.45.4.js"></script>
-<script src="config.js?v=32"></script>
-<script src="auth.js?v=32"></script>
-<script src="doodles.js?v=32"></script>
-<script src="levels.js?v=32"></script>
-<script src="rate.js?v=32"></script>
-<script src="sessions.js?v=32"></script>
-<script src="share.js?v=32"></script>
+<script src="config.js?v=33"></script>
+<script src="auth.js?v=33"></script>
+<script src="doodles.js?v=33"></script>
+<script src="levels.js?v=33"></script>
+<script src="rate.js?v=33"></script>
+<script src="sessions.js?v=33"></script>
+<script src="share.js?v=33"></script>
 <script>PadPal.me = PadPal.guard(); // members only</script>
 <style>
   /* ===== Feed-only styles ===== */
@@ -139,6 +139,34 @@
   .menu button { border: 1px solid var(--line); background: var(--card-2); border-radius: 14px; padding: 16px 10px; text-align: left; }
   .menu span { font-size: 26px; display: block; margin-bottom: 6px; }
   .menu small { color: var(--text-2); display: block; font-size: 12px; margin-top: 2px; }
+  /* Everyone / My PadPals switch (call 123) */
+  .feed-seg { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 3px; margin: 0 0 12px; }
+  .feed-seg button { border: 0; background: none; padding: 7px 15px; border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; color: var(--text-2); }
+  .feed-seg button.on { background: var(--primary); color: var(--primary-text); }
+  /* line icons for like / comment / share; share sits on the right */
+  .actions .ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; }
+  .actions .liked .ic { fill: #FF4D6D; stroke: #FF4D6D; transform: scale(1.1); }
+  .actions .ic { transition: transform .15s; }
+  .actions .push { margin-left: auto; }
+  .more { font-size: 22px; line-height: 1; letter-spacing: 1px; font-weight: 700; }
+  /* ⋯ menu */
+  .pm-btn { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 14px 4px; font: inherit; font-size: 16px; color: var(--text); text-align: left; }
+  .pm-btn:last-child { border-bottom: 0; }
+  .pm-btn.danger { color: var(--loss); font-weight: 600; }
+  /* session result title: "⇄ Americano · 6 players · 4 rounds" */
+  .s-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 6px; font-size: 13px; color: var(--text-2); }
+  .s-title .kind { background: var(--card-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-weight: 700; color: var(--text); font-size: 13px; }
+  /* 🎾 Play next (call 124) */
+  .play-next { display: block; }
+  .play-next .eyebrow { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-2); }
+  .play-next .eyebrow i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .play-next h4 { margin: 6px 0 4px; font-size: 18px; line-height: 1.25; }
+  .play-next .where { font-size: 13px; color: var(--text-2); }
+  .play-next .where b { color: var(--text); }
+  .play-next .row { display: flex; align-items: center; gap: 4px; margin-top: 12px; }
+  .play-next .row .avatar { width: 30px; height: 30px; font-size: 12px; border: 2px solid var(--card); margin-right: -8px; }
+  .play-next .row .free { width: 30px; height: 30px; border-radius: 50%; border: 1.5px dashed var(--text-2); display: grid; place-items: center; font-size: 11px; color: var(--text-2); margin-left: 12px; }
+  .play-next .row .btn { margin-left: auto; padding: 8px 18px; font-size: 14px; text-decoration: none; }
   /* 🖥️ Big screens: the feed stays one column (like Instagram), just a bit wider */
   @media (min-width: 768px) { main.wrap { max-width: 620px; } .topbar-inner { max-width: 588px; } }
 </style>
@@ -153,11 +181,12 @@
 <main class="wrap">
   <a class="idle-warn" id="idleWarn" href="play.html" hidden></a>
   <div class="stories" id="stories"></div>
-  <div class="chips-row" id="feedChips">
-    <button class="on" data-ffilter="all">🌍 All</button>
-    <button data-ffilter="pals">👥 PadPals</button>
+  <div class="feed-seg" id="feedChips">
+    <button class="on" data-ffilter="all">Everyone</button>
+    <button data-ffilter="pals">My PadPals</button>
   </div>
   <div class="error-box" id="feedError" role="alert" hidden></div>
+  <div id="playNext"></div>
   <div id="feed"><div class="empty-feed">Loading…</div></div>
 </main>
 
@@ -211,6 +240,8 @@
     <button class="btn btn-primary" id="composeBtn" style="width:100%">Post</button>
   </form>
 </div>
+
+<div class="sheet" id="menuSheet"><div class="grab"></div><div id="menuBody"></div></div>
 
 <div class="sheet" id="detailSheet"><div class="grab"></div><div id="detailBody"></div></div>
 
@@ -329,6 +360,45 @@
     if (document.visibilityState === 'visible' && profile) load();
   });
 
+  // 🎾 Play next (call 124): the next game for you, shown on top of the feed only when there is one.
+  // Your invite first, then a game you're in, then an open game with a free spot.
+  async function loadPlayNext() {
+    var r = await db.from('games').select('id, kind, scheduled_at, place, size, is_open, session_state, game_players(user_id, status)')
+      .eq('status', 'open').gt('scheduled_at', new Date(Date.now() - 3 * 3600000).toISOString()).order('scheduled_at').limit(30);
+    if (r.error || !r.data) { $('playNext').innerHTML = ''; return; }
+    function st(g) { var x = g.game_players.filter(function (p) { return p.user_id === profile.id; })[0]; return x ? x.status : null; }
+    function inOf(g) { return g.game_players.filter(function (p) { return p.status === 'joined'; }).map(function (p) { return p.user_id; }); }
+    var list = r.data.filter(function (g) { return !g.session_state; });
+    var g = list.filter(function (x) { return st(x) === 'invited'; })[0], how = 'invited';
+    if (!g) { g = list.filter(function (x) { return st(x) === 'joined'; })[0]; how = 'in'; }
+    if (!g) { g = list.filter(function (x) { return x.is_open && !st(x) && inOf(x).length < x.size; })[0]; how = 'open'; }
+    if (!g) { $('playNext').innerHTML = ''; return; }
+    var ids = inOf(g), free = Math.max(0, g.size - ids.length);
+    var d = new Date(g.scheduled_at), now = new Date();
+    var day = d.toDateString() === now.toDateString() ? 'Today'
+      : d.toDateString() === new Date(now.getTime() + 86400000).toDateString() ? 'Tomorrow'
+      : d.toLocaleDateString(undefined, { weekday: 'short' });
+    var when = day + ', ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    var who = ids.length === 1 ? esc(nameOf(people[ids[0]]).split(' ')[0]) + ' is' : ids.length + ' PadPals are';
+    var faces = ids.slice(0, 4).map(function (id) { return '<div class="avatar" data-uid="' + id + '">' + avatarHtml(people[id]) + '</div>'; }).join('');
+    var btn = how === 'in' ? '<a class="btn btn-ghost" href="play.html">You\'re in ›</a>'
+      : '<button class="btn btn-primary" data-pnjoin="' + g.id + '">Join</button>';
+    $('playNext').innerHTML = '<article class="card play-next">' +
+      '<div class="eyebrow"><i></i>' + (how === 'invited' ? 'You\'re invited' : 'Play next') + '</div>' +
+      '<h4>' + who + ' playing ' + when + '</h4>' +
+      '<div class="where">' + (PadPal.sessions.KINDS[g.kind] || '🎾 Match') + (g.place ? ' · 📍 ' + esc(g.place) : '') +
+        (free ? ' · <b>' + free + ' slot' + (free === 1 ? '' : 's') + ' left</b>' : ' · <b>Full</b>') + '</div>' +
+      '<div class="row">' + faces + (ids.length > 4 ? '<span class="meta" style="margin-left:12px">+' + (ids.length - 4) + '</span>' : '') +
+        (free ? '<span class="free">+' + free + '</span>' : '') + btn + '</div></article>';
+  }
+  async function joinPlayNext(el, id) {
+    el.disabled = true;
+    var r = await db.rpc('join_game', { p_game: id, p_code: null });
+    if (r.error) { el.disabled = false; return toast(PadPal.friendlyError(r.error)); }
+    toast('🎾 You joined! See you on court');
+    loadPlayNext();
+  }
+
   async function load() {
     var r = await db.from('posts')
       .select('id, kind, body, photo_path, match_id, game_id, tournament_id, expires_at, created_at, author_id, author:profiles!posts_author_id_fkey(id, username, display_name, avatar_url), likes(user_id), comments(count)')
@@ -380,6 +450,7 @@
 
     renderStories();
     renderFeed();
+    loadPlayNext().catch(function () {});   // needs the names above
     if (feedFilter === 'all') PadPal.snap.save('feed', [$('stories'), $('feed')]);   // 🗂️ shown instantly next time
   }
 
@@ -432,10 +503,10 @@
       '<div class="tier-change"><span class="pill">' + from.icon + ' ' + esc(from.name) + '</span>→<span class="pill">' + to.icon + ' ' + esc(to.name) + '</span></div>' +
       '<p>' + PadPal.fmt(parts[2]) + ' points · ' + line + ' · ' + ago(p.created_at) + '</p>' +
       '<div class="actions">' +
-        '<button class="' + (liked ? 'liked' : '') + '" data-like="' + p.id + '"><span class="heart">' + (liked ? '❤️' : '🤍') + '</span>' + p.likes.length + '</button>' +
-        '<button data-comments="' + p.id + '">💬 ' + nComments + '</button>' +
-        (p.kind === 'rankup' ? '<button data-share="' + p.id + '">📤 Share</button>' : '') +
-        (profile.is_admin ? '<button data-delete="' + p.id + '">🗑️</button>' : '') +
+        '<button class="' + (liked ? 'liked' : '') + '" data-like="' + p.id + '" aria-label="Like">' + ICON.heart + p.likes.length + '</button>' +
+        '<button data-comments="' + p.id + '" aria-label="Comments">' + ICON.comment + nComments + '</button>' +
+        (p.kind === 'rankup' ? '<button data-share="' + p.id + '">' + ICON.share + 'Share</button>' : '') +
+        (profile.is_admin ? '<button data-pmenu="' + p.id + '" aria-label="More" style="font-size:20px;font-weight:700">⋯</button>' : '') +
       '</div></article>';
   }
 
@@ -470,7 +541,7 @@
       '<div class="post-head"><a class="user" href="' + profileLink(p.author_id) + '" style="text-decoration:none;color:var(--text)"><div class="avatar" data-uid="' + p.author_id + '">' + avatarHtml(a) + '</div>' +
       '<div style="min-width:0"><div class="name" data-uid="' + p.author_id + '">' + esc(nameOf(a)) + '</div>' +
       '<div class="meta">@' + esc(a.username) + ' · ' + ago(p.created_at) + '</div></div></a>' +
-      (mine || profile.is_admin ? '<button class="more" data-delete="' + p.id + '" aria-label="Delete post">🗑️</button>' : '') +
+      '<button class="more" data-pmenu="' + p.id + '" aria-label="More">⋯</button>' +
       '</div>';
     if (p.body) html += '<p class="post-text">' + esc(p.body) + '</p>';
     if (p.kind === 'match') html += matchHtml(matches[p.match_id]);
@@ -485,17 +556,36 @@
     }
     html += tagLine(p);
     html += '<div class="actions">' +
-      '<button class="' + (liked ? 'liked' : '') + '" data-like="' + p.id + '"><span class="heart">' + (liked ? '❤️' : '🤍') + '</span>' + p.likes.length + '</button>' +
-      '<button data-comments="' + p.id + '">💬 ' + nComments + '</button>' +
-      '<button data-share="' + p.id + '">📤</button>' +
+      '<button class="' + (liked ? 'liked' : '') + '" data-like="' + p.id + '" aria-label="Like">' + ICON.heart + p.likes.length + '</button>' +
+      '<button data-comments="' + p.id + '" aria-label="Comments">' + ICON.comment + nComments + '</button>' +
       (mine && p.kind === 'photo' && !myPins[p.photo_path] ? '<button data-pin="' + p.id + '">📌 Pin to profile</button>' : '') +
       (p.kind === 'match' && canReport(matches[p.match_id]) ? '<button data-rate="' + matchPlayers(matches[p.match_id]) + '">🎯 Rate shots</button>' : '') +
       (p.kind === 'session' && canReportSession(sessions[p.game_id]) ? '<button data-rate="' + Object.keys(sessions[p.game_id].changes).join(',') + '">🎯 Rate shots</button>' : '') +
       (p.kind === 'match' && canReport(matches[p.match_id]) ? '<button data-report="' + p.match_id + '">⚠️ Wrong score?</button>' : '') +
       (p.kind === 'session' && canReportSession(sessions[p.game_id]) ? '<button data-report-session="' + p.game_id + '">⚠️ Wrong score?</button>' : '') +
+      '<button class="push" data-share="' + p.id + '" aria-label="Share">' + ICON.share + '</button>' +
       '</div></article>';
     return html;
   }
+
+  // ⋯ menu of a post: share, and delete (your own post, or any post for the admin)
+  function openPostMenu(id) {
+    var p = findPost(id);
+    if (!p) return;
+    var canDelete = p.author_id === profile.id || profile.is_admin;
+    $('menuBody').innerHTML =
+      '<button class="pm-btn" data-share="' + id + '">📤 Share as a picture</button>' +
+      (canDelete ? '<button class="pm-btn danger" data-delete="' + id + '">🗑️ Delete post</button>' : '') +
+      '<button class="pm-btn" data-close-menu="1" style="justify-content:center;color:var(--text-2)">Cancel</button>';
+    openSheet($('menuSheet'));
+  }
+
+  // line icons (like the owner's design)
+  var ICON = {
+    heart: '<svg class="ic" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>',
+    comment: '<svg class="ic" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    share: '<svg class="ic" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>'
+  };
 
   // Players of a match can report a wrong score within 24 hours
   function canReport(m) {
@@ -569,8 +659,7 @@
     var changes = {};
     Object.keys(g.changes).forEach(function (id) { changes[id] = g.changes[id].change; });
     var list = PadPal.sessions.rows(s, changes);
-    var title = (PadPal.sessions.KINDS[g.kind] || '🔄 Session') + ' · ' + s.players.length + ' players · ' + s.rounds.length + ' rounds';
-    return '<p class="post-text" style="font-weight:600">' + title + '</p>' +
+    return '<div class="s-title"><span class="kind">' + (PadPal.sessions.KINDS[g.kind] || '🔄 Session') + '</span>' + s.players.length + ' players · ' + s.rounds.length + ' rounds</div>' +
       PadPal.sessions.podium(list, personName, personAvatar) +
       '<div class="match" style="padding:2px 12px">' + PadPal.sessions.table(list, personName, profile.id) + '</div>' +
       '<button class="btn btn-ghost" style="width:100%;margin-top:8px;padding:8px;font-size:13px" data-sdetail="' + g.id + '">📋 See all rounds</button>';
@@ -813,6 +902,7 @@
     if (r.error) return toast(PadPal.friendlyError(r.error));
     if (p.photo_path && p.author_id === profile.id && !myPins[p.photo_path]) db.storage.from('photos').remove([p.photo_path]);
     posts = posts.filter(function (x) { return x.id !== id; });
+    closeSheets();
     renderStories();
     renderFeed();
     toast('🗑️ Post deleted');
@@ -857,7 +947,7 @@
 
   // ===== One click handler for the feed =====
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-untagme],[data-share],[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-report],[data-report-session],[data-rate],[data-ffilter],[data-sdetail],[data-soon]');
+    var el = e.target.closest('[data-pmenu],[data-close-menu],[data-pnjoin],[data-untagme],[data-share],[data-like],[data-comments],[data-story],[data-new],[data-pin],[data-delete],[data-report],[data-report-session],[data-rate],[data-ffilter],[data-sdetail],[data-soon]');
     if (!el) return;
     var d = el.dataset;
     if (d.untagme) {
@@ -868,7 +958,10 @@
         renderFeed(); toast('🏷️ Tag removed');
       });
     }
-    else if (d.share) sharePost(findPost(d.share));
+    else if (d.pmenu) openPostMenu(d.pmenu);
+    else if (d.closeMenu) closeSheets();
+    else if (d.pnjoin) joinPlayNext(el, d.pnjoin);
+    else if (d.share) { closeSheets(); sharePost(findPost(d.share)); }
     else if (d.ffilter) setFeedFilter(d.ffilter);
     else if (d.sdetail) {
       var g = sessions[d.sdetail], ch = {};
